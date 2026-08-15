@@ -1,0 +1,12 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/data" },
+    { "path": "packages/http" },
+    { "path": "packages/crud" },
+    { "path": "packages/auth" },
+    { "path": "packages/di" },
+    { "path": "packages/cli" }
+  ]
+}

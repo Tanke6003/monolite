@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# Real environment files never get committed; the templates that document them do.
+.env
+.env.*
+!.env.template
+!.env.example
+
+# Scratch output from running the CLI by hand during development.
+/tmp/

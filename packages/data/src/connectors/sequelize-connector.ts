@@ -1,0 +1,252 @@
+// NOTE ON THE OPTIONAL DRIVER: `sequelize` —and, underneath it, `tedious`, `pg`
+// or `mysql2` depending on the engine— is declared as an *optional* peer
+// dependency, but this static import defeats that: requiring this module loads
+// Sequelize, so a consumer that only uses Oracle or MongoDB still needs it
+// installed or the import throws before a single line of their code runs. Before
+// the optional peer dependency truly works this has to become a lazy
+// `const { Sequelize, QueryTypes } = await import("sequelize")` resolved on the
+// first connection, with the `Sequelize` instance created there instead of in
+// the constructor. The import is kept static for now to keep this port a
+// straight translation; making it lazy is a separate change.
+import { Options, QueryTypes, Sequelize, Transaction } from "sequelize";
+import type { ILogger } from "@monolite/core";
+import type {
+  ISqlExecutor,
+  SqlExecuteOptions,
+  SqlExecuteResult,
+} from "../contracts/sql-executor";
+import type { DbEngine, ISqlDbPlugin } from "../contracts/db-plugin";
+
+/** Engines this connector covers; Sequelize speaks all three. */
+export type SequelizeEngine = Extract<DbEngine, "mssql" | "postgres" | "mysql">;
+
+export interface SequelizeConnectionConfig {
+  engine: SequelizeEngine;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+  poolMin?: number;
+  poolMax?: number;
+}
+
+/** Alias of the engine as Sequelize names it. */
+const SEQUELIZE_DIALECT: Record<SequelizeEngine, "mssql" | "postgres" | "mysql"> = {
+  mssql: "mssql",
+  postgres: "postgres",
+  mysql: "mysql",
+};
+
+/** Alias of the column SQL Server reports the affected rows in. */
+const AFFECTED_ROWS = "AFFECTEDROWS";
+/** Alias the dialect expects to find the generated PK under. */
+const INSERTED_ID = "insertedId";
+
+function toMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * Connector for the SQL engines Sequelize speaks: SQL Server, PostgreSQL and
+ * MySQL/MariaDB.
+ *
+ * It is a single one for all three because what differs between them —how a
+ * generated PK is recovered, the date expression, the pagination— lives in the
+ * `SqlDialect`, not here. The only thing this connector resolves per engine is
+ * how to ask the driver for two pieces of data that not all of them return the
+ * same way: the affected rows and the generated id.
+ *
+ * A note on the binds: Sequelize's `replacements` are escaped and interpolated,
+ * they are not server-side parameters. The escaping is done by Sequelize
+ * according to the dialect, so it is safe against injection, but it does not
+ * reuse execution plans the way a real bind would.
+ */
+export class SequelizeConnector implements ISqlDbPlugin {
+  readonly engine: DbEngine;
+  private readonly connection: Sequelize;
+
+  constructor(
+    private readonly config: SequelizeConnectionConfig,
+    private readonly logger: ILogger
+  ) {
+    this.engine = config.engine;
+    this.connection = new Sequelize({
+      dialect: SEQUELIZE_DIALECT[config.engine],
+      host: config.host,
+      port: config.port,
+      username: config.username,
+      password: config.password,
+      database: config.database,
+      pool: { max: config.poolMax ?? 10, min: config.poolMin ?? 0, idle: 10000 },
+      logging:
+        process.env.NODE_ENV !== "production"
+          ? (sql: string) => this.logger.debug(sql)
+          : false,
+    } as Options);
+  }
+
+  async authenticate(): Promise<void> {
+    try {
+      await this.connection.authenticate();
+      this.logger.info(`Connection to ${this.engine} established successfully.`);
+    } catch (err) {
+      this.logger.error(`Could not connect to ${this.engine}`, { err: toMessage(err) });
+      throw new Error(`[SequelizeConnector:${this.engine}] authenticate failed: ${toMessage(err)}`, {
+        cause: err,
+      });
+    }
+  }
+
+  // ----------------------------------------------------------- execution ----
+
+  /**
+   * Affected rows.
+   *
+   * SQL Server does not report them in the response, so a `SELECT @@ROWCOUNT`
+   * is appended and read as a result set. PostgreSQL and MySQL do return them,
+   * and Sequelize exposes them through `QueryTypes.BULKUPDATE`.
+   */
+  private async runAffected(
+    sql: string,
+    binds: Record<string, unknown>,
+    transaction?: Transaction
+  ): Promise<number> {
+    if (this.engine === "mssql") {
+      // @@ROWCOUNT reflects the last statement of the batch, which is the write.
+      const rows = (await this.connection.query(
+        `${sql}; SELECT @@ROWCOUNT AS ${AFFECTED_ROWS};`,
+        { replacements: binds, type: QueryTypes.SELECT, transaction }
+      )) as Record<string, unknown>[];
+
+      return Number(rows.at(-1)?.[AFFECTED_ROWS] ?? 0);
+    }
+
+    const affected = (await this.connection.query(sql, {
+      replacements: binds,
+      type: QueryTypes.BULKUPDATE,
+      transaction,
+    })) as unknown as number;
+
+    return Number(affected ?? 0);
+  }
+
+  /** Id generated by the engine, for the ones that have neither RETURNING nor OUTPUT. */
+  private async runIdentity(
+    sql: string,
+    binds: Record<string, unknown>,
+    transaction?: Transaction
+  ): Promise<SqlExecuteResult<never>> {
+    // `QueryTypes.INSERT` returns [id, rows]; it is how Sequelize exposes
+    // LAST_INSERT_ID() without having to emit a second statement, which in a
+    // pool could end up on another connection and return the wrong id.
+    const [insertedId, affected] = (await this.connection.query(sql, {
+      replacements: binds,
+      type: QueryTypes.INSERT,
+      transaction,
+    })) as unknown as [number, number];
+
+    return {
+      rows: [{ [INSERTED_ID]: insertedId }] as never[],
+      rowsAffected: Number(affected ?? 1),
+      outBinds: {},
+    };
+  }
+
+  private async run<TRow>(
+    sql: string,
+    binds: Record<string, unknown>,
+    options: SqlExecuteOptions,
+    transaction?: Transaction
+  ): Promise<SqlExecuteResult<TRow>> {
+    try {
+      const expects = options.expects ?? "rows";
+
+      if (expects === "rows") {
+        const rows = (await this.connection.query(sql, {
+          replacements: binds,
+          type: QueryTypes.SELECT,
+          transaction,
+        })) as TRow[];
+
+        return { rows, rowsAffected: rows.length, outBinds: {} };
+      }
+
+      if (expects === "identity") {
+        return (await this.runIdentity(sql, binds, transaction)) as SqlExecuteResult<TRow>;
+      }
+
+      return {
+        rows: [],
+        rowsAffected: await this.runAffected(sql, binds, transaction),
+        outBinds: {},
+      };
+    } catch (err) {
+      this.logger.error(`Error running a statement on ${this.engine}`, {
+        sql,
+        err: toMessage(err),
+      });
+      throw new Error(`[SequelizeConnector:${this.engine}] execute failed: ${toMessage(err)}`, {
+        cause: err,
+      });
+    }
+  }
+
+  execute<TRow = Record<string, unknown>>(
+    sql: string,
+    binds: Record<string, unknown> = {},
+    options: SqlExecuteOptions = {}
+  ): Promise<SqlExecuteResult<TRow>> {
+    return this.run<TRow>(sql, binds, options, undefined);
+  }
+
+  /**
+   * Sequelize has no `executeMany` like node-oracledb's, so the statement is
+   * repeated inside a transaction: either every row goes in or none does, which
+   * is the guarantee Oracle's bulk gives.
+   */
+  private async runMany(
+    sql: string,
+    binds: Record<string, unknown>[],
+    transaction: Transaction
+  ): Promise<number> {
+    let affected = 0;
+    for (const row of binds) {
+      affected += await this.runAffected(sql, row, transaction);
+    }
+    return affected;
+  }
+
+  async executeMany(sql: string, binds: Record<string, unknown>[]): Promise<number> {
+    if (binds.length === 0) return 0;
+
+    const affected = await this.connection.transaction((t) => this.runMany(sql, binds, t));
+    this.logger.debug(`${this.engine} executeMany`, { sql, batch: binds.length, affected });
+    return affected;
+  }
+
+  /**
+   * Transaction managed by Sequelize: commit on resolve, rollback on throw. The
+   * block receives an executor bound to it.
+   */
+  transaction<T>(work: (tx: ISqlExecutor) => Promise<T>): Promise<T> {
+    return this.connection.transaction(async (t) => {
+      const tx: ISqlExecutor = {
+        execute: <TRow = Record<string, unknown>>(
+          sql: string,
+          binds: Record<string, unknown> = {},
+          options: SqlExecuteOptions = {}
+        ) => this.run<TRow>(sql, binds, options, t),
+        executeMany: (sql: string, binds: Record<string, unknown>[]) =>
+          binds.length === 0 ? Promise.resolve(0) : this.runMany(sql, binds, t),
+      };
+
+      return work(tx);
+    });
+  }
+
+  async close(): Promise<void> {
+    await this.connection.close();
+    this.logger.info(`Connection to ${this.engine} closed.`);
+  }
+}

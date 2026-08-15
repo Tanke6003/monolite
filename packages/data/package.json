@@ -1,0 +1,90 @@
+{
+  "name": "@monolite/data",
+  "version": "0.1.0",
+  "description": "One repository contract over six engines: in-memory, Oracle, SQL Server, PostgreSQL, MySQL/MariaDB and MongoDB.",
+  "keywords": [
+    "monolite",
+    "repository",
+    "generic-repository",
+    "unit-of-work",
+    "oracle",
+    "sqlserver",
+    "postgres",
+    "mysql",
+    "mongodb",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Tanke6003",
+  "homepage": "https://github.com/Tanke6003/monolite/tree/master/packages/data#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tanke6003/monolite.git",
+    "directory": "packages/data"
+  },
+  "bugs": {
+    "url": "https://github.com/Tanke6003/monolite/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@monolite/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "mongodb": "^7",
+    "mysql2": "^3",
+    "oracledb": "^7",
+    "pg": "^8",
+    "sequelize": "^6",
+    "tedious": "^18"
+  },
+  "peerDependenciesMeta": {
+    "mongodb": {
+      "optional": true
+    },
+    "mysql2": {
+      "optional": true
+    },
+    "oracledb": {
+      "optional": true
+    },
+    "pg": {
+      "optional": true
+    },
+    "sequelize": {
+      "optional": true
+    },
+    "tedious": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/oracledb": "^7.0.2",
+    "@types/pg": "^8.21.0",
+    "mongodb": "^7.5.0",
+    "mysql2": "^3.23.3",
+    "oracledb": "^7.0.1",
+    "pg": "^8.23.0",
+    "sequelize": "^6.37.7",
+    "tedious": "^18.6.1"
+  }
+}

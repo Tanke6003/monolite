@@ -1,0 +1,53 @@
+{
+  "name": "@monolite/crud",
+  "version": "0.1.0",
+  "description": "Generic CRUD stack: one decorator gives an entity list/getOne/create/update/softDelete over HTTP.",
+  "keywords": [
+    "monolite",
+    "crud",
+    "rest",
+    "express",
+    "transactions",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Tanke6003",
+  "homepage": "https://github.com/Tanke6003/monolite/tree/master/packages/crud#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tanke6003/monolite.git",
+    "directory": "packages/crud"
+  },
+  "bugs": {
+    "url": "https://github.com/Tanke6003/monolite/issues"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@monolite/core": "0.1.0",
+    "@monolite/data": "0.1.0",
+    "@monolite/http": "0.1.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "express": "^5"
+  }
+}

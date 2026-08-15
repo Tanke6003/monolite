@@ -1,0 +1,16 @@
+# Stored in the CLI as `gitignore`, without the dot, and renamed when written.
+# npm rewrites a published `.gitignore` to `.npmignore`, so a template that
+# shipped it under its real name would arrive renamed and this project would
+# have no ignore file at all.
+node_modules/
+dist/
+coverage/
+reports/
+logs/
+*.tsbuildinfo
+
+# The real credentials live here. `.env.example` is the committed copy, with
+# placeholders instead of secrets.
+.env
+.env.*
+!.env.example

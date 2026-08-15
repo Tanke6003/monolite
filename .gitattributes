@@ -1,0 +1,10 @@
+# Normalise line endings in the repository to LF, whatever the checkout platform
+# does locally. Without this, a Windows contributor's first commit rewrites every
+# file it touches and the diff stops being readable.
+* text=auto eol=lf
+
+# Binary-ish files must never be normalised.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary

@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is the floor the packages declare in `engines`; 22 is what most
+        # people will actually run. Testing only one of them means the other is
+        # supported by assertion rather than by evidence.
+        node: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --coverage
+
+  scaffold:
+    # The CLI's real contract is that the project it writes builds and passes its
+    # own tests. Checking that the CLI compiles proves nothing about its output,
+    # so this job generates a project and runs it.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Scaffold a project with every optional feature on
+        run: |
+          node packages/cli/dist/bin/monolite.js new smoke-full \
+            --database=postgres --auth --example --yes --skip-install --skip-git
+
+      - name: Scaffold the minimal project
+        run: |
+          node packages/cli/dist/bin/monolite.js new smoke-min \
+            --database=none --no-auth --no-example --yes --skip-install --skip-git
+
+      - name: No placeholder survived the render
+        run: |
+          if grep -rn '__[a-zA-Z]*__' smoke-full smoke-min; then
+            echo "::error::an unrendered placeholder reached the generated project"
+            exit 1
+          fi

@@ -1,0 +1,28 @@
+{
+  "name": "__projectName__",
+  "version": "__projectVersion__",
+  "description": "__projectDescription__",
+  "author": "__projectAuthor__",
+  "license": "__projectLicense__",
+  "private": true,
+  "main": "dist/main.js",
+  "engines": { "node": ">=20" },
+  "monolite": {
+    "cli": "__cliVersion__",
+    "database": "__engineId__",
+    "apiPrefix": "__apiPrefix__",
+    "auth": __authEnabled__,
+    "sourceRoot": "src"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "test": "jest",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "__pmRun__ typecheck && __pmRun__ lint && __pmRun__ test"
+  },
+  "dependencies": { __dependencies__ },
+  "devDependencies": { __devDependencies__ }
+}

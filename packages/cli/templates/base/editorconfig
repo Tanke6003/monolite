@@ -1,0 +1,24 @@
+# https://editorconfig.org
+#
+# What the editor has to get right before the linter has an opinion. ESLint can
+# fix quotes and semicolons, but it cannot recover a file saved as CRLF or
+# without a trailing newline: that is decided on write, which is why it lives
+# here and not in the lint config.
+root = true
+
+# lf is not a preference. Anything mounted into a container —shell scripts, SQL
+# seeds— fails with "bad interpreter: ...^M" when it carries CRLF.
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# Two trailing spaces are a line break in Markdown, so trimming them would
+# change the rendered text.
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
