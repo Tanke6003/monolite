@@ -5,8 +5,8 @@ import type {
   QueryOptions,
   SortDirection,
   WhereFilter,
-} from "../contracts/generic-repository";
-import { normalizeOrderBy } from "./filter-helpers";
+} from "../contracts/generic-repository.js";
+import { normalizeOrderBy } from "./filter-helpers.js";
 
 /**
  * Implementation of `IQueryable<T>` shared by every driver: it knows nothing

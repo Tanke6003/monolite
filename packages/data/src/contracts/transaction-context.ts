@@ -1,4 +1,4 @@
-import type { ITransactionScope } from "./unit-of-work";
+import type { ITransactionScope } from "./unit-of-work.js";
 
 /**
  * The transaction in progress, reachable from wherever it is needed without

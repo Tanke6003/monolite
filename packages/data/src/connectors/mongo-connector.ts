@@ -10,7 +10,7 @@
 // translation; making it lazy is a separate change.
 import { ClientSession, Collection, Db, Document, MongoClient } from "mongodb";
 import type { ILogger } from "@monolite/core";
-import type { DbEngine, IDbPlugin } from "../contracts/db-plugin";
+import type { DbEngine, IDbPlugin } from "../contracts/db-plugin.js";
 
 export interface MongoConnectionConfig {
   host: string;

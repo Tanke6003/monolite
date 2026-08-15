@@ -135,8 +135,19 @@ function substitute(source: string, vars: Record<string, string>, origin: string
   });
 }
 
+/**
+ * Dropping a conditional block leaves the blank lines that surrounded it, and
+ * two or three of them in a row is the tell-tale sign of generated code. One
+ * pass over the output is cheaper than making every template author reason
+ * about where the blank line belongs relative to the `#if`.
+ */
+function collapseBlankRuns(source: string): string {
+  return source.replace(/\n{3,}/g, "\n\n");
+}
+
 export function renderText(source: string, context: RenderContext, origin: string): string {
-  return substitute(applyConditionals(source, context.flags, origin), context.vars, origin);
+  const conditioned = collapseBlankRuns(applyConditionals(source, context.flags, origin));
+  return substitute(conditioned, context.vars, origin);
 }
 
 /** Path segments only ever get substitution; a directory cannot hold a `#if`. */

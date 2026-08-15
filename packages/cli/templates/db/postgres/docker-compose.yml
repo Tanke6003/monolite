@@ -1,0 +1,35 @@
+# Only the engine this project chose. A compose file listing five databases is
+# a compose file where `docker compose up` starts four you do not need.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: __projectName__-postgres
+    restart: unless-stopped
+    environment:
+      # The image creates this user and this database when it initialises the
+      # volume. It is the account the API uses; there is no separate superuser
+      # to look after.
+      POSTGRES_USER: ${POSTGRES_USER:-__dbUser__}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-__dbName__}
+    ports:
+      - "${POSTGRES_PORT:-__dbPort__}:__dbContainerPort__"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Anything dropped here runs once, in alphabetical order, already
+      # connected as POSTGRES_USER to POSTGRES_DB. Put the schema here: the
+      # application never creates tables.
+      - ./docker/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      # pg_isready only answers over TCP once initialisation is finished: while
+      # the init scripts run, the temporary server listens on a Unix socket only.
+      # So "healthy" here means "schema applied", not just "port open".
+      test:
+        ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-__dbUser__} -d ${POSTGRES_DB:-__dbName__}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  postgres_data:

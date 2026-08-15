@@ -10,7 +10,7 @@
 // straight translation; making it lazy is a separate change.
 import oracledb from "oracledb";
 import type { ILogger } from "@monolite/core";
-import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor";
+import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor.js";
 
 /**
  * An Oracle bind: either the value itself, or a descriptor for output

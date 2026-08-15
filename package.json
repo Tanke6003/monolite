@@ -13,13 +13,18 @@
   "bugs": {
     "url": "https://github.com/Tanke6003/monolite/issues"
   },
-  "engines": { "node": ">=20" },
-  "workspaces": ["packages/*", "examples/*"],
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
     "build": "tsc --build",
     "clean": "tsc --build --clean",
     "typecheck": "tsc --build",
-    "lint": "eslint \"packages/*/src/**/*.ts\"",
+    "lint": "eslint \"packages/*/{src,tests}/**/*.ts\"",
     "test": "jest",
     "check": "npm run typecheck && npm run lint && npm test",
     "cli": "node packages/cli/dist/bin/monolite.js"
@@ -29,6 +34,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.5.0",
     "eslint": "^9.36.0",
+    "globals": "^17.11.0",
     "jest": "^30.1.3",
     "ts-jest": "^29.4.4",
     "typescript": "^5.9.2",

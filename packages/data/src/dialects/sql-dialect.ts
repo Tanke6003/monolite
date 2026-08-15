@@ -8,7 +8,7 @@
 // (or the two constants have to be inlined as the numeric literals the driver
 // documents).
 import oracledb from "oracledb";
-import type { SqlExecuteResult } from "../contracts/sql-executor";
+import type { SqlExecuteResult } from "../contracts/sql-executor.js";
 
 export interface BuildInsertParams {
   table: string;

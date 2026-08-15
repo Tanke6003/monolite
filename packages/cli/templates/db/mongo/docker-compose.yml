@@ -1,0 +1,38 @@
+# Only the engine this project chose. A compose file listing five databases is
+# a compose file where `docker compose up` starts four you do not need.
+services:
+  mongo:
+    image: mongo:7
+    container_name: __projectName__-mongo
+    restart: unless-stopped
+    # A single-node replica set, not a bare mongod. The generic repository can
+    # write an operation and its change-log entry inside one transaction, and
+    # multi-document transactions only exist over a replica set: a mongod with
+    # no oplog rejects startTransaction outright.
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-__dbName__}
+      # MONGO_INITDB_ROOT_USERNAME / _PASSWORD are left unset on purpose: with
+      # them, the entrypoint drops --replSet from the temporary init server and
+      # the replica set would additionally need an internal-auth key file.
+      # Development runs without authentication; production does not use this
+      # file.
+    ports:
+      - "${MONGO_PORT:-__dbPort__}:__dbContainerPort__"
+    volumes:
+      - mongo_data:/data/db
+      # Put `rs.initiate()` inside the first script here rather than in a
+      # separate step: the temporary init server also starts with --replSet, so
+      # until the set is initiated the node is not primary and any seed fails.
+      - ./docker/mongo:/docker-entrypoint-initdb.d
+    healthcheck:
+      # rs.status() throws until the set is initiated, so "healthy" here means
+      # "replica ready", not merely "port open".
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'quit(rs.status().ok === 1 ? 0 : 1)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  mongo_data:

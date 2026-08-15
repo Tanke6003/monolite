@@ -25,32 +25,32 @@ export type {
   QueryOptions,
   SortDirection,
   WhereFilter,
-} from "./contracts/generic-repository";
+} from "./contracts/generic-repository.js";
 
-export type { ITransactionScope, IUnitOfWork } from "./contracts/unit-of-work";
+export type { ITransactionScope, IUnitOfWork } from "./contracts/unit-of-work.js";
 
-export { AUDIT_ACTIONS } from "./contracts/audit-trail";
+export { AUDIT_ACTIONS } from "./contracts/audit-trail.js";
 export type {
   AuditAction,
   AuditActor,
   AuditEntry,
   IAuditLog,
   IAuditTrail,
-} from "./contracts/audit-trail";
+} from "./contracts/audit-trail.js";
 
 export type {
   ISqlExecutor,
   SqlExecuteOptions,
   SqlExecuteResult,
-} from "./contracts/sql-executor";
+} from "./contracts/sql-executor.js";
 
-export type { DbEngine, IDbPlugin, ISqlDbPlugin } from "./contracts/db-plugin";
+export type { DbEngine, IDbPlugin, ISqlDbPlugin } from "./contracts/db-plugin.js";
 
-export type { ITransactionContext } from "./contracts/transaction-context";
+export type { ITransactionContext } from "./contracts/transaction-context.js";
 
 // -------------------------------------------------------------- metadata ---
 
-export { defineEntity, EntitySchema } from "./metadata/entity-metadata";
+export { defineEntity, EntitySchema } from "./metadata/entity-metadata.js";
 export type {
   AuditMetadata,
   ColumnDefinition,
@@ -59,7 +59,7 @@ export type {
   EntityMetadata,
   SoftDeleteMetadata,
   TimestampMetadata,
-} from "./metadata/entity-metadata";
+} from "./metadata/entity-metadata.js";
 
 // ----------------------------------------------------------------- query ---
 
@@ -71,17 +71,17 @@ export {
   likeToRegExp,
   normalizeOrderBy,
   OPERATOR_KEYS,
-} from "./query/filter-helpers";
+} from "./query/filter-helpers.js";
 
-export { QueryBuilder } from "./query/query-builder";
+export { QueryBuilder } from "./query/query-builder.js";
 
-export { compareBy, matchesFilter } from "./query/memory-filter";
+export { compareBy, matchesFilter } from "./query/memory-filter.js";
 
-export { toMongoFilter } from "./query/mongo-filter";
-export type { MongoQuery } from "./query/mongo-filter";
+export { toMongoFilter } from "./query/mongo-filter.js";
+export type { MongoQuery } from "./query/mongo-filter.js";
 
-export { SqlWhereCompiler } from "./query/sql-where-compiler";
-export type { CompiledWhere } from "./query/sql-where-compiler";
+export { SqlWhereCompiler } from "./query/sql-where-compiler.js";
+export type { CompiledWhere } from "./query/sql-where-compiler.js";
 
 // -------------------------------------------------------------- dialects ---
 
@@ -90,54 +90,54 @@ export {
   oracleDialect,
   postgresDialect,
   sqlServerDialect,
-} from "./dialects/sql-dialect";
+} from "./dialects/sql-dialect.js";
 export type {
   BuildInsertParams,
   InsertedIdSource,
   InsertStatement,
   SqlDialect,
-} from "./dialects/sql-dialect";
+} from "./dialects/sql-dialect.js";
 
 // --------------------------------------------------------------- drivers ---
 
-export { MemoryGenericRepository } from "./drivers/memory-generic-repository";
-export type { MemorySnapshot } from "./drivers/memory-generic-repository";
+export { MemoryGenericRepository } from "./drivers/memory-generic-repository.js";
+export type { MemorySnapshot } from "./drivers/memory-generic-repository.js";
 
-export { SqlGenericRepository } from "./drivers/sql-generic-repository";
+export { SqlGenericRepository } from "./drivers/sql-generic-repository.js";
 
-export { MongoGenericRepository } from "./drivers/mongo-generic-repository";
-export type { IMongoDataSource } from "./drivers/mongo-generic-repository";
+export { MongoGenericRepository } from "./drivers/mongo-generic-repository.js";
+export type { IMongoDataSource } from "./drivers/mongo-generic-repository.js";
 
 // --------------------------------------------------------- unit of work ----
 
-export { MemoryUnitOfWork } from "./unit-of-work/memory-unit-of-work";
-export type { MemoryRepositoryRegistry } from "./unit-of-work/memory-unit-of-work";
+export { MemoryUnitOfWork } from "./unit-of-work/memory-unit-of-work.js";
+export type { MemoryRepositoryRegistry } from "./unit-of-work/memory-unit-of-work.js";
 
-export { SqlUnitOfWork } from "./unit-of-work/sql-unit-of-work";
+export { SqlUnitOfWork } from "./unit-of-work/sql-unit-of-work.js";
 export type {
   ISqlTransactionRunner,
   SqlRepositoryRegistry,
-} from "./unit-of-work/sql-unit-of-work";
+} from "./unit-of-work/sql-unit-of-work.js";
 
-export { MongoUnitOfWork } from "./unit-of-work/mongo-unit-of-work";
+export { MongoUnitOfWork } from "./unit-of-work/mongo-unit-of-work.js";
 export type {
   IMongoTransactionRunner,
   MongoRepositoryRegistry,
-} from "./unit-of-work/mongo-unit-of-work";
+} from "./unit-of-work/mongo-unit-of-work.js";
 
-export { AsyncTransactionContext } from "./transactions/async-transaction-context";
+export { AsyncTransactionContext } from "./transactions/async-transaction-context.js";
 
 // ----------------------------------------------------------------- audit ---
 
-export { MemoryAuditTrail, MongoAuditTrail, SqlAuditTrail } from "./audit/audit-trail";
+export { MemoryAuditTrail, MongoAuditTrail, SqlAuditTrail } from "./audit/audit-trail.js";
 
 // ----------------------------------------------------- module repository ---
 
-export { BaseModuleRepository } from "./module-repository";
+export { BaseModuleRepository } from "./module-repository.js";
 
 // ------------------------------------------------------------ connectors ---
 
-export { OracleConnector } from "./connectors/oracle-connector";
+export { OracleConnector } from "./connectors/oracle-connector.js";
 export type {
   IOracleConnector,
   IOracleTransaction,
@@ -146,18 +146,18 @@ export type {
   OracleConnectionConfig,
   OracleExecuteResult,
   OracleOutBind,
-} from "./connectors/oracle-connector";
+} from "./connectors/oracle-connector.js";
 
-export { SequelizeConnector } from "./connectors/sequelize-connector";
+export { SequelizeConnector } from "./connectors/sequelize-connector.js";
 export type {
   SequelizeConnectionConfig,
   SequelizeEngine,
-} from "./connectors/sequelize-connector";
+} from "./connectors/sequelize-connector.js";
 
-export { MongoConnector } from "./connectors/mongo-connector";
-export type { MongoConnectionConfig } from "./connectors/mongo-connector";
+export { MongoConnector } from "./connectors/mongo-connector.js";
+export type { MongoConnectionConfig } from "./connectors/mongo-connector.js";
 
 // --------------------------------------------------------------- testing ---
 
-export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./testing/repository-contract";
-export type { ContractItem, ContractSetup } from "./testing/repository-contract";
+export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./testing/repository-contract.js";
+export type { ContractItem, ContractSetup } from "./testing/repository-contract.js";

@@ -2,7 +2,7 @@
 
 A TypeScript backend toolkit you can adopt one package at a time.
 
-> 🇪🇸 [Leer en español](./README.es.md) · 📚 [Documentation](./docs/en/) · [Documentación](./docs/es/)
+> 🇪🇸 [Leer en español](./README.es.md) · 📚 [Documentation index](./docs/)
 
 ---
 

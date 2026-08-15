@@ -4,10 +4,10 @@
 // have to become a lazy `await import("mongodb")`, otherwise a consumer that
 // only uses PostgreSQL would be forced to install the optional peer dependency.
 import type { ClientSession } from "mongodb";
-import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work";
-import type { IGenericRepository } from "../contracts/generic-repository";
-import type { ITransactionContext } from "../contracts/transaction-context";
-import { MongoGenericRepository } from "../drivers/mongo-generic-repository";
+import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work.js";
+import type { IGenericRepository } from "../contracts/generic-repository.js";
+import type { ITransactionContext } from "../contracts/transaction-context.js";
+import { MongoGenericRepository } from "../drivers/mongo-generic-repository.js";
 
 /**
  * The only thing the unit of work needs from the connector: to open a session

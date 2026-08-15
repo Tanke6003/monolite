@@ -1,6 +1,6 @@
-import type { FieldOperators, WhereFilter } from "../contracts/generic-repository";
-import { EntitySchema } from "../metadata/entity-metadata";
-import { escapeRegExp, isOperatorObject, likeToRegExp } from "./filter-helpers";
+import type { FieldOperators, WhereFilter } from "../contracts/generic-repository.js";
+import { EntitySchema } from "../metadata/entity-metadata.js";
+import { escapeRegExp, isOperatorObject, likeToRegExp } from "./filter-helpers.js";
 
 /**
  * Translates the same `WhereFilter<T>` that `SqlWhereCompiler` takes to SQL and

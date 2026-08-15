@@ -1,4 +1,4 @@
-import type { FieldOperators, OrderByClause } from "../contracts/generic-repository";
+import type { FieldOperators, OrderByClause } from "../contracts/generic-repository.js";
 
 /** Keys recognised as operators inside a field filter. */
 export const OPERATOR_KEYS = new Set([

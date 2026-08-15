@@ -1,0 +1,38 @@
+# Only the engine this project chose. A compose file listing five databases is
+# a compose file where `docker compose up` starts four you do not need.
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: __projectName__-mssql
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      # SQL Server enforces its own complexity rules on this one, so a short
+      # placeholder will be rejected at container start rather than at connect.
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "${DB_PORT:-__dbPort__}:__dbContainerPort__"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      # -C accepts the image's self-signed certificate; without it sqlcmd 18
+      # refuses to connect and the container never reaches healthy.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+# This image is the one engine with no initdb.d directory: it applies nothing on
+# first boot. Create the database and its schema yourself once the container is
+# healthy — the application never creates tables.
+#
+#   docker compose exec mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
+#     -P "$DB_PASSWORD" -C -Q "CREATE DATABASE __dbName__"
+
+volumes:
+  mssql_data:

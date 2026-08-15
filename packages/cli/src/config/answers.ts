@@ -1,6 +1,7 @@
 import type { EngineSpec } from "./engines.js";
 import type { RenderContext } from "../util/render.js";
 import { toPascalCase } from "../util/naming.js";
+import { cliVersion } from "../version.js";
 
 export type PackageManager = "npm" | "pnpm" | "yarn";
 
@@ -134,6 +135,9 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
       engineId: engine.id,
       engineLabel: engine.label,
       engineSentence: engineSentence(engine),
+      // The compose service is named after the image, which is not always the
+      // engine id: `mongodb` runs in a service called `mongo`.
+      dockerService: engine.templateDir ?? "",
       envPrefix: engine.envPrefix || "DB",
       dbHost: answers.dbHost,
       dbPort: String(answers.dbPort),
@@ -146,6 +150,9 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
       pmRun: run,
       pmInstall: answers.packageManager === "yarn" ? "yarn" : `${answers.packageManager} install`,
       monoliteVersion: MONOLITE_VERSION,
+      // Stamped into the project's `monolite` marker, so a future `generate`
+      // can tell what produced the layout it is adding to.
+      cliVersion: cliVersion(),
       dependencies: asJsonBody(dependenciesFor(answers)),
       devDependencies: asJsonBody(devDependenciesFor(answers)),
       authEnabled: String(answers.auth),

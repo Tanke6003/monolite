@@ -6,12 +6,12 @@ import type {
   PagedResult,
   QueryOptions,
   WhereFilter,
-} from "../contracts/generic-repository";
-import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail";
-import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata";
-import { compareBy, matchesFilter } from "../query/memory-filter";
-import { QueryBuilder } from "../query/query-builder";
-import { normalizeOrderBy } from "../query/filter-helpers";
+} from "../contracts/generic-repository.js";
+import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail.js";
+import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata.js";
+import { compareBy, matchesFilter } from "../query/memory-filter.js";
+import { QueryBuilder } from "../query/query-builder.js";
+import { normalizeOrderBy } from "../query/filter-helpers.js";
 
 /**
  * Same semantics as `SqlGenericRepository`, but over an in-memory array.

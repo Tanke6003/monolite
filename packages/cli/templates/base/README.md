@@ -11,7 +11,7 @@ Express 5 and TypeScript, laid out as Clean Architecture, and persists through _
 __pmInstall__
 cp .env.example .env
 <!-- #if docker -->
-docker compose up -d __engineId__
+docker compose up -d __dockerService__
 <!-- #endif -->
 __pmRun__ dev
 ```

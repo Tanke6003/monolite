@@ -17,8 +17,8 @@
 // It expects the Jest globals (`describe`, `it`, `expect`, `beforeEach`,
 // `afterAll`) to be in scope, so it must be imported from a test file run by
 // Jest — or by any runner that provides the same globals.
-import type { IGenericRepository } from "../contracts/generic-repository";
-import { defineEntity } from "../metadata/entity-metadata";
+import type { IGenericRepository } from "../contracts/generic-repository.js";
+import { defineEntity } from "../metadata/entity-metadata.js";
 
 /** Minimal entity the suite needs in order to operate. */
 export interface ContractItem {

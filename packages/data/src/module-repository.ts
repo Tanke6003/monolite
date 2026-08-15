@@ -5,9 +5,9 @@ import type {
   PagedResult,
   QueryOptions,
   WhereFilter,
-} from "./contracts/generic-repository";
-import type { ITransactionContext } from "./contracts/transaction-context";
-import { QueryBuilder } from "./query/query-builder";
+} from "./contracts/generic-repository.js";
+import type { ITransactionContext } from "./contracts/transaction-context.js";
+import { QueryBuilder } from "./query/query-builder.js";
 
 /**
  * Module repository: it wraps the generic repository of the active driver and

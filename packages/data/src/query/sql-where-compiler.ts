@@ -1,6 +1,6 @@
-import type { FieldOperators, WhereFilter } from "../contracts/generic-repository";
-import { EntitySchema } from "../metadata/entity-metadata";
-import { containsPattern, isOperatorObject, LIKE_ESCAPE } from "./filter-helpers";
+import type { FieldOperators, WhereFilter } from "../contracts/generic-repository.js";
+import { EntitySchema } from "../metadata/entity-metadata.js";
+import { containsPattern, isOperatorObject, LIKE_ESCAPE } from "./filter-helpers.js";
 
 export interface CompiledWhere {
   /** Body of the WHERE without the keyword; empty string if there are no conditions. */

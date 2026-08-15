@@ -1,4 +1,4 @@
-import type { ISqlExecutor } from "./sql-executor";
+import type { ISqlExecutor } from "./sql-executor.js";
 
 /** Supported engines. It is also the value accepted by `DATA_SOURCE`. */
 export type DbEngine = "memory" | "oracle" | "mssql" | "postgres" | "mysql" | "mongodb";

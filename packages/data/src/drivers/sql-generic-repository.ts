@@ -7,14 +7,14 @@ import type {
   PagedResult,
   QueryOptions,
   WhereFilter,
-} from "../contracts/generic-repository";
-import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor";
-import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail";
-import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata";
-import { SqlWhereCompiler } from "../query/sql-where-compiler";
-import { QueryBuilder } from "../query/query-builder";
-import { normalizeOrderBy } from "../query/filter-helpers";
-import type { SqlDialect } from "../dialects/sql-dialect";
+} from "../contracts/generic-repository.js";
+import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor.js";
+import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail.js";
+import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata.js";
+import { SqlWhereCompiler } from "../query/sql-where-compiler.js";
+import { QueryBuilder } from "../query/query-builder.js";
+import { normalizeOrderBy } from "../query/filter-helpers.js";
+import type { SqlDialect } from "../dialects/sql-dialect.js";
 
 /**
  * Generic repository over SQL.

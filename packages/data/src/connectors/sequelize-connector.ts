@@ -14,8 +14,8 @@ import type {
   ISqlExecutor,
   SqlExecuteOptions,
   SqlExecuteResult,
-} from "../contracts/sql-executor";
-import type { DbEngine, ISqlDbPlugin } from "../contracts/db-plugin";
+} from "../contracts/sql-executor.js";
+import type { DbEngine, ISqlDbPlugin } from "../contracts/db-plugin.js";
 
 /** Engines this connector covers; Sequelize speaks all three. */
 export type SequelizeEngine = Extract<DbEngine, "mssql" | "postgres" | "mysql">;

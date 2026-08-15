@@ -14,12 +14,12 @@ import type {
   PagedResult,
   QueryOptions,
   WhereFilter,
-} from "../contracts/generic-repository";
-import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail";
-import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata";
-import { toMongoFilter } from "../query/mongo-filter";
-import { QueryBuilder } from "../query/query-builder";
-import { normalizeOrderBy } from "../query/filter-helpers";
+} from "../contracts/generic-repository.js";
+import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail.js";
+import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata.js";
+import { toMongoFilter } from "../query/mongo-filter.js";
+import { QueryBuilder } from "../query/query-builder.js";
+import { normalizeOrderBy } from "../query/filter-helpers.js";
 
 /**
  * The only thing this repository needs from the connector: a collection by

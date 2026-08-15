@@ -4,11 +4,11 @@
 // have to become a lazy `await import("mongodb")`, otherwise a consumer that
 // only uses PostgreSQL would be forced to install the optional peer dependency.
 import type { ClientSession } from "mongodb";
-import type { AuditEntry, IAuditLog, IAuditTrail } from "../contracts/audit-trail";
-import type { IGenericRepository } from "../contracts/generic-repository";
-import type { ISqlExecutor } from "../contracts/sql-executor";
-import { SqlGenericRepository } from "../drivers/sql-generic-repository";
-import { MongoGenericRepository } from "../drivers/mongo-generic-repository";
+import type { AuditEntry, IAuditLog, IAuditTrail } from "../contracts/audit-trail.js";
+import type { IGenericRepository } from "../contracts/generic-repository.js";
+import type { ISqlExecutor } from "../contracts/sql-executor.js";
+import { SqlGenericRepository } from "../drivers/sql-generic-repository.js";
+import { MongoGenericRepository } from "../drivers/mongo-generic-repository.js";
 
 /** Cap on the serialized detail, so the table does not fill up with huge payloads. */
 const MAX_CHANGES_LENGTH = 4000;

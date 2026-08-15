@@ -1,7 +1,7 @@
-import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work";
-import type { IGenericRepository } from "../contracts/generic-repository";
-import type { ITransactionContext } from "../contracts/transaction-context";
-import { MemoryGenericRepository, MemorySnapshot } from "../drivers/memory-generic-repository";
+import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work.js";
+import type { IGenericRepository } from "../contracts/generic-repository.js";
+import type { ITransactionContext } from "../contracts/transaction-context.js";
+import { MemoryGenericRepository, MemorySnapshot } from "../drivers/memory-generic-repository.js";
 
 export type MemoryRepositoryRegistry = Map<string, MemoryGenericRepository<never, never>>;
 

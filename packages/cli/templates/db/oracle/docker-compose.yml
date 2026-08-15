@@ -1,0 +1,33 @@
+# Only the engine this project chose. A compose file listing five databases is
+# a compose file where `docker compose up` starts four you do not need.
+services:
+  oracle:
+    # Gerald Venzl's community image: Oracle Database 23ai Free, with no login
+    # against container-registry.oracle.com. The "faststart" variant ships the
+    # database already created, which turns a ~10 minute first boot into ~1.
+    image: gvenzl/oracle-free:23-slim-faststart
+    container_name: __projectName__-oracle
+    restart: unless-stopped
+    environment:
+      # SYS / SYSTEM password. Only the container uses it.
+      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD:?set ORACLE_SYS_PASSWORD in .env}
+      # The image creates this user inside the PDB and grants it CONNECT and
+      # RESOURCE. It is the account the API uses; we never connect as SYS.
+      APP_USER: ${ORACLE_USER:-__dbUser__}
+      APP_USER_PASSWORD: ${ORACLE_PASSWORD:?set ORACLE_PASSWORD in .env}
+    ports:
+      - "${ORACLE_PORT:-__dbPort__}:__dbContainerPort__"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      # Scripts here run once on first boot. Put the schema in them: the
+      # application never creates tables.
+      - ./docker/oracle:/container-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  oracle_data:

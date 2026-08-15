@@ -2,7 +2,7 @@
 
 Un conjunto de herramientas de backend en TypeScript que puedes adoptar paquete a paquete.
 
-> 🇬🇧 [Read in English](./README.md) · 📚 [Documentación](./docs/es/) · [Documentation](./docs/en/)
+> 🇬🇧 [Read in English](./README.md) · 📚 [Índice de documentación](./docs/)
 
 ---
 

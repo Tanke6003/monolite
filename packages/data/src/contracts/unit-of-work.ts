@@ -1,4 +1,4 @@
-import type { IGenericRepository } from "./generic-repository";
+import type { IGenericRepository } from "./generic-repository.js";
 
 /**
  * Unit of work.

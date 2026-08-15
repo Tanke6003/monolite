@@ -1,8 +1,8 @@
-import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work";
-import type { IGenericRepository } from "../contracts/generic-repository";
-import type { ISqlExecutor } from "../contracts/sql-executor";
-import type { ITransactionContext } from "../contracts/transaction-context";
-import { SqlGenericRepository } from "../drivers/sql-generic-repository";
+import type { ITransactionScope, IUnitOfWork } from "../contracts/unit-of-work.js";
+import type { IGenericRepository } from "../contracts/generic-repository.js";
+import type { ISqlExecutor } from "../contracts/sql-executor.js";
+import type { ITransactionContext } from "../contracts/transaction-context.js";
+import { SqlGenericRepository } from "../drivers/sql-generic-repository.js";
 
 /**
  * The only thing the unit of work needs from the driver: to open a transaction

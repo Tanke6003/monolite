@@ -1,6 +1,6 @@
-import type { FieldOperators, WhereFilter } from "../contracts/generic-repository";
-import { EntitySchema } from "../metadata/entity-metadata";
-import { isOperatorObject, likeToRegExp } from "./filter-helpers";
+import type { FieldOperators, WhereFilter } from "../contracts/generic-repository.js";
+import { EntitySchema } from "../metadata/entity-metadata.js";
+import { isOperatorObject, likeToRegExp } from "./filter-helpers.js";
 
 /**
  * In-memory evaluation of the very same `WhereFilter<T>` that

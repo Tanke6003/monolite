@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { ITransactionContext } from "../contracts/transaction-context";
-import type { ITransactionScope } from "../contracts/unit-of-work";
+import type { ITransactionContext } from "../contracts/transaction-context.js";
+import type { ITransactionScope } from "../contracts/unit-of-work.js";
 
 /**
  * The transaction in progress, held in an `AsyncLocalStorage`.
