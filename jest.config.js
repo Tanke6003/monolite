@@ -51,6 +51,15 @@ module.exports = {
   moduleFileExtensions: ["ts", "js", "json"],
 
   /**
+   * The CLI templates are not code, they are text with placeholders in it, and
+   * `templates/base/package.json` holds `"auth": __authEnabled__` — which is not
+   * JSON. Jest's module map parses every `package.json` under `roots` before a
+   * single test runs, so without this the whole suite dies on a file that is
+   * doing exactly what it is supposed to.
+   */
+  modulePathIgnorePatterns: ["<rootDir>/packages/cli/templates/"],
+
+  /**
    * Coverage is collected from every source file, not only the ones a test
    * happens to import. An untested file that never appears in the report reads
    * as "covered" to anyone skimming the number.
