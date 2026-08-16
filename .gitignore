@@ -11,3 +11,7 @@ coverage/
 
 # Scratch output from running the CLI by hand during development.
 /tmp/
+
+# Projects the scaffold test generates and compiles. Inside the repository so
+# they can resolve its node_modules; removed when the test finishes.
+/.scaffold-tests/
