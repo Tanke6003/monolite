@@ -1,16 +1,17 @@
-// NOTE ON THE OPTIONAL DRIVER: `mongodb` is declared as an *optional* peer
-// dependency, but this static import defeats that: `MongoClient` is a value, not
-// just a type, so requiring this module loads the driver and a consumer that only
-// uses PostgreSQL still needs `mongodb` installed or the import throws before a
-// single line of their code runs. Before the optional peer dependency truly works
-// this has to become a lazy `const { MongoClient } = await import("mongodb")`
-// resolved inside `getClient()` —the first place that really needs the driver—
-// while the type-only imports can stay static, because `import type` is erased at
-// compile time. The import is kept static for now to keep this port a straight
-// translation; making it lazy is a separate change.
-import { ClientSession, Collection, Db, Document, MongoClient } from "mongodb";
+import type { ClientSession, Collection, Db, Document, MongoClient } from "mongodb";
 import type { ILogger } from "@monolite/core";
 import type { DbEngine, IDbPlugin } from "../contracts/db-plugin.js";
+import { loadOptionalDriver } from "./optional-driver.js";
+
+/**
+ * `MongoClient` is a value, not only a type, so a static import of it would
+ * load the driver for anybody who imports this package — including the projects
+ * on PostgreSQL that never installed it. The types above stay static: `import
+ * type` is erased and costs nothing.
+ */
+function mongoClient(): typeof MongoClient {
+  return loadOptionalDriver<{ MongoClient: typeof MongoClient }>("mongodb", "MongoDB").MongoClient;
+}
 
 export interface MongoConnectionConfig {
   host: string;
@@ -80,7 +81,8 @@ export class MongoConnector implements IDbPlugin {
     if (this.closed) throw new Error("[MongoConnector] The client has already been closed.");
 
     if (!this.pending) {
-      const client = new MongoClient(this.buildUri(), {
+      const Client = mongoClient();
+      const client = new Client(this.buildUri(), {
         // The official image's admin user lives in `admin`, not in the
         // application database; without credentials the option is not used.
         ...(this.config.username ? { authSource: "admin" } : {}),

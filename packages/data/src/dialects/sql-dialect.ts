@@ -1,14 +1,5 @@
-// NOTE ON THE OPTIONAL DRIVER: `oracledb` is imported statically here only to
-// read two constants (`BIND_OUT` and `NUMBER`) that Oracle's `RETURNING ... INTO`
-// needs. Because the import sits at the top of the file, requiring this module
-// loads the driver even for a consumer that only ever uses PostgreSQL, which
-// defeats the optional peer dependency declared in package.json. Before the
-// optional peer dependency truly works, this has to become a lazy
-// `await import("oracledb")` resolved inside `oracleDialect.buildInsert`
-// (or the two constants have to be inlined as the numeric literals the driver
-// documents).
-import oracledb from "oracledb";
 import type { SqlExecuteResult } from "../contracts/sql-executor.js";
+import { loadOptionalDriver } from "../connectors/optional-driver.js";
 
 export interface BuildInsertParams {
   table: string;
@@ -124,9 +115,15 @@ export const oracleDialect: SqlDialect = {
 
     if (!identity) return { sql, binds: {}, idFrom: "none" };
 
+    // The two constants are read from the driver rather than inlined as the
+    // numbers it documents, and the driver is loaded here rather than at the
+    // top of the file: this module is imported by every consumer of the
+    // package, and only an insert against Oracle actually needs `oracledb`.
+    const oracle = loadOptionalDriver<typeof import("oracledb")>("oracledb", "Oracle");
+
     return {
       sql: `${sql} RETURNING ${primaryKeyColumn} INTO :${INSERTED_ID}`,
-      binds: { [INSERTED_ID]: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } },
+      binds: { [INSERTED_ID]: { dir: oracle.BIND_OUT, type: oracle.NUMBER } },
       idFrom: "outBinds",
     };
   },

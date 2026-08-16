@@ -1,14 +1,4 @@
-// NOTE ON THE OPTIONAL DRIVER: `sequelize` —and, underneath it, `tedious`, `pg`
-// or `mysql2` depending on the engine— is declared as an *optional* peer
-// dependency, but this static import defeats that: requiring this module loads
-// Sequelize, so a consumer that only uses Oracle or MongoDB still needs it
-// installed or the import throws before a single line of their code runs. Before
-// the optional peer dependency truly works this has to become a lazy
-// `const { Sequelize, QueryTypes } = await import("sequelize")` resolved on the
-// first connection, with the `Sequelize` instance created there instead of in
-// the constructor. The import is kept static for now to keep this port a
-// straight translation; making it lazy is a separate change.
-import { Options, QueryTypes, Sequelize, Transaction } from "sequelize";
+import type { Options, Sequelize, Transaction } from "sequelize";
 import type { ILogger } from "@monolite/core";
 import type {
   ISqlExecutor,
@@ -16,6 +6,24 @@ import type {
   SqlExecuteResult,
 } from "../contracts/sql-executor.js";
 import type { DbEngine, ISqlDbPlugin } from "../contracts/db-plugin.js";
+import { loadOptionalDriver } from "./optional-driver.js";
+
+type SequelizeModule = typeof import("sequelize");
+
+let loaded: SequelizeModule | undefined;
+
+/**
+ * Sequelize, required on first use rather than on import.
+ *
+ * `Sequelize` and `QueryTypes` are values, so importing them statically would
+ * load the ORM —and, underneath it, `tedious`, `pg` or `mysql2`— for every
+ * consumer of this package, including the ones on Oracle or MongoDB that
+ * declared none of them. The types stay static and cost nothing.
+ */
+function driver(): SequelizeModule {
+  loaded ??= loadOptionalDriver<SequelizeModule>("sequelize", "SQL Server, PostgreSQL and MySQL");
+  return loaded;
+}
 
 /** Engines this connector covers; Sequelize speaks all three. */
 export type SequelizeEngine = Extract<DbEngine, "mssql" | "postgres" | "mysql">;
@@ -71,7 +79,7 @@ export class SequelizeConnector implements ISqlDbPlugin {
     private readonly logger: ILogger
   ) {
     this.engine = config.engine;
-    this.connection = new Sequelize({
+    this.connection = new (driver().Sequelize)({
       dialect: SEQUELIZE_DIALECT[config.engine],
       host: config.host,
       port: config.port,
@@ -116,7 +124,7 @@ export class SequelizeConnector implements ISqlDbPlugin {
       // @@ROWCOUNT reflects the last statement of the batch, which is the write.
       const rows = (await this.connection.query(
         `${sql}; SELECT @@ROWCOUNT AS ${AFFECTED_ROWS};`,
-        { replacements: binds, type: QueryTypes.SELECT, transaction }
+        { replacements: binds, type: driver().QueryTypes.SELECT, transaction }
       )) as Record<string, unknown>[];
 
       return Number(rows.at(-1)?.[AFFECTED_ROWS] ?? 0);
@@ -124,7 +132,7 @@ export class SequelizeConnector implements ISqlDbPlugin {
 
     const affected = (await this.connection.query(sql, {
       replacements: binds,
-      type: QueryTypes.BULKUPDATE,
+      type: driver().QueryTypes.BULKUPDATE,
       transaction,
     })) as unknown as number;
 
@@ -142,7 +150,7 @@ export class SequelizeConnector implements ISqlDbPlugin {
     // pool could end up on another connection and return the wrong id.
     const [insertedId, affected] = (await this.connection.query(sql, {
       replacements: binds,
-      type: QueryTypes.INSERT,
+      type: driver().QueryTypes.INSERT,
       transaction,
     })) as unknown as [number, number];
 
@@ -165,7 +173,7 @@ export class SequelizeConnector implements ISqlDbPlugin {
       if (expects === "rows") {
         const rows = (await this.connection.query(sql, {
           replacements: binds,
-          type: QueryTypes.SELECT,
+          type: driver().QueryTypes.SELECT,
           transaction,
         })) as TRow[];
 

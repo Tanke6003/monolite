@@ -1,16 +1,7 @@
-// NOTE ON THE OPTIONAL DRIVER: `oracledb` is declared as an *optional* peer
-// dependency, but this static import defeats that: requiring this module loads
-// the driver, so a consumer that only uses PostgreSQL still needs `oracledb`
-// installed or the import throws before a single line of their code runs. The
-// module-level configuration below makes it worse, because it runs on import.
-// Before the optional peer dependency truly works this has to become a lazy
-// `const oracledb = await import("oracledb")` resolved inside `getPool()` —the
-// first place that really needs the driver— with the global settings applied
-// right after loading it. The import is kept static for now to keep this port a
-// straight translation; making it lazy is a separate change.
-import oracledb from "oracledb";
+import type * as oracledb from "oracledb";
 import type { ILogger } from "@monolite/core";
 import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor.js";
+import { loadOptionalDriver } from "./optional-driver.js";
 
 /**
  * An Oracle bind: either the value itself, or a descriptor for output
@@ -74,13 +65,34 @@ export interface OracleConnectionConfig {
   poolIncrement?: number;
 }
 
-// Returning objects (`{ PK_USER: 1 }`) instead of positional arrays is what lets
-// the generic repository map column -> property without knowing the order of the
-// SELECT. It is global driver configuration, set exactly once.
-oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
-// LOBs arrive as strings instead of as streams: it simplifies the mapping and
-// our text columns are small.
-oracledb.fetchAsString = [oracledb.CLOB];
+type OracleDriver = typeof import("oracledb");
+
+let loaded: OracleDriver | undefined;
+
+/**
+ * The driver, required on first use and configured once.
+ *
+ * Both halves matter. The require is deferred because `oracledb` is an optional
+ * peer dependency and a project on PostgreSQL does not have it; the settings
+ * below used to run at module scope, which meant they ran on import — for
+ * everybody, whichever engine they were on.
+ */
+function driver(): OracleDriver {
+  if (loaded) return loaded;
+
+  const oracle = loadOptionalDriver<OracleDriver>("oracledb", "Oracle");
+
+  // Returning objects (`{ PK_USER: 1 }`) instead of positional arrays is what
+  // lets the generic repository map column -> property without knowing the
+  // order of the SELECT.
+  oracle.outFormat = oracle.OUT_FORMAT_OBJECT;
+  // LOBs arrive as strings instead of as streams: it simplifies the mapping and
+  // our text columns are small.
+  oracle.fetchAsString = [oracle.CLOB];
+
+  loaded = oracle;
+  return oracle;
+}
 
 function toMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -115,7 +127,7 @@ export class OracleConnector implements IOracleConnector {
     if (this.closed) throw new Error("[OracleConnector] The pool has already been closed.");
 
     if (!this.pending) {
-      this.pending = oracledb
+      this.pending = driver()
         .createPool({
           user: this.config.user,
           password: this.config.password,
@@ -225,7 +237,8 @@ export class OracleConnector implements IOracleConnector {
     params.forEach((value, i) => {
       binds[`p${i}`] = value;
     });
-    binds.cursor = { dir: oracledb.BIND_OUT, type: oracledb.CURSOR };
+    const oracle = driver();
+    binds.cursor = { dir: oracle.BIND_OUT, type: oracle.CURSOR };
 
     const placeholders = params.map((_, i) => `:p${i}`).concat(":cursor").join(", ");
     const sql = `BEGIN ${spName}(${placeholders}); END;`;
