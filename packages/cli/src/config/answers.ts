@@ -37,7 +37,7 @@ export interface ProjectAnswers {
  * this monorepo, and a scaffold that pins `core` and `http` to different minors
  * is a support ticket waiting to happen.
  */
-export const MONOLITE_VERSION = "^0.1.4";
+export const MONOLITE_VERSION = "^0.2.0";
 
 /** Third-party runtime dependencies every generated project needs. */
 const BASE_DEPENDENCIES: Record<string, string> = {
