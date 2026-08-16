@@ -1,6 +1,6 @@
 {
   "name": "monolite-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scaffolds and extends backend projects built on the monolite toolkit.",
   "keywords": [
     "monolite",

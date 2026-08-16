@@ -1,6 +1,6 @@
 {
   "name": "monolite-http",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Decorator-driven Express layer: routing, validation, error handling, security policy and OpenAPI generated from the same metadata.",
   "keywords": [
     "monolite",
@@ -44,7 +44,7 @@
     "access": "public"
   },
   "dependencies": {
-    "monolite-core": "0.1.0",
+    "monolite-core": "^0.1.1",
     "@types/cors": "^2.8.19",
     "cors": "^2.8.5",
     "express-rate-limit": "^8.6.2",
