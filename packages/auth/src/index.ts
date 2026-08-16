@@ -27,6 +27,10 @@ export type {
   TokenClaims,
 } from "./contracts.js";
 
+// ------------------------------------------------------  container tokens  ---
+export { AUTH_TOKENS } from "./tokens.js";
+export type { AuthToken } from "./tokens.js";
+
 // ---------------------------------------------------------------  tokens  ---
 export { JwtTokenService } from "./jwt.token-service.js";
 export type { JwtTokenServiceOptions } from "./jwt.token-service.js";

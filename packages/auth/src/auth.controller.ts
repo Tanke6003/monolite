@@ -2,6 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { ApiController, Post } from "@monolite/http";
 import { z } from "zod";
 import type { Credentials, IAuthService } from "./contracts.js";
+import { AUTH_TOKENS } from "./tokens.js";
 
 /** The body of `POST /auth/login`. Exported so an app can reuse or extend it. */
 export const loginSchema = z.object({
@@ -39,7 +40,11 @@ export const authResultSchema = z.object({
  * about the application's persistence, so it does not belong to a package that
  * refuses to know how anything is stored. Better absent than pretended.
  */
-@ApiController("/auth", { tag: "Auth" })
+// The token is declared here, and not left to the application, because a router
+// that mounts every decorated controller it finds resolves each one by the
+// token on its metadata. Without it this controller is discovered and then
+// cannot be served.
+@ApiController("/auth", { tag: "Auth", token: AUTH_TOKENS.IAuthController })
 export class AuthController {
   /**
    * Extra middleware for the login route — a rate limiter, in practice.

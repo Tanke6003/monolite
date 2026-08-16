@@ -111,6 +111,16 @@ export interface ControllerMetadata {
  * It is indexed by constructor and not by name so that two controllers with the
  * same name in different modules do not overwrite each other.
  */
+/**
+ * A decorated controller class.
+ *
+ * `never[]` rather than `unknown[]` because nothing here ever constructs one —
+ * the container does, from the arguments its own decorators declared. This type
+ * only has to be the shape a class satisfies and an instance does not, which is
+ * what stops an already-built controller being passed where the class belongs.
+ */
+export type ControllerType = new (...args: never[]) => object;
+
 const REGISTRY = new Map<object, ControllerMetadata>();
 
 function metadataOf(target: object): ControllerMetadata {
@@ -245,7 +255,16 @@ export function getControllerMetadata(target: object): ControllerMetadata | null
   return metadata;
 }
 
-/** Every registered controller. The OpenAPI generator uses this. */
-export function registeredControllers(): [object, ControllerMetadata][] {
-  return [...REGISTRY.entries()];
+/**
+ * Every registered controller, the class first.
+ *
+ * The registry is keyed by `object` because that is all a property decorator
+ * knows about the `constructor` it is handed, but every key in it arrived from
+ * decorating a class and there is no other way in. Narrowing here rather than
+ * at each call site is what lets an application feed this straight back into
+ * `registerController`, which is the whole point of walking the registry: the
+ * OpenAPI generator only wants the metadata, but the router wants the class.
+ */
+export function registeredControllers(): [ControllerType, ControllerMetadata][] {
+  return [...REGISTRY.entries()] as [ControllerType, ControllerMetadata][];
 }
