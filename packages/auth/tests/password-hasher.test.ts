@@ -8,7 +8,7 @@
  * because the caller of `verify` is a login, and a throw there turns a stale
  * column into a 500 instead of a refused sign-in.
  */
-import { ScryptPasswordHasher } from "@monolite/auth";
+import { ScryptPasswordHasher } from "monolite-auth";
 
 // `require` rather than `import * as`: with `esModuleInterop` the namespace
 // import is a *copy* of the module's exports, and a spy on a copy would not be

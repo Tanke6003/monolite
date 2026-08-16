@@ -15,7 +15,7 @@ import {
  * startup, are never exercised by a happy-path request, and whose failure mode
  * is silent. They are also the only part of the bootstrap with no dependency on
  * the container, so this file proves the toolchain works before a single
- * `@monolite/*` package has to resolve.
+ * `monolite-*` package has to resolve.
  */
 describe("configuration helpers", () => {
   describe("toInt", () => {

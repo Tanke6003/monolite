@@ -10,7 +10,7 @@
  */
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
-import type { IRequestContext } from "@monolite/core";
+import type { IRequestContext } from "monolite-core";
 import {
   ApiController,
   Get,
@@ -18,8 +18,8 @@ import {
   registerController,
   sortedRoutes,
   type RouteMetadata,
-} from "@monolite/http";
-import { Crud, CrudController, type ICrudService } from "@monolite/crud";
+} from "monolite-http";
+import { Crud, CrudController, type ICrudService } from "monolite-crud";
 import { serve } from "./support/http-client.js";
 
 interface ItemDTO {

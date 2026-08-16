@@ -28,7 +28,7 @@ export interface ProjectAnswers {
 }
 
 /**
- * Range the generated project depends on for every `@monolite/*` package.
+ * Range the generated project depends on for every `monolite-*` package.
  *
  * One constant rather than one per package: they are released together out of
  * this monorepo, and a scaffold that pins `core` and `http` to different minors
@@ -63,12 +63,12 @@ const BASE_DEV_DEPENDENCIES: Record<string, string> = {
 
 export function dependenciesFor(answers: ProjectAnswers): Record<string, string> {
   return sorted({
-    "@monolite/core": MONOLITE_VERSION,
-    "@monolite/crud": MONOLITE_VERSION,
-    "@monolite/data": MONOLITE_VERSION,
-    "@monolite/di": MONOLITE_VERSION,
-    "@monolite/http": MONOLITE_VERSION,
-    ...(answers.auth ? { "@monolite/auth": MONOLITE_VERSION } : {}),
+    "monolite-core": MONOLITE_VERSION,
+    "monolite-crud": MONOLITE_VERSION,
+    "monolite-data": MONOLITE_VERSION,
+    "monolite-di": MONOLITE_VERSION,
+    "monolite-http": MONOLITE_VERSION,
+    ...(answers.auth ? { "monolite-auth": MONOLITE_VERSION } : {}),
     ...BASE_DEPENDENCIES,
     ...answers.engine.dependencies,
   });
@@ -98,7 +98,7 @@ function asJsonBody(entries: Record<string, string>): string {
 function engineSentence(engine: EngineSpec): string {
   return engine.id === "memory"
     ? "the in-memory driver, so it runs with nothing else installed"
-    : `${engine.label}, through the generic repository in \`@monolite/data\``;
+    : `${engine.label}, through the generic repository in \`monolite-data\``;
 }
 
 export function buildRenderContext(answers: ProjectAnswers): RenderContext {

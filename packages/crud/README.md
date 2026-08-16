@@ -1,8 +1,8 @@
-# @monolite/crud
+# monolite-crud
 
 The CRUD you stop writing.
 
-`@monolite/data` removed the SQL: you describe a table and get a repository.
+`monolite-data` removed the SQL: you describe a table and get a repository.
 This package does the same thing one layer up. You supply a repository and a
 mapper, and you get the service; you put one decorator on the controller, and
 you get the five routes with their validation and their OpenAPI. What
@@ -18,11 +18,11 @@ business rules overrides the verb that has them and keeps the other four.
 ## Install
 
 ```bash
-npm install @monolite/crud
+npm install monolite-crud
 ```
 
 It expects `express@^5` in the host application, and it builds on
-`@monolite/core`, `@monolite/data` and `@monolite/http`.
+`monolite-core`, `monolite-data` and `monolite-http`.
 
 ## Usage
 
@@ -32,7 +32,7 @@ A whole module, end to end.
 property, and both directions follow from it:
 
 ```ts
-import { createMapper } from "@monolite/crud";
+import { createMapper } from "monolite-crud";
 
 const userMapper = createMapper<IUser, UserDTO>({
   id: "pkUser",
@@ -48,8 +48,8 @@ const userMapper = createMapper<IUser, UserDTO>({
 the listing has to filter:
 
 ```ts
-import { CrudService } from "@monolite/crud";
-import type { IGenericRepository, QueryOptions } from "@monolite/data";
+import { CrudService } from "monolite-crud";
+import type { IGenericRepository, QueryOptions } from "monolite-data";
 
 export class UsersService extends CrudService<IUser, UserDTO> {
   constructor(repository: IGenericRepository<IUser>) {
@@ -68,8 +68,8 @@ concrete class — it cannot live on the base, or the routes would register unde
 the base's name:
 
 ```ts
-import { Crud, CrudController } from "@monolite/crud";
-import { ApiController } from "@monolite/http";
+import { Crud, CrudController } from "monolite-crud";
+import { ApiController } from "monolite-http";
 
 @ApiController("/users", { tag: "Users" })
 @Crud({
@@ -114,7 +114,7 @@ method body. If a transaction is already open it joins it instead of nesting
 another, so two transactional services calling each other share one commit.
 
 ```ts
-import { lockRow, Transactional, TransactionalService } from "@monolite/crud";
+import { lockRow, Transactional, TransactionalService } from "monolite-crud";
 
 export class AppointmentsService extends TransactionalService {
   @Transactional()

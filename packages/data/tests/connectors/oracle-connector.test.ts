@@ -1,5 +1,5 @@
 import oracledb from "oracledb";
-import { OracleConnector } from "@monolite/data";
+import { OracleConnector } from "monolite-data";
 
 // The real driver would open an actual connection; here the only thing that
 // matters is what the connector asks it for and how it translates its answers.

@@ -1,5 +1,5 @@
 {
-  "name": "@monolite/di",
+  "name": "monolite-di",
   "version": "0.1.0",
   "description": "tsyringe wiring for the monolite toolkit: framework tokens, engine factories and composition-root helpers.",
   "keywords": [
@@ -42,8 +42,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@monolite/core": "0.1.0",
-    "@monolite/data": "0.1.0",
+    "monolite-core": "0.1.0",
+    "monolite-data": "0.1.0",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }

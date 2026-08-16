@@ -1,6 +1,6 @@
 # Autenticación
 
-> 🇬🇧 [Read in English](../en/authentication.md) · paquete: `@monolite/auth`
+> 🇬🇧 [Read in English](../en/authentication.md) · paquete: `monolite-auth`
 
 Opcional y enchufable. El paquete aporta lo que es igual en todas las aplicaciones
 —el flujo de login, un servicio de tokens, un hasheador de contraseñas, el
@@ -42,7 +42,7 @@ import {
   ScryptPasswordHasher,
   requireAuth,
   requireRoles,
-} from "@monolite/auth";
+} from "monolite-auth";
 
 const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();

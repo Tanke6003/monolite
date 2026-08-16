@@ -8,7 +8,7 @@
 import type { CorsOptions } from "cors";
 import rateLimit, { type RateLimitRequestHandler } from "express-rate-limit";
 import type { HelmetOptions } from "helmet";
-import { AppError, type ILogger } from "@monolite/core";
+import { AppError, type ILogger } from "monolite-core";
 import { REQUEST_ID_HEADER } from "../middlewares/request-context.js";
 import type { EnvSource } from "./env-source.js";
 

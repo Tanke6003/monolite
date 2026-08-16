@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
-import { createMapper, CrudService } from "@monolite/crud";
-import type { IGenericRepository } from "@monolite/data";
+import { createMapper, CrudService } from "monolite-crud";
+import type { IGenericRepository } from "monolite-data";
 import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import type { __dtoName__ } from "../dtos/__entityKebab__.dto";
 import { __entityUpper___TOKENS } from "../../composition/modules/__entityKebab__.tokens";

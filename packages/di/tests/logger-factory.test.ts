@@ -1,5 +1,5 @@
-import { createLogger } from "@monolite/di";
-import type { LoggerDriverFactory, LoggerSettings } from "@monolite/di";
+import { createLogger } from "monolite-di";
+import type { LoggerDriverFactory, LoggerSettings } from "monolite-di";
 import { envsFrom, silentLogger } from "./support/test-entity";
 
 /**

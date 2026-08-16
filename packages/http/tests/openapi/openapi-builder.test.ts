@@ -21,7 +21,7 @@ import {
   buildOpenApiDocument,
   buildOpenApiPaths,
   getControllerMetadata,
-} from "@monolite/http";
+} from "monolite-http";
 
 const querySchema = z.object({
   page: z.string().optional(),
@@ -368,7 +368,7 @@ describe("buildOpenApiDocument", () => {
    */
   it("documents every registered controller when it is given no list", async () => {
     await jest.isolateModulesAsync(async () => {
-      const http = (await import("@monolite/http")) as typeof import("@monolite/http");
+      const http = (await import("monolite-http")) as typeof import("monolite-http");
 
       @http.ApiController("/only", { tag: "Only" })
       class OnlyController {

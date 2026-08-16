@@ -8,7 +8,7 @@
  * fails when they stop.
  */
 import { z } from "zod";
-import { buildDtoComponents, defineDto, definePagedDto } from "@monolite/http";
+import { buildDtoComponents, defineDto, definePagedDto } from "monolite-http";
 
 const userDto = defineDto(
   "User",

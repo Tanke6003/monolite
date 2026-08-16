@@ -21,7 +21,7 @@ import {
   type IHealthProbe,
   type ILogger,
   type IRequestContext,
-} from "@monolite/core";
+} from "monolite-core";
 import {
   ApiController,
   Get,
@@ -32,7 +32,7 @@ import {
   type CreateAppOptions,
   type EnvSource,
   type HttpApp,
-} from "@monolite/http";
+} from "monolite-http";
 import { httpClient, type TestClient } from "../support/http-client.js";
 
 const envsOf = (values: Record<string, string> = {}): EnvSource => ({

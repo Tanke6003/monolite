@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
-import type { IRequestContext } from "@monolite/core";
-import { AppError } from "@monolite/core";
-import { BaseController, parseId } from "@monolite/http";
+import type { IRequestContext } from "monolite-core";
+import { AppError } from "monolite-core";
+import { BaseController, parseId } from "monolite-http";
 import type { ICrudService, ListOptions } from "./crud.service.js";
 
 /** The HTTP contract `@Crud()` mounts. A module may replace any of them. */
@@ -23,7 +23,7 @@ interface PagedQuery {
 /**
  * What the CRUD reads off the request on top of Express's own fields.
  *
- * The query validator in `@monolite/http` leaves the parsed query in
+ * The query validator in `monolite-http` leaves the parsed query in
  * `validatedQuery` and declares the property on Express's `Request` by
  * declaration merging. Going through this intersection rather than leaning on
  * that ambient declaration keeps the CRUD compiling on its own, whatever subset

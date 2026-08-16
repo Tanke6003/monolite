@@ -1,5 +1,5 @@
 /**
- * `@monolite/http` — the decorator-driven Express layer.
+ * `monolite-http` — the decorator-driven Express layer.
  *
  * A controller declares its own routes: which verb it serves, on which path,
  * what it validates and what it answers. Out of that single declaration come

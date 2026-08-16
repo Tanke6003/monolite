@@ -2,7 +2,7 @@
 
 __projectDescription__
 
-Scaffolded with [`@monolite/cli`](https://www.npmjs.com/package/@monolite/cli). It runs on
+Scaffolded with [`monolite-cli`](https://www.npmjs.com/package/monolite-cli). It runs on
 Express 5 and TypeScript, laid out as Clean Architecture, and persists through __engineSentence__.
 
 ## Getting started
@@ -98,7 +98,7 @@ matter, with the defaults this project was generated with:
 | --- | --- | --- |
 | `PORT` | `3000` | Port the HTTP server binds |
 | `API_PREFIX` | `__apiPrefix__` | Where the API is mounted |
-| `DATA_SOURCE` | `__dataSource__` | Which driver `@monolite/data` builds |
+| `DATA_SOURCE` | `__dataSource__` | Which driver `monolite-data` builds |
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma separated. Empty = same origin only |
 | `BODY_LIMIT` | `1mb` | Maximum JSON body |
 | `TRUST_PROXY_HOPS` | `0` | Trusted proxies in front of the app |
@@ -139,7 +139,7 @@ A plain CRUD module writes no query and no route:
 - **`domain/models/*.model.ts`** — the entity, as an interface. No decorators, no base
   class, nothing from the framework.
 - **`infrastructure/persistence/entities/*.entity.ts`** — `defineEntity` maps it to a
-  table. This is the only file that names a column; from here `@monolite/data` generates
+  table. This is the only file that names a column; from here `monolite-data` generates
   the whole CRUD.
 - **`application/services/*.service.ts`** — extends `CrudService`, which already knows
   how to page, map and soft delete. A module with a real rule overrides the one verb

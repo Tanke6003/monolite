@@ -5,7 +5,7 @@ import {
   createPersistenceLayer,
   isOracleDriver,
   resolveDriver,
-} from "@monolite/di";
+} from "monolite-di";
 import {
   AUDIT_LOG_ENTITY,
   envsFrom,

@@ -5,7 +5,7 @@
  * whole promise of the package: a project on PostgreSQL installs `pg` and
  * `sequelize` and nothing else. A static `import` at the top of a connector
  * defeats that completely — the module graph is resolved before a single line
- * runs, so importing `@monolite/data` at all would require Oracle's driver,
+ * runs, so importing `monolite-data` at all would require Oracle's driver,
  * MongoDB's and Sequelize's to be present, whichever engine is configured.
  *
  * So the drivers are required at the point the connector is built, which only

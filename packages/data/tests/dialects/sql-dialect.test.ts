@@ -4,7 +4,7 @@ import {
   postgresDialect,
   sqlServerDialect,
   SqlGenericRepository,
-} from "@monolite/data";
+} from "monolite-data";
 import { FakeSqlExecutor, silentLogger } from "../support/fake-sql-executor";
 import { ITestItem, IPlainItem, PLAIN_ENTITY, TEST_ENTITY } from "../support/test-entity";
 

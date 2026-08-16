@@ -1,4 +1,4 @@
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import type { IEnvs } from "./env.js";
 
 /** What every logging backend is given, whichever one is picked. */

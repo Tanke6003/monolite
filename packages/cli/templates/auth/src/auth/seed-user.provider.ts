@@ -1,11 +1,11 @@
 import { inject, injectable } from "tsyringe";
-import { AUTH_TOKENS } from "@monolite/auth";
-import type { AuthUserWithSecret, IPasswordHasher, IUserProvider } from "@monolite/auth";
+import { AUTH_TOKENS } from "monolite-auth";
+import type { AuthUserWithSecret, IPasswordHasher, IUserProvider } from "monolite-auth";
 
 /**
  * Where the login looks its users up. **Replace this.**
  *
- * `IUserProvider` is the one thing `@monolite/auth` cannot supply: it knows how
+ * `IUserProvider` is the one thing `monolite-auth` cannot supply: it knows how
  * to check a password, mint a token and guard a route, but it has no opinion
  * about your users' table, and that is what keeps it usable in a project whose
  * identities live in LDAP or behind another service.

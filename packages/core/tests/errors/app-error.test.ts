@@ -1,4 +1,4 @@
-import { AppError } from "@monolite/core";
+import { AppError } from "monolite-core";
 
 describe("AppError", () => {
   it("should create an error with the given message and statusCode", () => {

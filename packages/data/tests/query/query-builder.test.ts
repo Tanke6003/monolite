@@ -1,4 +1,4 @@
-import { QueryBuilder } from "@monolite/data";
+import { QueryBuilder } from "monolite-data";
 import { ITestItem } from "../support/test-entity";
 
 describe("QueryBuilder", () => {

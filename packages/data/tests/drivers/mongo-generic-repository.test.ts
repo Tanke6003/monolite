@@ -1,12 +1,12 @@
 import type { ClientSession } from "mongodb";
-import { AsyncRequestContext } from "@monolite/core";
+import { AsyncRequestContext } from "monolite-core";
 import {
   defineEntity,
   MongoAuditTrail,
   MongoGenericRepository,
   QueryBuilder,
   type IAuditLog,
-} from "@monolite/data";
+} from "monolite-data";
 import { FakeMongoDataSource } from "../support/fake-mongo";
 import { silentLogger } from "../support/fake-sql-executor";
 import {

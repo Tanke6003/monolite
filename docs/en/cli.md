@@ -1,9 +1,9 @@
 # CLI reference
 
-> 🇪🇸 [Leer en español](../es/cli.md) · package: `@monolite/cli`
+> 🇪🇸 [Leer en español](../es/cli.md) · package: `monolite-cli`
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite new my-api
 ```
 
@@ -68,7 +68,7 @@ real value.
 
 | Flag | Default | Effect |
 | --- | --- | --- |
-| `--auth` / `--no-auth` | on | Adds `@monolite/auth`, a login module and a guard |
+| `--auth` / `--no-auth` | on | Adds `monolite-auth`, a login module and a guard |
 | `--example` / `--no-example` | on | A sample CRUD module, end to end |
 
 ### Afterwards
@@ -167,6 +167,6 @@ Two conventions worth knowing if you edit them:
   `.npmignore`, so the template would never reach the tarball under its own name.
   The renderer restores the dot on write.
 - **Templates are excluded from this repository's typecheck and lint.** They are
-  TypeScript for the *generated* project — they import `@monolite/*` packages that
+  TypeScript for the *generated* project — they import `monolite-*` packages that
   are not dependencies here, and they contain placeholders that are not valid
   syntax until rendered.

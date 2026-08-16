@@ -1,4 +1,4 @@
-# @monolite/auth
+# monolite-auth
 
 Authentication you can plug your own everything into.
 
@@ -16,11 +16,11 @@ and an application that already authenticates somewhere else can take
 ## Install
 
 ```bash
-npm install @monolite/auth
+npm install monolite-auth
 ```
 
-It expects `express@^5` in the host application, and builds on `@monolite/core`
-and `@monolite/http`.
+It expects `express@^5` in the host application, and builds on `monolite-core`
+and `monolite-http`.
 
 ## Usage
 
@@ -32,7 +32,7 @@ import {
   ScryptPasswordHasher,
   requireAuth,
   requireRoles,
-} from "@monolite/auth";
+} from "monolite-auth";
 
 const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
@@ -64,7 +64,7 @@ found", because telling a missing user apart from a broken lookup is exactly
 what the login flow refuses to leak.
 
 ```ts
-import type { AuthUserWithSecret, IUserProvider } from "@monolite/auth";
+import type { AuthUserWithSecret, IUserProvider } from "monolite-auth";
 
 export class SqlUserProvider implements IUserProvider {
   constructor(private readonly users: IGenericRepository<IUser>) {}
@@ -109,7 +109,7 @@ To use argon2id or bcrypt instead, implement the same two methods:
 
 ```ts
 import argon2 from "argon2";
-import type { IPasswordHasher } from "@monolite/auth";
+import type { IPasswordHasher } from "monolite-auth";
 
 export class Argon2PasswordHasher implements IPasswordHasher {
   hash(plain: string): Promise<string> {
@@ -156,7 +156,7 @@ asking without threading the user through every signature.
 requireAuth(tokens, {
   context: requestContext,
   // For an issuer whose claims the toolkit does not recognise. The default is
-  // `toCurrentUser` from @monolite/http, which already knows what OIDC and
+  // `toCurrentUser` from monolite-http, which already knows what OIDC and
   // Azure AD emit — and is the same function the request context is built on.
   toCurrentUser: (claims) => ({ id: claims.uid as string, name: "...", email: null, roles: [] }),
 });

@@ -10,9 +10,9 @@
  * a package that refuses to know how anything is stored.
  */
 import express, { type Express, type RequestHandler } from "express";
-import { AppError } from "@monolite/core";
-import { errorHandler, getControllerMetadata, registerController } from "@monolite/http";
-import { AuthController, authResultSchema, loginSchema, type IAuthService } from "@monolite/auth";
+import { AppError } from "monolite-core";
+import { errorHandler, getControllerMetadata, registerController } from "monolite-http";
+import { AuthController, authResultSchema, loginSchema, type IAuthService } from "monolite-auth";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 const result = {

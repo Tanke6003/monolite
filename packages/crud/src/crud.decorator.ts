@@ -1,5 +1,5 @@
 import type { ZodType } from "zod";
-import { Delete, Get, Post, Put, type RouteOptions } from "@monolite/http";
+import { Delete, Get, Post, Put, type RouteOptions } from "monolite-http";
 
 /** The five verbs `CrudController` implements. */
 export type CrudVerb = "list" | "getOne" | "create" | "update" | "softDelete";

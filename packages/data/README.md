@@ -1,4 +1,4 @@
-# @monolite/data
+# monolite-data
 
 One repository contract over six engines: **in-memory, Oracle, SQL Server,
 PostgreSQL, MySQL/MariaDB and MongoDB**.
@@ -9,7 +9,7 @@ columns and a change log — plus a chainable query API in the style of LINQ's
 `IQueryable<T>`. Which engine is underneath is a wiring decision, not a code
 decision: nothing above the repository changes when it changes.
 
-Depends only on [`@monolite/core`](../core). Every database driver is an
+Depends only on [`monolite-core`](../core). Every database driver is an
 **optional** peer dependency, so a project on PostgreSQL never downloads Oracle.
 
 Requires Node 20 or newer.
@@ -95,7 +95,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 Describe the table once:
 
 ```ts
-import { defineEntity } from "@monolite/data";
+import { defineEntity } from "monolite-data";
 
 interface Branch {
   pkBranch: number;
@@ -133,7 +133,7 @@ import {
   SqlGenericRepository,
   postgresDialect,
   type IGenericRepository,
-} from "@monolite/data";
+} from "monolite-data";
 
 declare const useDatabase: boolean;
 
@@ -201,7 +201,7 @@ await unitOfWork.execute(async (scope) => {
 ### Verifying your own driver
 
 ```ts
-import { runGenericRepositoryContract, CONTRACT_ENTITY, MemoryGenericRepository } from "@monolite/data";
+import { runGenericRepositoryContract, CONTRACT_ENTITY, MemoryGenericRepository } from "monolite-data";
 
 runGenericRepositoryContract("memory", {
   create: () => new MemoryGenericRepository(CONTRACT_ENTITY),

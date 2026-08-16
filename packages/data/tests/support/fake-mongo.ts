@@ -1,5 +1,5 @@
 import type { Collection, Document } from "mongodb";
-import type { IMongoDataSource } from "@monolite/data";
+import type { IMongoDataSource } from "monolite-data";
 
 /**
  * Fake MongoDB: in-memory collections that understand exactly the subset of the

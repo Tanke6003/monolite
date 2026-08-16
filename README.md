@@ -18,18 +18,18 @@ Every package works on its own. Install the one you need and ignore the rest.
 
 | Package | What it is | Depends on |
 | --- | --- | --- |
-| [`@monolite/core`](./packages/core) | Errors, logger and request-context contracts, `AsyncLocalStorage` request identity, health probe. Zero dependencies. | — |
-| [`@monolite/data`](./packages/data) | One `IGenericRepository<T>` over in-memory, Oracle, SQL Server, PostgreSQL, MySQL and MongoDB. Unit of work, SQL dialects, filter compilers. | `core` |
-| [`@monolite/http`](./packages/http) | `@ApiController` / `@Get` / `@Post` decorators, router builder, Zod validation, error handler, security defaults, OpenAPI 3.1 generation. | `core` |
-| [`@monolite/crud`](./packages/crud) | Generic `CrudService` / `CrudController` and a `@Crud()` decorator: five endpoints per entity, each one overridable. Ambient transactions via `@Transactional()`. | `core`, `data`, `http` |
-| [`@monolite/auth`](./packages/auth) | Optional authentication: login, JWT issuing and verification, password hashing, `requireAuth` / `requireRoles` guards. | `core`, `http` |
-| [`@monolite/di`](./packages/di) | The tsyringe composition root, kept separate so nothing else depends on a container. | `core`, `data` |
-| [`@monolite/cli`](./packages/cli) | `monolite new` — scaffolds a project and asks which database you want. | — |
+| [`monolite-core`](./packages/core) | Errors, logger and request-context contracts, `AsyncLocalStorage` request identity, health probe. Zero dependencies. | — |
+| [`monolite-data`](./packages/data) | One `IGenericRepository<T>` over in-memory, Oracle, SQL Server, PostgreSQL, MySQL and MongoDB. Unit of work, SQL dialects, filter compilers. | `core` |
+| [`monolite-http`](./packages/http) | `@ApiController` / `@Get` / `@Post` decorators, router builder, Zod validation, error handler, security defaults, OpenAPI 3.1 generation. | `core` |
+| [`monolite-crud`](./packages/crud) | Generic `CrudService` / `CrudController` and a `@Crud()` decorator: five endpoints per entity, each one overridable. Ambient transactions via `@Transactional()`. | `core`, `data`, `http` |
+| [`monolite-auth`](./packages/auth) | Optional authentication: login, JWT issuing and verification, password hashing, `requireAuth` / `requireRoles` guards. | `core`, `http` |
+| [`monolite-di`](./packages/di) | The tsyringe composition root, kept separate so nothing else depends on a container. | `core`, `data` |
+| [`monolite-cli`](./packages/cli) | `monolite new` — scaffolds a project and asks which database you want. | — |
 
 ## Quick start
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite new my-api
 ```
 
@@ -47,11 +47,11 @@ monolite new my-api --database=postgres --auth --example --yes
 ## Or use the packages directly
 
 An existing Express application can adopt a single package. This is the whole of a
-CRUD module once `@monolite/crud` is in place:
+CRUD module once `monolite-crud` is in place:
 
 ```ts
-import { Crud } from "@monolite/crud";
-import { ApiController } from "@monolite/http";
+import { Crud } from "monolite-crud";
+import { ApiController } from "monolite-http";
 
 @ApiController("/branches", { tag: "Branches" })
 @Crud({ resource: "branch", dto: BranchDto, paged: true })
@@ -65,7 +65,7 @@ declaring a method with the same name; the decorator only fills the gaps.
 ## Why this exists
 
 Most backend templates make one database decision for you and bury it in three
-hundred files. Monolite's `@monolite/data` puts every engine behind the same
+hundred files. Monolite's `monolite-data` puts every engine behind the same
 contract and every engine-specific difference behind a `SqlDialect`, so switching
 from Oracle to PostgreSQL is a configuration change plus one dialect object, not a
 rewrite. The same idea drives the rest: the OpenAPI document is generated from the

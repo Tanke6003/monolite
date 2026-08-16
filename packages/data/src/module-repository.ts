@@ -1,4 +1,4 @@
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import type {
   IGenericRepository,
   IQueryable,

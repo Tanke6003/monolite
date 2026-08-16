@@ -1,5 +1,5 @@
 /**
- * `@monolite/core` — the kernel every other package builds on.
+ * `monolite-core` — the kernel every other package builds on.
  *
  * It carries the vocabulary the whole toolkit shares: the error type services
  * throw, the mapper that turns anything thrown into an HTTP-shaped answer, the

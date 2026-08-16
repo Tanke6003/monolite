@@ -1,5 +1,5 @@
 import type { ClientSession, Collection, Db, Document, MongoClient } from "mongodb";
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import type { DbEngine, IDbPlugin } from "../contracts/db-plugin.js";
 import { loadOptionalDriver } from "./optional-driver.js";
 

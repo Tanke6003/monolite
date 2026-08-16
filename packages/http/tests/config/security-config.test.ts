@@ -6,7 +6,7 @@
  * whoever deploys raises what they need instead of lowering what they forgot.
  */
 import type { NextFunction, Request, Response } from "express";
-import { AppError, type ILogger } from "@monolite/core";
+import { AppError, type ILogger } from "monolite-core";
 import {
   DEFAULT_CSP_DIRECTIVES,
   REQUEST_ID_HEADER,
@@ -20,7 +20,7 @@ import {
   resolveBodyLimit,
   resolveTrustProxy,
   type EnvSource,
-} from "@monolite/http";
+} from "monolite-http";
 
 /** A fake environment: anything not declared answers "", as a real one does. */
 const envsOf = (values: Record<string, string> = {}): EnvSource => ({

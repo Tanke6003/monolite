@@ -377,7 +377,7 @@ function scaffold(answers: ProjectAnswers, targetDirectory: string, force: boole
   // ones; today none do, and `FileWriter` refuses to overwrite without --force,
   // so an accidental collision surfaces as a missing file in the summary.
   // The in-memory driver contributes no files at all: with the persistence
-  // layer built by `@monolite/di` from `DATA_SOURCE`, what is left under
+  // layer built by `monolite-di` from `DATA_SOURCE`, what is left under
   // `db/<engine>/` is the compose file, and there is no container to run.
   const trees = [
     templatePath("base"),

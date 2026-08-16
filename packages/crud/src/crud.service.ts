@@ -1,5 +1,5 @@
-import type { IGenericRepository, OrderByClause, QueryOptions } from "@monolite/data";
-import { AppError } from "@monolite/core";
+import type { IGenericRepository, OrderByClause, QueryOptions } from "monolite-data";
+import { AppError } from "monolite-core";
 
 /**
  * A page of results as it leaves over HTTP.

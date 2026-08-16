@@ -4,17 +4,17 @@ import {
   AuthService,
   JwtTokenService,
   ScryptPasswordHasher,
-} from "@monolite/auth";
-import type { IAuthService, IPasswordHasher, ITokenService, IUserProvider } from "@monolite/auth";
-import { registerInstance, registerSingleton } from "@monolite/di";
-import type { DependencyContainer } from "@monolite/di";
+} from "monolite-auth";
+import type { IAuthService, IPasswordHasher, ITokenService, IUserProvider } from "monolite-auth";
+import { registerInstance, registerSingleton } from "monolite-di";
+import type { DependencyContainer } from "monolite-di";
 import { SeedUserProvider } from "../auth/seed-user.provider";
 import { readEnv, requireEnv, toInt } from "../config/env";
 
 /**
  * Everything the login flow needs, in one place you own.
  *
- * `@monolite/auth` ships the parts that are the same in every application —
+ * `monolite-auth` ships the parts that are the same in every application —
  * checking a password, minting a token, guarding a route — and refuses to know
  * the one that is not, which is where the users live. That is `IUserProvider`,
  * and the scaffold's implementation is a single seeded account: replace it.
@@ -42,7 +42,7 @@ export function registerAuth(container: DependencyContainer): void {
     // lifetime somebody has to go and measure.
     expiresIn: toInt(readEnv("JWT_EXPIRES_IN"), 3600, 1),
   });
-  // Registered under the string both `@monolite/auth` and `@monolite/di` use,
+  // Registered under the string both `monolite-auth` and `monolite-di` use,
   // so whatever asks for a token service finds this one.
   registerInstance<ITokenService>(container, AUTH_TOKENS.ITokenService, tokens);
 

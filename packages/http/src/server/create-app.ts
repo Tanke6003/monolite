@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import express, { type Application, type RequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import type { IHealthProbe, ILogger, IRequestContext } from "@monolite/core";
+import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 
 import { resolveApiPrefix, resolveLegacyPrefix } from "../config/api.config.js";
 import { processEnv, type EnvSource } from "../config/env-source.js";

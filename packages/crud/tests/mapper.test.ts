@@ -7,7 +7,7 @@
  * arrived as null" is exactly the detail one gets wrong by hand, and getting it
  * wrong wipes columns nobody asked to change.
  */
-import { createMapper } from "@monolite/crud";
+import { createMapper } from "monolite-crud";
 
 interface IThing {
   pkThing: number;

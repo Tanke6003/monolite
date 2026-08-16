@@ -1,4 +1,4 @@
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import { readEnv } from "../config/env";
 
 /**

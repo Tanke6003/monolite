@@ -1,5 +1,5 @@
 /**
- * `@monolite/auth` — optional, pluggable authentication.
+ * `monolite-auth` — optional, pluggable authentication.
  *
  * The package supplies the parts that are the same in every application — the
  * login flow, a token service, a password hasher, the middleware that guards a
@@ -45,7 +45,7 @@ export type { AuthServiceOptions } from "./auth.service.js";
 
 // ----------------------------------------------------------  middleware  ---
 // The claim-to-identity mapping is not re-exported: it is `toCurrentUser` in
-// `@monolite/http`, which is the same function the request context is built
+// `monolite-http`, which is the same function the request context is built
 // around, and having one name for it is the point.
 export { authenticatedUser, requireAuth, requireRoles } from "./auth.middleware.js";
 export type { RequireAuthOptions } from "./auth.middleware.js";

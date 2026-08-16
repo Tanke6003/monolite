@@ -20,7 +20,7 @@ already have. Both are supported; neither is a lesser path.
 ## Path A — scaffold a new project
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite new my-api
 ```
 
@@ -34,7 +34,7 @@ The CLI asks, in order:
 | Database family | SQL | which of the next questions you see |
 | Engine | PostgreSQL | the driver dependency, the docker service, the SQL dialect, the seed schema |
 | Connection details | per-engine defaults | `.env.example` (never a real password) |
-| Authentication | yes | adds `@monolite/auth`, a login module and a guard on the example routes |
+| Authentication | yes | adds `monolite-auth`, a login module and a guard on the example routes |
 | Example CRUD module | yes | one entity end to end, so the pattern is visible |
 | API prefix | `/api/v1` | `API_PREFIX` in the environment |
 | Package manager | npm | lockfile and the install command it runs |
@@ -74,11 +74,11 @@ dependencies, and none of them require the CLI.
 ### Just the data layer
 
 ```bash
-npm install @monolite/core @monolite/data pg
+npm install monolite-core monolite-data pg
 ```
 
 ```ts
-import { EntitySchema, SqlGenericRepository, postgresDialect } from "@monolite/data";
+import { EntitySchema, SqlGenericRepository, postgresDialect } from "monolite-data";
 
 const USERS = {
   table: "USERS",
@@ -105,11 +105,11 @@ to SQL.
 ### Just the routing and OpenAPI
 
 ```bash
-npm install @monolite/core @monolite/http express zod
+npm install monolite-core monolite-http express zod
 ```
 
 ```ts
-import { ApiController, Get, buildOpenApiDocument, registerController } from "@monolite/http";
+import { ApiController, Get, buildOpenApiDocument, registerController } from "monolite-http";
 
 @ApiController("/reports", { tag: "Reports" })
 export class ReportsController {
@@ -124,7 +124,7 @@ your own everything else.
 
 ### Just the errors and request identity
 
-`@monolite/core` has no dependencies at all, so it is safe to adopt in isolation
+`monolite-core` has no dependencies at all, so it is safe to adopt in isolation
 for `AppError` + `normalizeError` + the `AsyncLocalStorage` request context, even
 in a project that will never use the rest.
 

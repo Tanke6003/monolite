@@ -1,5 +1,5 @@
 /**
- * `@monolite/di` — the toolkit's dependency-injection wiring, on tsyringe.
+ * `monolite-di` — the toolkit's dependency-injection wiring, on tsyringe.
  *
  * Everything the rest of the framework needs in order to be assembled lives
  * here, and nothing the rest of the framework needs in order to *work* does.

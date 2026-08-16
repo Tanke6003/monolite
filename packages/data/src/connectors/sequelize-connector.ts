@@ -1,5 +1,5 @@
 import type { Options, Sequelize, Transaction } from "sequelize";
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import type {
   ISqlExecutor,
   SqlExecuteOptions,

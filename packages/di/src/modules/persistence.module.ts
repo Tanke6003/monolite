@@ -1,6 +1,6 @@
-import { HealthProbe } from "@monolite/core";
-import type { IHealthProbe } from "@monolite/core";
-import type { IAuditTrail, IUnitOfWork } from "@monolite/data";
+import { HealthProbe } from "monolite-core";
+import type { IHealthProbe } from "monolite-core";
+import type { IAuditTrail, IUnitOfWork } from "monolite-data";
 import { container as rootContainer, registerInstance } from "../container.js";
 import type { DependencyContainer } from "../container.js";
 import { createPersistenceLayer } from "../repository.factory.js";

@@ -1,6 +1,6 @@
-import { defineEntity, type IAuditLog } from "@monolite/data";
-import type { ILogger } from "@monolite/core";
-import type { IEnvs } from "@monolite/di";
+import { defineEntity, type IAuditLog } from "monolite-data";
+import type { ILogger } from "monolite-core";
+import type { IEnvs } from "monolite-di";
 
 /** Toy entity. The wiring never looks inside one, so two columns are plenty. */
 export interface IWidget {

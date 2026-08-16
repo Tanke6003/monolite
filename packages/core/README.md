@@ -1,4 +1,4 @@
-# @monolite/core
+# monolite-core
 
 The kernel of the monolite toolkit. Every other package depends on it, which is
 exactly why it depends on nothing: no Express, no database driver, no DI
@@ -63,7 +63,7 @@ import {
   HealthProbe,
   normalizeError,
   SYSTEM_USER,
-} from "@monolite/core";
+} from "monolite-core";
 
 const context = new AsyncRequestContext();
 

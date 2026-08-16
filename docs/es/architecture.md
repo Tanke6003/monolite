@@ -43,7 +43,7 @@ Tres reglas mantienen esto honesto:
    reciben sus colaboradores por el constructor, así que quien prefiera Awilix,
    InversifyJS o un `new` a secas nunca instala tsyringe.
 3. **Los drivers de base de datos son peer dependencies opcionales.**
-   `@monolite/data` declara los seis, todos opcionales. Un proyecto con PostgreSQL
+   `monolite-data` declara los seis, todos opcionales. Un proyecto con PostgreSQL
    no se descarga el cliente de Oracle.
 
 ---
@@ -55,13 +55,13 @@ siendo Clean Architecture, y la CLI genera exactamente esta forma:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Presentación   controladores, middlewares          │  ← @monolite/http
+│  Presentación   controladores, middlewares          │  ← monolite-http
 ├─────────────────────────────────────────────────────┤
-│  Aplicación     servicios, DTOs, casos de uso       │  ← @monolite/crud
+│  Aplicación     servicios, DTOs, casos de uso       │  ← monolite-crud
 ├─────────────────────────────────────────────────────┤
 │  Dominio        interfaces y modelos, sin imports   │  ← sólo tu código
 ├─────────────────────────────────────────────────────┤
-│  Infraestructura repositorios, conectores, plugins  │  ← @monolite/data
+│  Infraestructura repositorios, conectores, plugins  │  ← monolite-data
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -78,25 +78,25 @@ tuyos.
 Petición HTTP
     │
     ▼
-Cadena de middlewares                                     @monolite/http
+Cadena de middlewares                                     monolite-http
     │  x-powered-by off → trust proxy → contexto de petición →
     │  helmet → rate limit → cors → parseo del body → log http → static
     │
     ▼
-Router construido a partir de los decoradores             @monolite/http
+Router construido a partir de los decoradores             monolite-http
     │  guarda de autenticación, luego validación Zod de body/query/params
     ▼
-Controlador                                               tuyo, o @monolite/crud
+Controlador                                               tuyo, o monolite-crud
     │  lee la petición, llama al servicio
     ▼
-Servicio                                                  tuyo, o @monolite/crud
+Servicio                                                  tuyo, o monolite-crud
     │  reglas de negocio. Abre una transacción con @Transactional()
     │  cuando el caso de uso escribe en más de un sitio
     ▼
-Repositorio                                               tuyo (fino) + @monolite/data
+Repositorio                                               tuyo (fino) + monolite-data
     │  registra, envuelve los errores del driver, delega
     ▼
-Repositorio genérico — SQL, MongoDB o memoria             @monolite/data
+Repositorio genérico — SQL, MongoDB o memoria             monolite-data
     │  construye la consulta desde el mapeo de la entidad; todo valor va como bind
     ▼
 Respuesta, o un error por el único manejador de errores
@@ -118,7 +118,7 @@ mirando el mismo.
 
 ---
 
-## `@monolite/core` — el vocabulario
+## `monolite-core` — el vocabulario
 
 Todo lo que está aquí existe para que los demás paquetes puedan hablar de los
 mismos conceptos sin depender unos de otros.
@@ -165,7 +165,7 @@ marca un bug: se registra como error y se responde de forma genérica.
 
 ---
 
-## `@monolite/data` — un contrato, seis motores
+## `monolite-data` — un contrato, seis motores
 
 Este es el paquete que el resto del proyecto existe para hacer posible. El detalle
 completo está en [data-access.md](data-access.md); los puntos arquitectónicos son
@@ -199,7 +199,7 @@ un bloqueo real de fila en SQL, y degrada con honestidad en el resto.
 
 ---
 
-## `@monolite/http` — los metadatos son la fuente de verdad
+## `monolite-http` — los metadatos son la fuente de verdad
 
 Un controlador declara sus rutas sobre sí mismo:
 
@@ -256,7 +256,7 @@ manejador de 404 puesto demasiado pronto se traga Swagger.
 
 ---
 
-## `@monolite/crud` — cinco endpoints, todos sobreescribibles
+## `monolite-crud` — cinco endpoints, todos sobreescribibles
 
 `@Crud()` registra `list`, `getOne`, `create`, `update` y `softDelete` para una
 entidad, cada uno con validación, paginación y su entrada de OpenAPI. El decorador
@@ -276,7 +276,7 @@ lectura.
 
 ---
 
-## `@monolite/di` — una hoja a propósito
+## `monolite-di` — una hoja a propósito
 
 tsyringe resuelve por token de cadena, lo que significa que una errata en
 `@inject("IUsersServcie")` compila sin ruido y sólo revienta cuando esa clase se

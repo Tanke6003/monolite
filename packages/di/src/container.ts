@@ -2,7 +2,7 @@
 // constructor dependencies from the design-time types the TypeScript decorators
 // emit, and that metadata only exists if `reflect-metadata` was evaluated
 // before the first decorated class. Doing it in this module means that
-// importing anything from `@monolite/di` is enough: no consumer has to remember
+// importing anything from `monolite-di` is enough: no consumer has to remember
 // the import, and no other package of the toolkit has to carry the dependency.
 import "reflect-metadata";
 import { container as rootContainer, Lifecycle } from "tsyringe";

@@ -2,7 +2,7 @@
  * Colour without a dependency.
  *
  * chalk would be one more package inside a tool whose selling point is that
- * `npm i -g @monolite/cli` pulls nothing else, and the escape codes it wraps
+ * `npm i -g monolite-cli` pulls nothing else, and the escape codes it wraps
  * are four characters long. What is worth copying from it is the *policy*: a
  * CLI that is piped is usually being read by a log file, a CI annotation or
  * another program, and escape sequences there are noise at best and broken

@@ -1,9 +1,9 @@
 # CRUD genérico
 
-> 🇬🇧 [Read in English](../en/crud.md) · paquete: `@monolite/crud`
+> 🇬🇧 [Read in English](../en/crud.md) · paquete: `monolite-crud`
 
-`@monolite/data` quitó la repetición por debajo del servicio: una implementación de
-repositorio en vez de seis. `@monolite/crud` quita la que quedaba por encima — el
+`monolite-data` quitó la repetición por debajo del servicio: una implementación de
+repositorio en vez de seis. `monolite-crud` quita la que quedaba por encima — el
 controlador que parsea un id, lo envuelve todo en `try/catch` y llama a un servicio
 que sólo reenvía al repositorio.
 

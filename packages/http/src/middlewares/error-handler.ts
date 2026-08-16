@@ -5,7 +5,7 @@ import {
   normalizeError,
   type ILogger,
   type IRequestContext,
-} from "@monolite/core";
+} from "monolite-core";
 import { REQUEST_ID_HEADER } from "./request-context.js";
 
 export interface ErrorHandlerOptions {

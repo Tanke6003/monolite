@@ -18,7 +18,7 @@ import {
   errorHandler,
   registerController,
   registerControllers,
-} from "@monolite/http";
+} from "monolite-http";
 import { serve, type ServedApp } from "../support/http-client.js";
 
 const bodySchema = z.object({ name: z.string().min(1).max(10) });

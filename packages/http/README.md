@@ -1,4 +1,4 @@
-# @monolite/http
+# monolite-http
 
 The decorator-driven Express layer of the monolite toolkit. A controller
 declares its own routes — which verb it serves, on which path, what it validates
@@ -54,8 +54,8 @@ without a `.bind()`.
 ## A controller
 
 ```ts
-import { ApiController, BaseController, Get, Post, defineDto, definePagedDto, parseId } from "@monolite/http";
-import type { IRequestContext } from "@monolite/core";
+import { ApiController, BaseController, Get, Post, defineDto, definePagedDto, parseId } from "monolite-http";
+import type { IRequestContext } from "monolite-core";
 import { z } from "zod";
 
 const userDto = defineDto(
@@ -143,7 +143,7 @@ other failure in the API.
 document cannot describe a route that does not exist or miss one that does.
 
 ```ts
-import { buildOpenApiDocument } from "@monolite/http";
+import { buildOpenApiDocument } from "monolite-http";
 
 const spec = buildOpenApiDocument({
   title: "Appointments API",
@@ -183,8 +183,8 @@ would need translating into its differences (`nullable`, boolean
 the controllers and returns a server you can start and stop.
 
 ```ts
-import { createApp, controllersFromRegistry } from "@monolite/http";
-import { AsyncRequestContext, HealthProbe } from "@monolite/core";
+import { createApp, controllersFromRegistry } from "monolite-http";
+import { AsyncRequestContext, HealthProbe } from "monolite-core";
 
 // Importing a controller is what runs its decorators and registers it. That one
 // line per module is the only list left.

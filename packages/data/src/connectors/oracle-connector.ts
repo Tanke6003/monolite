@@ -1,5 +1,5 @@
 import type * as oracledb from "oracledb";
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor.js";
 import { loadOptionalDriver } from "./optional-driver.js";
 

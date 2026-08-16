@@ -5,8 +5,8 @@
 // a lazy `await import("mongodb")`, otherwise a consumer that only uses
 // PostgreSQL would be forced to install the optional peer dependency.
 import type { ClientSession, Collection, Document } from "mongodb";
-import type { ILogger, IRequestContext } from "@monolite/core";
-import { SYSTEM_USER } from "@monolite/core";
+import type { ILogger, IRequestContext } from "monolite-core";
+import { SYSTEM_USER } from "monolite-core";
 import type {
   IGenericRepository,
   IQueryable,

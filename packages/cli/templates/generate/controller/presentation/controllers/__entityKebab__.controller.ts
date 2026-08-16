@@ -1,8 +1,8 @@
 import { inject, injectable } from "tsyringe";
-import type { IRequestContext } from "@monolite/core";
-import { Crud, CrudController } from "@monolite/crud";
-import { TOKENS } from "@monolite/di";
-import { ApiController } from "@monolite/http";
+import type { IRequestContext } from "monolite-core";
+import { Crud, CrudController } from "monolite-crud";
+import { TOKENS } from "monolite-di";
+import { ApiController } from "monolite-http";
 import {
   create__entityName__Schema,
   update__entityName__Schema,

@@ -1,4 +1,4 @@
-import { defineEntity } from "@monolite/data";
+import { defineEntity } from "monolite-data";
 import type { I__entityName__ } from "../../../domain/models/__entityKebab__.model";
 
 /**

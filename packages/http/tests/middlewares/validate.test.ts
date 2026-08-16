@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
-import { AppError } from "@monolite/core";
-import { validateBody, validateQuery } from "@monolite/http";
+import { AppError } from "monolite-core";
+import { validateBody, validateQuery } from "monolite-http";
 
 const schema = z.object({ name: z.string().min(1) });
 

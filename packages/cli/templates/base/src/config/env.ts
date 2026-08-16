@@ -1,4 +1,4 @@
-import type { IEnvs } from "@monolite/di";
+import type { IEnvs } from "monolite-di";
 
 /**
  * Reading configuration, and the conversions that go with it.
@@ -17,7 +17,7 @@ export function readEnv(name: string, fallback = ""): string {
 }
 
 /**
- * The whole contract `@monolite/di` needs in order to configure itself: a
+ * The whole contract `monolite-di` needs in order to configure itself: a
  * function that answers by name. Swapping `process.env` for a secrets manager
  * is replacing this object, and nothing that reads configuration through the
  * container notices.
