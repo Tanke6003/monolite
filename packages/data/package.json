@@ -1,6 +1,6 @@
 {
   "name": "monolite-data",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "One repository contract over six engines: in-memory, Oracle, SQL Server, PostgreSQL, MySQL/MariaDB and MongoDB.",
   "keywords": [
     "monolite",
@@ -46,7 +46,7 @@
     "access": "public"
   },
   "dependencies": {
-    "monolite-core": "^0.1.2"
+    "monolite-core": "^0.1.3"
   },
   "peerDependencies": {
     "mongodb": "^7",

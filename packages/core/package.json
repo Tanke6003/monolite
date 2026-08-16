@@ -1,6 +1,6 @@
 {
   "name": "monolite-core",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Kernel of the monolite toolkit: shared errors, contracts and Node-only primitives.",
   "keywords": [
     "monolite",
