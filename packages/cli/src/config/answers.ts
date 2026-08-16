@@ -1,3 +1,5 @@
+import type { DocsUiSpec } from "./docs.js";
+import { docsSentence } from "./docs.js";
 import type { EngineSpec } from "./engines.js";
 import type { RenderContext } from "../util/render.js";
 import { toPascalCase } from "../util/naming.js";
@@ -15,6 +17,7 @@ export interface ProjectAnswers {
   author: string;
   license: string;
   engine: EngineSpec;
+  docsUi: DocsUiSpec;
   dbHost: string;
   dbPort: number;
   dbName: string;
@@ -71,11 +74,16 @@ export function dependenciesFor(answers: ProjectAnswers): Record<string, string>
     ...(answers.auth ? { "monolite-auth": MONOLITE_VERSION } : {}),
     ...BASE_DEPENDENCIES,
     ...answers.engine.dependencies,
+    ...answers.docsUi.dependencies,
   });
 }
 
 export function devDependenciesFor(answers: ProjectAnswers): Record<string, string> {
-  return sorted({ ...BASE_DEV_DEPENDENCIES, ...answers.engine.devDependencies });
+  return sorted({
+    ...BASE_DEV_DEPENDENCIES,
+    ...answers.engine.devDependencies,
+    ...answers.docsUi.devDependencies,
+  });
 }
 
 function sorted(entries: Record<string, string>): Record<string, string> {
@@ -107,6 +115,10 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
 
   const flags = new Set<string>();
   if (answers.auth) flags.add("auth");
+  // `docs` is "a reader is mounted", which is not the same as "the document is
+  // published" — that always is.
+  if (answers.docsUi.id !== "none") flags.add("docs");
+  flags.add(answers.docsUi.id);
   if (answers.example) flags.add("example");
   if (isMemory) flags.add("memory");
   else {
@@ -136,6 +148,10 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
       engineId: engine.id,
       engineLabel: engine.label,
       engineSentence: engineSentence(engine),
+      docsUiId: answers.docsUi.id,
+      docsUiLabel: answers.docsUi.label,
+      docsPath: answers.docsUi.path ?? "",
+      docsSentence: docsSentence(answers.docsUi),
       // The compose service is named after the image, which is not always the
       // engine id: `mongodb` runs in a service called `mongo`.
       dockerService: engine.templateDir ?? "",

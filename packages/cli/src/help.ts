@@ -1,5 +1,6 @@
 import { color } from "./util/colors.js";
 import { line } from "./util/log.js";
+import { docsUiAliases } from "./config/docs.js";
 import { engineAliases } from "./config/engines.js";
 import { cliVersion } from "./version.js";
 
@@ -54,6 +55,7 @@ export function printNewHelp(): void {
   line();
   line(heading("Database"));
   line(`  ${flag("--database=<engine>")}         ${color.dim(engineAliases().join(", "))}`);
+  line(`  ${flag("--docs=<reader>")}             ${color.dim(docsUiAliases().join(", "))}`);
   line(`  ${flag("--db-host=<host>")}            Default localhost`);
   line(`  ${flag("--db-port=<port>")}            Default is the engine's, matching docker-compose.yml`);
   line(`  ${flag("--db-name=<name>")}            Database (Oracle: the service name)`);

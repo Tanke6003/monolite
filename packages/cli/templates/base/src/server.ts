@@ -4,14 +4,10 @@ import cors from "cors";
 import express, { type Application, type Request, type Response } from "express";
 import helmet from "helmet";
 import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
-import {
-  buildOpenApiDocument,
-  errorHandler,
-  notFoundHandler,
-  requestContext,
-} from "monolite-http";
+import { errorHandler, notFoundHandler, requestContext } from "monolite-http";
 import { container, TOKENS } from "./composition/container";
-import { areDocsEnabled, readEnv, resolveApiPrefix, resolveCorsOrigins, toInt } from "./config/env";
+import { readEnv, resolveApiPrefix, resolveCorsOrigins, toInt } from "./config/env";
+import { mountDocs } from "./presentation/docs";
 import { registerRoutes } from "./presentation/routes";
 
 /**
@@ -109,23 +105,8 @@ export class Server {
 
     this.app.use(prefix, registerRoutes());
 
-    if (areDocsEnabled(readEnv("DOCS_ENABLED"), readEnv("NODE_ENV", "development"))) {
-      // One document, generated from the same decorator metadata that produced
-      // the routes, so the description cannot drift from the implementation.
-      // Point Swagger UI or Scalar at this URL.
-      this.app.get("/openapi.json", (_req: Request, res: Response) => {
-        res.json(
-          buildOpenApiDocument({
-            title: "__serviceName__",
-            version: "__projectVersion__",
-            description: "__projectDescription__",
-            // Published as the server rather than baked into every path, so
-            // moving `API_PREFIX` keeps "Try it out" pointing at this instance.
-            apiPrefix: prefix,
-          })
-        );
-      });
-    }
+    // The OpenAPI document, and __docsSentence__.
+    mountDocs(this.app, prefix);
   }
 
   /**

@@ -135,7 +135,8 @@ Three technical decisions behind that:
   2020-12, which is exactly what Zod emits. Targeting 3.0 would mean translating
   every schema into its differences (`nullable`, boolean `exclusiveMinimum`, …) —
   the class of code this design exists to delete. Both Swagger UI and Scalar
-  support 3.1.
+  support 3.1, and `monolite new --docs=` mounts either one of them over the
+  document at `/docs`.
 - **The 401 is not written on each route.** The guard adds it, so the generator
   adds it too, on every route that is not marked `public`.
 

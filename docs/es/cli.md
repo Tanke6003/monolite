@@ -71,6 +71,23 @@ valor real.
 | --- | --- | --- |
 | `--auth` / `--no-auth` | sí | Añade `monolite-auth`, un módulo de login y una guarda |
 | `--example` / `--no-example` | sí | Un módulo CRUD de ejemplo, de punta a punta |
+| `--docs=<lector>` | `swagger` | Qué lector se monta sobre el documento OpenAPI |
+
+El documento en sí nunca es opcional: se construye a partir de los mismos
+metadatos de decorador que produjeron las rutas, así que publicarlo no cuesta
+nada y no puede desviarse de la implementación. `--docs` elige qué se monta —si
+es que se monta algo— para leerlo.
+
+| `--docs` | Monta | Notas |
+| --- | --- | --- |
+| `swagger` | Swagger UI en `/docs` | Trae sus propios recursos, así que funciona sin conexión |
+| `scalar` | Scalar en `/docs` | Carga el lector de un CDN; apunta `cdn` a una copia local si no hay salida a internet |
+| `none` | nada | `/openapi.json` se sigue sirviendo |
+
+Los dos lectores apuntan a `/openapi.json` en vez de recibir el documento, para
+que haya una sola fuente. `DOCS_ENABLED` gobierna todo esto y está encendido
+fuera de producción: el documento describe la superficie entera de la API,
+reglas de validación incluidas.
 
 ### Después
 
