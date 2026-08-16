@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+# One release at a time. Two runs racing would read the same last tag, decide
+# the same version, and the loser would die halfway through publishing — with
+# some of the seven packages already on the registry and immutable.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  # The version commit and its tag.
+  contents: write
+  # npm trusted publishing. Unused until the packages are configured for it on
+  # npmjs.com, and harmless until then — but granting it here means that switch
+  # is a change on the website rather than a change to this file.
+  id-token: write
+
+jobs:
+  release:
+    # The release commit is itself a push to master. A push made with
+    # GITHUB_TOKEN does not start another workflow, so this is the second lock
+    # on that door rather than the first — cheap, and the failure it prevents
+    # is an infinite loop.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The bump is read from the commits since the last tag, so a shallow
+          # clone with no tags in it would decide the version from nothing.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs a newer npm than Node ships with. Doing it
+      # unconditionally keeps the workflow identical before and after that
+      # switch is thrown.
+      - name: Use an npm that can publish over OIDC
+        run: npm install -g npm@latest
+
+      - run: npm ci
+
+      # The same gate as CI, run again here rather than trusted from the CI
+      # job: this is the run that publishes, and it should not publish
+      # something it did not itself check.
+      - name: Check
+        run: npm run check
+
+      - name: Identify the committer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Decide the version, publish it, and tag it
+        run: npm run release
+        env:
+          # Falls back to a token until trusted publishing is configured for
+          # each package. With trusted publishing on, npm uses OIDC and ignores
+          # this, and the secret can be deleted.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

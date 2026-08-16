@@ -89,7 +89,39 @@ and each page links to its counterpart at the top.
 
 ## Releasing
 
-Packages are versioned together for now — `0.1.0` across the board — because the
-API is not stable and independent versions would only encourage mismatched
-installs. Once the surface settles, they move to independent versions with
-explicit ranges between them.
+Nobody releases by hand. A push to `master` runs `.github/workflows/release.yml`,
+which reads the commits since the last `v*` tag and decides what they add up to:
+
+| Commit | Release |
+| --- | --- |
+| `fix:`, `perf:`, `revert:` | patch — `0.1.0` → `0.1.1` |
+| `feat:` | minor — `0.1.0` → `0.2.0` |
+| `feat!:`, or a `BREAKING CHANGE:` footer | major, but see below |
+| `docs:`, `test:`, `chore:`, `ci:`, `refactor:`, `style:` | none |
+
+The strongest bump in the range wins, and a branch that only moves
+documentation and tests lands without cutting a version — which is the point of
+the last row. Below `1.0.0` a breaking change moves the minor instead: declaring
+stability is a decision a person makes, not one a commit message makes for them.
+
+Having decided, the workflow writes that version into all seven manifests, the
+ranges they use for each other and `MONOLITE_VERSION` in the CLI, builds,
+commits it as `chore(release): vX.Y.Z`, tags it, publishes every package in
+dependency order, and pushes. Publishing is last, because it is the only step
+that cannot be undone.
+
+To see what a merge would release before merging it:
+
+```bash
+npm run release:dry
+```
+
+Packages are versioned together — one number across all seven — because the API
+is not stable and independent versions would only encourage mismatched installs.
+`MONOLITE_VERSION` in `packages/cli/src/config/answers.ts` is the same decision
+seen from the other side: a scaffold that pinned `core` and `http` to different
+minors would be a support ticket waiting to happen.
+
+The decision itself is tested — `npm run test:scripts`, part of `npm run check`
+— because it is made once per merge, by nobody, and a published version cannot
+be taken back.
