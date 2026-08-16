@@ -15,3 +15,4 @@ coverage/
 # Projects the scaffold test generates and compiles. Inside the repository so
 # they can resolve its node_modules; removed when the test finishes.
 /.scaffold-tests/
+/.wizard-tests/
