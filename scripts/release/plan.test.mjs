@@ -11,6 +11,12 @@ import { nextVersion, parseCommit, plan, releaseType } from "./plan.mjs";
  * teaching the Jest setup about a second language for three files buys less
  * than it costs. What matters is that the decision is tested at all: it is
  * made once per merge, by nobody, and it is not reversible.
+ *
+ * The script is `cd scripts && node --test` — recursive discovery from a
+ * directory — and not a glob, because `--test` only learned glob patterns in
+ * Node 22 and the packages support Node 20. Passing the directory as an
+ * argument does not work either: Node reads path arguments as test files to
+ * run, not as trees to search.
  */
 
 describe("parseCommit", () => {

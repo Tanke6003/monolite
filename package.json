@@ -26,7 +26,7 @@
     "typecheck": "tsc --build",
     "lint": "eslint \"packages/*/{src,tests}/**/*.ts\"",
     "test": "jest",
-    "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
+    "test:scripts": "cd scripts && node --test",
     "check": "npm run typecheck && npm run lint && npm test && npm run test:scripts",
     "release": "node scripts/release/run.mjs",
     "release:dry": "node scripts/release/run.mjs --dry-run",
