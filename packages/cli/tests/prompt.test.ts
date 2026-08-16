@@ -4,10 +4,15 @@ import { nextIndex, selectAction } from "../src/util/prompt";
  * The arrow-driven list, tested through the part of it that holds the
  * behaviour.
  *
- * Raw mode, cursor movement and redrawing are not tested here on purpose: a
- * test for those would have to fake a TTY and would then be asserting on its
- * own fake. What can genuinely be wrong is which key means what and where the
+ * Raw mode, cursor movement and redrawing are not tested here: a test for
+ * those would have to fake a TTY and would then be asserting on its own fake.
+ * What can genuinely be wrong *here* is which key means what and where the
  * highlight lands, and both of those are plain functions.
+ *
+ * That reasoning went one step too far once. Every test in this file passed
+ * while the list ignored every key it was sent, because nothing here ever sent
+ * it one. `prompt.select.test.ts` fakes the terminal and does — it covers the
+ * wiring, this covers the decisions.
  */
 describe("selectAction", () => {
   it("reads the arrow keys and their vim equivalents", () => {

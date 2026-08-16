@@ -93,9 +93,23 @@ export function nextIndex(action: SelectAction, index: number, length: number): 
  */
 export class Prompter {
   private readonly rl: readline.Interface;
+  private readonly input: NodeJS.ReadStream;
+  private readonly output: NodeJS.WriteStream;
 
-  constructor() {
-    this.rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  /**
+   * The streams are arguments rather than `process.stdin` reached for inside,
+   * so the arrow-driven list can be driven by a test. It is the one prompt
+   * with enough machinery —raw mode, a paused interface, a listener swap— to
+   * be broken while looking perfectly fine on screen, which is exactly what
+   * happened: it rendered and then ignored every key.
+   */
+  constructor(
+    input: NodeJS.ReadStream = process.stdin,
+    output: NodeJS.WriteStream = process.stdout
+  ) {
+    this.input = input;
+    this.output = output;
+    this.rl = readline.createInterface({ input, output });
   }
 
   close(): void {
@@ -116,7 +130,7 @@ export class Prompter {
     // has to have is needed before typing, and a question line long enough to
     // wrap is worse than one dim line of its own — the same way the select
     // prompt puts its hints beside the choices instead of in the message.
-    if (options.hint) process.stdout.write(color.dim(`  ${options.hint}\n`));
+    if (options.hint) this.output.write(color.dim(`  ${options.hint}\n`));
 
     for (;;) {
       const raw = (await this.rl.question(`${color.cyan("?")} ${message}${suffix}: `)).trim();
@@ -125,7 +139,7 @@ export class Prompter {
       const error = options.validate?.(value) ?? null;
       if (!error) return value;
 
-      process.stdout.write(`  ${color.red(error)}\n`);
+      this.output.write(`  ${color.red(error)}\n`);
     }
   }
 
@@ -141,7 +155,7 @@ export class Prompter {
       if (["y", "yes"].includes(raw)) return true;
       if (["n", "no"].includes(raw)) return false;
 
-      process.stdout.write(`  ${color.red("answer y or n")}\n`);
+      this.output.write(`  ${color.red("answer y or n")}\n`);
     }
   }
 
@@ -170,18 +184,37 @@ export class Prompter {
     choices: Choice<T>[],
     defaultIndex: number
   ): Promise<{ supported: true; value: T } | { supported: false }> {
-    const input = process.stdin;
-    const output = process.stdout;
+    const { input, output } = this;
 
     if (!input.isTTY || typeof input.setRawMode !== "function") return { supported: false };
 
     // The readline interface is listening on the same stdin. Left running it
     // would eat the keypresses and echo them, so it stands down for the length
     // of the selection and is resumed in `restore`.
+    //
+    // Pausing it is not enough on its own, and pausing it alone is worse than
+    // doing nothing: `pause()` pauses the stream, a paused stream emits no
+    // data, and no data means no `keypress` — so the list drew itself, ignored
+    // every key including Ctrl+C, and had to be killed from outside. The
+    // interface's own handlers come off the stream, and then the stream is
+    // resumed for the length of the selection.
     this.rl.pause();
+
+    const readlineHandlers = input.listeners("keypress") as ((...args: unknown[]) => void)[];
+    for (const handler of readlineHandlers) input.off("keypress", handler);
+
+    // Whatever was typed while the previous question was on screen is still
+    // buffered — an Enter held a moment too long at the last prompt, say. Left
+    // there it would be delivered to the list, which would answer itself
+    // before anyone had read it.
+    while (input.read() !== null) {
+      /* drain */
+    }
+
     emitKeypressEvents(input);
     const wasRaw = Boolean(input.isRaw);
     input.setRawMode(true);
+    input.resume();
     output.write(cursor.hide);
 
     let index = Math.min(Math.max(defaultIndex, 0), choices.length - 1);
@@ -207,6 +240,8 @@ export class Prompter {
 
     const restore = (): void => {
       output.write(cursor.show);
+      input.pause();
+      for (const handler of readlineHandlers) input.on("keypress", handler);
       input.setRawMode(wasRaw);
       this.rl.resume();
     };
@@ -256,12 +291,12 @@ export class Prompter {
     choices: Choice<T>[],
     defaultIndex: number
   ): Promise<T> {
-    process.stdout.write(`${color.cyan("?")} ${message}\n`);
+    this.output.write(`${color.cyan("?")} ${message}\n`);
 
     choices.forEach((choice, index) => {
       const marker = index === defaultIndex ? color.green(">") : " ";
       const hint = choice.hint ? color.dim(`  ${choice.hint}`) : "";
-      process.stdout.write(`  ${marker} ${color.bold(String(index + 1))}) ${choice.label}${hint}\n`);
+      this.output.write(`  ${marker} ${color.bold(String(index + 1))}) ${choice.label}${hint}\n`);
     });
 
     for (;;) {
@@ -281,7 +316,7 @@ export class Prompter {
       const byLabel = choices.find((choice) => choice.label.toLowerCase() === raw.toLowerCase());
       if (byLabel) return byLabel.value;
 
-      process.stdout.write(`  ${color.red(`enter a number between 1 and ${choices.length}`)}\n`);
+      this.output.write(`  ${color.red(`enter a number between 1 and ${choices.length}`)}\n`);
     }
   }
 }
