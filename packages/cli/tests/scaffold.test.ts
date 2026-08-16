@@ -38,6 +38,8 @@ const PACKAGES = path.resolve(__dirname, "..", "..");
 interface Variant {
   name: string;
   args: string[];
+  /** Whether this one is also compiled to JavaScript and served over HTTP. */
+  boot?: boolean;
 }
 
 const VARIANTS: Variant[] = [
@@ -59,6 +61,13 @@ const VARIANTS: Variant[] = [
   {
     name: "mongo",
     args: ["--database=mongo", "--no-auth", "--example"],
+  },
+  // The one that is actually run. In memory and with the example module, so it
+  // serves real routes without a container to bring up first.
+  {
+    name: "memory",
+    args: ["--database=none", "--no-auth", "--example"],
+    boot: true,
   },
 ];
 
@@ -132,6 +141,34 @@ function typeErrors(files: string[]): string[] {
     });
 }
 
+/**
+ * Emits the project to `dist/`, the way its own `npm run build` would.
+ *
+ * The emitted `require("@monolite/di")` resolves through this repository's
+ * workspace links, and Jest's module mapper then sends it at the package
+ * sources — so what is served is the code in this working tree, not a build
+ * from whenever `tsc` last ran.
+ */
+function emitJavaScript(target: string): void {
+  const sources = filesOf(path.join(target, "src"), ".ts");
+
+  const program = ts.createProgram(sources, {
+    ...COMPILER_OPTIONS,
+    noEmit: false,
+    outDir: path.join(target, "dist"),
+    rootDir: path.join(target, "src"),
+  });
+
+  // One file at a time, and not a whole-program emit. The program also contains
+  // the toolkit's sources —`paths` puts them there— and they sit outside
+  // `rootDir`, so a blanket emit writes a `.js` next to every `.ts` in this
+  // repository. Naming each file keeps the output inside the generated project.
+  for (const source of sources) {
+    const emitted = program.emit(program.getSourceFile(source));
+    expect(emitted.emitSkipped).toBe(false);
+  }
+}
+
 beforeAll(() => {
   fs.mkdirSync(SCRATCH, { recursive: true });
 });
@@ -194,6 +231,112 @@ describe("the projects `monolite new` writes", () => {
       expect(sources.length).toBeGreaterThan(0);
 
       expect(typeErrors(sources)).toEqual([]);
+    });
+
+    /**
+     * Compiling is not the same as working, and the difference has been three
+     * separate bugs: a driver imported at the top of a module that a project on
+     * another engine never installs, and an error-handler *factory* handed to
+     * Express unbuilt — which type-checks, registers as ordinary middleware and
+     * turns every failure into Express's default HTML page, stack trace and all.
+     *
+     * So one variant is emitted to JavaScript and actually served. `@monolite/*`
+     * resolves through this repository's own workspace links, which is why no
+     * install is needed here.
+     */
+    (variant.boot ? describe : describe.skip)("served over HTTP", () => {
+      let server: { run(): Promise<void>; close(): Promise<void>; address: { port: number } | null };
+      let base: string;
+      let quiet: jest.SpyInstance[];
+
+      beforeAll(async () => {
+        emitJavaScript(target);
+
+        // The generated logger writes a JSON line per request, to stdout and to
+        // stderr. Useful in the project, noise around these assertions — and it
+        // stays silenced for the whole block, since the requests are what log.
+        quiet = [
+          jest.spyOn(process.stdout, "write").mockReturnValue(true),
+          jest.spyOn(process.stderr, "write").mockReturnValue(true),
+        ];
+
+        // Required rather than imported: the path only exists once the project
+        // above has been generated and emitted.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { Server } = require(path.join(target, "dist", "server.js")) as {
+          Server: new (port: number) => typeof server;
+        };
+
+        // Port 0: the OS picks a free one, so a developer with something already
+        // on 3000 does not get a mystery failure here.
+        server = new Server(0);
+        await server.run();
+        base = `http://localhost:${server.address?.port}`;
+      });
+
+      afterAll(async () => {
+        await server?.close();
+        for (const spy of quiet ?? []) spy.mockRestore();
+      });
+
+      it("reports itself ready", async () => {
+        const response = await fetch(`${base}/health/ready`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ status: "ok", dataSource: "memory" });
+      });
+
+      it("serves the example module, seeded", async () => {
+        const response = await fetch(`${base}/api/v1/products`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ total: 2, page: 1 });
+      });
+
+      it("creates through the generic CRUD", async () => {
+        const response = await fetch(`${base}/api/v1/products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "over HTTP" }),
+        });
+
+        expect(response.status).toBe(201);
+        expect(await response.json()).toMatchObject({ name: "over HTTP" });
+      });
+
+      /**
+       * The assertion that catches the unbuilt error handler: what a rejected
+       * body produces has to be the API's own JSON, not a page with a stack
+       * trace in it.
+       */
+      it("answers a rejected body as JSON, not as an HTML stack trace", async () => {
+        const response = await fetch(`${base}/api/v1/products`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: "" }),
+        });
+
+        expect(response.status).toBe(400);
+        expect(response.headers.get("content-type")).toMatch(/application\/json/);
+        expect(await response.json()).toMatchObject({ message: expect.any(String) });
+      });
+
+      it("answers an unknown route the same way", async () => {
+        const response = await fetch(`${base}/api/v1/nothing-here`);
+
+        expect(response.status).toBe(404);
+        expect(response.headers.get("content-type")).toMatch(/application\/json/);
+      });
+
+      it("publishes a document generated from the same decorators", async () => {
+        const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
+          paths: Record<string, unknown>;
+        };
+
+        expect(Object.keys(document.paths)).toEqual(
+          expect.arrayContaining(["/products", "/products/{id}"])
+        );
+      });
     });
   });
 });

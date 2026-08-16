@@ -135,7 +135,21 @@ export class Server {
    */
   private configureErrorHandling(): void {
     this.app.use(notFoundHandler);
-    this.app.use(errorHandler);
+
+    // `errorHandler` is a factory and has to be called: handing Express the
+    // factory itself registers a one-argument function, which it reads as
+    // ordinary middleware rather than as an error handler — and every failure
+    // then falls through to its default page, stack trace included.
+    //
+    // The logger and the context are what make a failure traceable: the log
+    // line carries the same request id the client was given, and the user it
+    // happened to.
+    this.app.use(
+      errorHandler({
+        logger: container.resolve<ILogger>(TOKENS.ILogger),
+        context: container.resolve<IRequestContext>(TOKENS.IRequestContext),
+      })
+    );
   }
 
   async run(): Promise<void> {
