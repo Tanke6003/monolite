@@ -20,10 +20,26 @@ Then:
 
 ```bash
 curl http://localhost:3000/health/ready
+curl http://localhost:3000/openapi.json
 <!-- #if example -->
 curl http://localhost:3000__apiPrefix__/products
 <!-- #endif -->
 ```
+<!-- #if docs -->
+
+The API describes itself. __docsUiLabel__ is mounted at
+[http://localhost:3000__docsPath__](http://localhost:3000__docsPath__), reading the
+same OpenAPI document `/openapi.json` serves — which is generated from the decorator
+metadata that produced the routes, so it cannot drift from them.
+
+Both are governed by `DOCS_ENABLED`, on outside production.
+<!-- #else -->
+
+`/openapi.json` is the API's own description, generated from the decorator metadata
+that produced the routes. Nothing is mounted to read it with — point Swagger UI or
+Scalar at it, or scaffold with `--docs=` next time. It is governed by `DOCS_ENABLED`,
+on outside production.
+<!-- #endif -->
 
 <!-- #if docker -->
 > `.env.example` ships placeholder credentials. Put the real password in `.env`, which is

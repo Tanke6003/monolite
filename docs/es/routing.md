@@ -133,7 +133,8 @@ Tres decisiones técnicas detrás:
 - **El documento es OpenAPI 3.1, no 3.0.** El objeto de esquema de 3.1 *es* JSON
   Schema 2020-12, que es justo lo que emite Zod. Apuntar a 3.0 obligaría a traducir
   cada esquema a sus diferencias (`nullable`, `exclusiveMinimum` booleano…), que es
-  la clase de código que este diseño existe para borrar. Swagger UI y Scalar
+  la clase de código que este diseño existe para borrar. `monolite new --docs=`
+  monta cualquiera de los dos sobre el documento en `/docs`. Swagger UI y Scalar
   soportan 3.1.
 - **El 401 no se escribe en cada ruta.** Lo pone la guarda, así que lo pone también
   el generador en toda ruta que no esté marcada como `public`.

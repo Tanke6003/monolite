@@ -47,26 +47,28 @@ const VARIANTS: Variant[] = [
   // auth tree and the example module.
   {
     name: "full",
-    args: ["--database=postgres", "--auth", "--example"],
+    args: ["--database=postgres", "--auth", "--example", "--docs=swagger"],
   },
   // Every option off. Worth its own run because the `#if` blocks that drop out
   // leave behind unused imports and dangling references, which is exactly what
   // a conditional template gets wrong.
   {
     name: "bare",
-    args: ["--database=none", "--no-auth", "--no-example"],
+    args: ["--database=none", "--no-auth", "--no-example", "--docs=none"],
   },
   // A second engine, so a mistake in one `db/<engine>/` tree is not hidden by
   // postgres being the only one ever generated.
   {
     name: "mongo",
-    args: ["--database=mongo", "--no-auth", "--example"],
+    // Also the only run that generates Scalar, for the same reason it is the
+    // only one that generates the mongo tree.
+    args: ["--database=mongo", "--no-auth", "--example", "--docs=scalar"],
   },
   // The one that is actually run. In memory and with the example module, so it
   // serves real routes without a container to bring up first.
   {
     name: "memory",
-    args: ["--database=none", "--no-auth", "--example"],
+    args: ["--database=none", "--no-auth", "--example", "--docs=swagger"],
     boot: true,
   },
 ];
@@ -284,6 +286,27 @@ describe("the projects `monolite new` writes", () => {
 
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ status: "ok", dataSource: "memory" });
+      });
+
+      /**
+       * The document is what a client generator consumes, so it is published
+       * whether or not a reader is mounted over it.
+       */
+      it("publishes the OpenAPI document", async () => {
+        const response = await fetch(`${base}/openapi.json`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          openapi: expect.stringMatching(/^3\./),
+          paths: expect.any(Object),
+        });
+      });
+
+      it("serves the reader that was chosen", async () => {
+        const response = await fetch(`${base}/docs/`);
+
+        expect(response.status).toBe(200);
+        expect(await response.text()).toContain("swagger");
       });
 
       it("serves the example module, seeded", async () => {

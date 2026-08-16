@@ -106,7 +106,23 @@ describe("monolite new, answered at the prompts", () => {
   /** The whole wizard, not just the questions before the first list. */
   it("gets past the choice list to the questions after it", () => {
     expect(asked).toEqual(expect.arrayContaining([expect.stringContaining("Database family")]));
+    expect(asked).toEqual(expect.arrayContaining([expect.stringContaining("API documentation")]));
     expect(asked).toEqual(expect.arrayContaining([expect.stringContaining("Package manager")]));
+  });
+
+  it("mounts the reader the first choice offers", () => {
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(SCRATCH, "testapi", "package.json"), "utf8")
+    );
+    const docs = fs.readFileSync(
+      path.join(SCRATCH, "testapi", "src", "presentation", "docs.ts"),
+      "utf8"
+    );
+
+    // Enter on "API documentation" takes Swagger UI, which is the first row.
+    expect(manifest.dependencies["swagger-ui-express"]).toBeDefined();
+    expect(docs).toContain("swaggerUi");
+    expect(docs).toContain("/openapi.json");
   });
 
   it("writes the project into a folder named after the answer", () => {

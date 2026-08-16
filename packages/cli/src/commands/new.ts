@@ -9,6 +9,12 @@ import {
   type ProjectAnswers,
 } from "../config/answers.js";
 import {
+  DOCS_UIS,
+  docsUiAliases,
+  resolveDocsUi,
+  type DocsUiSpec,
+} from "../config/docs.js";
+import {
   ENGINES,
   engineAliases,
   enginesOfFamily,
@@ -42,6 +48,7 @@ const OPTIONS = {
   author: { type: "string" },
   license: { type: "string" },
   database: { type: "string" },
+  docs: { type: "string" },
   "db-host": { type: "string" },
   "db-port": { type: "string" },
   "db-name": { type: "string" },
@@ -260,6 +267,8 @@ async function collect(
   const engine = await resolveEngineAnswer(values, prompter);
   const connection = await collectConnection(values, engine, prompter);
 
+  const docsUi = await resolveDocsAnswer(values, prompter);
+
   const auth = await ask(
     tristate(values, "auth", "no-auth"),
     (p) => p.confirm("Include authentication (JWT login and route guards)?", false),
@@ -302,6 +311,7 @@ async function collect(
     license,
     engine,
     ...connection,
+    docsUi,
     auth,
     example,
     apiPrefix,
@@ -344,6 +354,36 @@ async function resolveEngineAnswer(values: Values, prompter: Prompter | null): P
   return prompter.select(
     "Engine",
     candidates.map((engine) => ({ value: engine, label: engine.label })),
+    0
+  );
+}
+
+/**
+ * Which reader is mounted over the OpenAPI document, if any.
+ *
+ * Swagger UI leads because it is the one most people already know, and because
+ * it bundles its assets — Scalar fetches itself from a CDN, which is a
+ * different answer in an air-gapped deployment.
+ */
+async function resolveDocsAnswer(
+  values: Values,
+  prompter: Prompter | null
+): Promise<DocsUiSpec> {
+  const requested = str(values, "docs");
+
+  if (requested !== undefined) {
+    const ui = resolveDocsUi(requested);
+    if (!ui) {
+      throw new Error(`unknown --docs=${requested}. Valid values: ${docsUiAliases().join(", ")}`);
+    }
+    return ui;
+  }
+
+  if (!prompter) return DOCS_UIS[0];
+
+  return prompter.select(
+    "API documentation",
+    DOCS_UIS.map((ui) => ({ value: ui, label: ui.label, hint: ui.hint })),
     0
   );
 }
@@ -483,6 +523,11 @@ function report(answers: ProjectAnswers, targetDirectory: string, writer: FileWr
 
   info(`Database: ${color.bold(answers.engine.label)} (DATA_SOURCE=${answers.engine.dataSource})`);
   info(`API mounted at ${color.bold(answers.apiPrefix)}`);
+  info(
+    answers.docsUi.path
+      ? `Documentation: ${color.bold(answers.docsUi.label)} at ${answers.docsUi.path}, document at /openapi.json`
+      : "Documentation: /openapi.json, with no reader mounted"
+  );
   info(`Authentication: ${answers.auth ? "included" : "not included"}`);
   info(`Example module: ${answers.example ? "included" : "not included"}`);
 }
@@ -535,5 +580,10 @@ function nextSteps(answers: ProjectAnswers, targetDirectory: string): void {
   line(`  ${runScript} dev`);
   line();
   hint("then GET http://localhost:3000/health/ready");
+  if (answers.docsUi.path) {
+    hint(`and read the API at http://localhost:3000${answers.docsUi.path}`);
+  } else {
+    hint("and fetch the API description from http://localhost:3000/openapi.json");
+  }
   line();
 }
