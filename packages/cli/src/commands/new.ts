@@ -23,7 +23,13 @@ import { color } from "../util/colors.js";
 import { copyTemplateTree, directoryIsEmpty, FileWriter } from "../util/files.js";
 import { run } from "../util/exec.js";
 import { created, fail, hint, info, line, success, title, warn } from "../util/log.js";
-import { sanitizeText, toPackageName, validatePackageName } from "../util/naming.js";
+import { normalizeLicense, validateLicense, validateVersion } from "../util/manifest.js";
+import {
+  packageNameNotice,
+  sanitizeText,
+  toPackageName,
+  validatePackageName,
+} from "../util/naming.js";
 import { canPrompt, Prompter } from "../util/prompt.js";
 
 const OPTIONS = {
@@ -118,12 +124,8 @@ export async function newCommand(argv: string[]): Promise<number> {
   const rawName = positional ?? path.basename(targetDirectory);
   const defaultName = toPackageName(rawName);
 
-  // Normalising beats refusing —`My App` is a perfectly clear intention— but it
-  // has to be said out loud, or the directory and the package end up with two
-  // different names and nobody knows which one the CLI decided.
-  if (defaultName !== rawName) {
-    warn(`"${rawName}" is not a valid npm package name; using "${defaultName}"`);
-  }
+  const notice = packageNameNotice(rawName, defaultName, interactive && !positional);
+  if (notice) warn(notice);
 
   const prompter = interactive ? new Prompter() : null;
 
@@ -172,9 +174,14 @@ async function collect(
 
   const version = await ask(
     str(values, "project-version") ?? str(values, "version"),
-    (p) => p.text("Version", { default: "0.1.0" }),
+    (p) => p.text("Version", { default: "0.1.0", validate: validateVersion }),
     "0.1.0"
   );
+
+  // The prompt already refused anything invalid; this catches the same answer
+  // arriving as `--project-version=latest`, which never met a validator.
+  const versionError = validateVersion(version);
+  if (versionError) throw new Error(`invalid version "${version}": ${versionError}`);
 
   const defaultDescription = "Backend service scaffolded with the monolite toolkit.";
   const description = sanitizeText(
@@ -189,9 +196,23 @@ async function collect(
     await ask(str(values, "author"), (p) => p.text("Author", { default: "" }), "")
   );
 
-  const license = sanitizeText(
-    await ask(str(values, "license"), (p) => p.text("License", { default: "MIT" }), "MIT")
+  const license = normalizeLicense(
+    sanitizeText(
+      await ask(
+        str(values, "license"),
+        (p) =>
+          p.text("License", {
+            default: "MIT",
+            hint: "an SPDX id — MIT, Apache-2.0, ISC — or UNLICENSED for a private project",
+            validate: validateLicense,
+          }),
+        "MIT"
+      )
+    )
   );
+
+  const licenseError = validateLicense(license);
+  if (licenseError) throw new Error(`invalid license "${license}": ${licenseError}`);
 
   const engine = await resolveEngineAnswer(values, prompter);
   const connection = await collectConnection(values, engine, prompter);

@@ -44,6 +44,32 @@ export function toPackageName(raw: string): string {
   return cleaned.slice(0, MAX_PACKAGE_NAME_LENGTH) || "monolite-app";
 }
 
+/**
+ * What to say when the name npm will get is not the one the filesystem gave.
+ *
+ * Normalising beats refusing —`My App` is a perfectly clear intention— but it
+ * has to be said out loud, or the directory and the package end up with two
+ * different names and nobody knows which one the CLI decided.
+ *
+ * `null` when nothing needs saying. That includes the case where the name is
+ * about to be prompted for: there the normalised form is the editable default
+ * already in front of the user, so announcing it first describes a decision
+ * they have not been allowed to make yet. Run from a drive root there is no
+ * directory name to derive one from at all, and `""` is not a name anyone
+ * typed, so it never appears in the message.
+ */
+export function packageNameNotice(
+  rawName: string,
+  defaultName: string,
+  willBeAsked: boolean
+): string | null {
+  if (willBeAsked || defaultName === rawName) return null;
+
+  return rawName
+    ? `"${rawName}" is not a valid npm package name; using "${defaultName}"`
+    : `the target directory has no name to build one from; using "${defaultName}"`;
+}
+
 /** Splits on anything that separates words, including camelCase boundaries. */
 function words(raw: string): string[] {
   return raw
