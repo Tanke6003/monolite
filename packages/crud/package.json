@@ -1,6 +1,6 @@
 {
   "name": "monolite-crud",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Generic CRUD stack: one decorator gives an entity list/getOne/create/update/softDelete over HTTP.",
   "keywords": [
     "monolite",
@@ -42,9 +42,9 @@
     "access": "public"
   },
   "dependencies": {
-    "monolite-core": "^0.1.3",
-    "monolite-data": "^0.1.3",
-    "monolite-http": "^0.1.3",
+    "monolite-core": "^0.1.4",
+    "monolite-data": "^0.1.4",
+    "monolite-http": "^0.1.4",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
