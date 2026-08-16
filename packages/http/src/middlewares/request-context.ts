@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import { SYSTEM_USER, type CurrentUser, type IRequestContext } from "@monolite/core";
+import { SYSTEM_USER, type CurrentUser, type IRequestContext } from "monolite-core";
 
 /** Header the request identifier is propagated with — or received on. */
 export const REQUEST_ID_HEADER = "x-request-id";

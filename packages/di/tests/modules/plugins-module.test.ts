@@ -1,8 +1,8 @@
-import { AsyncRequestContext } from "@monolite/core";
-import type { ILogger, IRequestContext } from "@monolite/core";
-import { AsyncTransactionContext } from "@monolite/data";
-import { container as rootContainer, createContainer, registerPlugins, TOKENS } from "@monolite/di";
-import type { IEnvs } from "@monolite/di";
+import { AsyncRequestContext } from "monolite-core";
+import type { ILogger, IRequestContext } from "monolite-core";
+import { AsyncTransactionContext } from "monolite-data";
+import { container as rootContainer, createContainer, registerPlugins, TOKENS } from "monolite-di";
+import type { IEnvs } from "monolite-di";
 import { envsFrom, silentLogger } from "../support/test-entity";
 
 describe("registerPlugins", () => {

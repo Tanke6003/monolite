@@ -10,15 +10,15 @@
  * means "sign in again".
  */
 import type { NextFunction, Request, Response } from "express";
-import { AppError, AsyncRequestContext, type CurrentUser } from "@monolite/core";
-import { errorHandler } from "@monolite/http";
+import { AppError, AsyncRequestContext, type CurrentUser } from "monolite-core";
+import { errorHandler } from "monolite-http";
 import {
   JwtTokenService,
   authenticatedUser,
   requireAuth,
   requireRoles,
   type RequireAuthOptions,
-} from "@monolite/auth";
+} from "monolite-auth";
 
 const SECRET = "unit-test-secret";
 const tokens = new JwtTokenService({ secret: SECRET });

@@ -1,5 +1,5 @@
 /**
- * `@monolite/crud` — the CRUD you stop writing.
+ * `monolite-crud` — the CRUD you stop writing.
  *
  * One decorator over a class that extends `CrudController` gives a resource its
  * list / getOne / create / update / softDelete over HTTP, with validation and

@@ -1,7 +1,7 @@
-import { AsyncRequestContext } from "@monolite/core";
-import type { ILogger, IRequestContext } from "@monolite/core";
-import { AsyncTransactionContext } from "@monolite/data";
-import type { ITransactionContext } from "@monolite/data";
+import { AsyncRequestContext } from "monolite-core";
+import type { ILogger, IRequestContext } from "monolite-core";
+import { AsyncTransactionContext } from "monolite-data";
+import type { ITransactionContext } from "monolite-data";
 import { container as rootContainer, registerBinding, registerInstance } from "../container.js";
 import type { Binding, Constructor, DependencyContainer } from "../container.js";
 import type { IEnvs } from "../env.js";

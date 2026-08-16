@@ -1,4 +1,4 @@
-# @monolite/cli
+# monolite-cli
 
 Scaffolds and extends backend projects built on the [monolite](../../README.md) toolkit —
 Express 5 and TypeScript, laid out as Clean Architecture, with one generic repository over
@@ -12,14 +12,14 @@ behind it.
 ## Install
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite --version
 ```
 
 Or without installing:
 
 ```bash
-npx @monolite/cli new my-api
+npx monolite-cli new my-api
 ```
 
 Requires Node 20 or newer.
@@ -67,7 +67,7 @@ rather than hanging on a question nobody is there to answer.
 | 3 | License | `--license` | `license` in `package.json` and the README footer. Default `MIT` |
 | 4 | Database family → engine | `--database` | See the table below. This is the single biggest branch in the output |
 | 5 | Host, port, database, user | `--db-host`, `--db-port`, `--db-name`, `--db-user` | Defaults in `.env.example`, defaults in `data-source.ts`, and the published port in `docker-compose.yml`. Only asked for a real engine |
-| 6 | Authentication | `--auth` / `--no-auth` | Adds `@monolite/auth` to the dependencies, `src/auth/seed-user.provider.ts`, the `registerAuth` call in the composition root, the guard in `routes.ts`, and `JWT_SECRET` / `JWT_EXPIRES_IN` in `.env.example`. Default: no |
+| 6 | Authentication | `--auth` / `--no-auth` | Adds `monolite-auth` to the dependencies, `src/auth/seed-user.provider.ts`, the `registerAuth` call in the composition root, the guard in `routes.ts`, and `JWT_SECRET` / `JWT_EXPIRES_IN` in `.env.example`. Default: no |
 | 7 | Example CRUD module | `--example` / `--no-example` | Adds a `product` module — entity, table mapping, DTO with validation, service, controller, tokens and registration — plus its import in `routes.ts` and its `registerProducts()` in the container. Default: yes |
 | 8 | API prefix | `--api-prefix` | `API_PREFIX` in `.env.example`, the fallback baked into `resolveApiPrefix`, and the URLs in the README. Normalised, so `api/v1` and `/api/v1/` both become `/api/v1`. Default `/api/v1` |
 | 9 | Package manager | `--pm` | Every command printed in the README and in the `check` script, and which binary the install step runs. `npm`, `pnpm` or `yarn`. Default `npm` |
@@ -159,7 +159,7 @@ a generator that edits your own files is a generator that eventually mangles the
 ## Templates
 
 Templates live in `templates/` as real files, outside `src/` so this package's `tsconfig`
-never tries to compile them — they import `@monolite/*` packages the CLI does not depend
+never tries to compile them — they import `monolite-*` packages the CLI does not depend
 on, and they contain placeholders that are not valid syntax. Both `dist` and `templates`
 are listed in `files`.
 
@@ -213,7 +213,7 @@ being assembled with `#if` blocks.
 ## Programmatic use
 
 ```ts
-import { run } from "@monolite/cli";
+import { run } from "monolite-cli";
 
 await run(["new", "demo", "--database=postgres", "--yes", "--skip-install"]);
 ```

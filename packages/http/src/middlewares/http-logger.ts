@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 import { REQUEST_ID_HEADER } from "./request-context.js";
 
 export interface HttpLoggerOptions {

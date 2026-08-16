@@ -1,4 +1,4 @@
-import type { AnyEntityRegistration } from "@monolite/di";
+import type { AnyEntityRegistration } from "monolite-di";
 // #if example
 import { PRODUCTS_ENTITY_REGISTRATION } from "./modules/product.module";
 // #endif

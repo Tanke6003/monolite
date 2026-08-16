@@ -1,6 +1,6 @@
 # Data access
 
-> 🇪🇸 [Leer en español](../es/data-access.md) · package: `@monolite/data`
+> 🇪🇸 [Leer en español](../es/data-access.md) · package: `monolite-data`
 
 Describe a table once and you get classic CRUD, a declarative filter language,
 chainable LINQ-style queries, paging, logical delete and transactions — without
@@ -54,7 +54,7 @@ instead of a blanket 500.
 
 ### The guarantee that the engines agree
 
-`@monolite/data` exports a **repository contract kit**: the set of assertions every
+`monolite-data` exports a **repository contract kit**: the set of assertions every
 implementation must pass, invoked by each driver with its own factory. Insert
 semantics, filter operators, ordering, paging, projections, idempotent soft delete,
 `hardDeleteWhere` reaching logically deleted rows — asserted once and replayed per
@@ -313,7 +313,7 @@ transaction, memoised per entity. Commit on success, rollback on throw, the
 original error propagated untouched. The change log follows the same scope: a
 rolled-back operation takes its audit line with it.
 
-The ambient form — `@Transactional()`, in [`@monolite/crud`](crud.md) — publishes
+The ambient form — `@Transactional()`, in [`monolite-crud`](crud.md) — publishes
 the open transaction to an `AsyncLocalStorage` so injected repositories join it
 without being handed anything. Same trade-off as the request context: reading
 `repository.insert(...)` you cannot tell whether it runs in a transaction. What you

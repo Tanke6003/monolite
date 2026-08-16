@@ -104,9 +104,19 @@ export class Prompter {
 
   async text(
     message: string,
-    options: { default?: string; validate?: (value: string) => string | null } = {}
+    options: {
+      default?: string;
+      hint?: string;
+      validate?: (value: string) => string | null;
+    } = {}
   ): Promise<string> {
     const suffix = options.default ? color.dim(` (${options.default})`) : "";
+
+    // Printed above the question rather than inside it. What shape the answer
+    // has to have is needed before typing, and a question line long enough to
+    // wrap is worse than one dim line of its own — the same way the select
+    // prompt puts its hints beside the choices instead of in the message.
+    if (options.hint) process.stdout.write(color.dim(`  ${options.hint}\n`));
 
     for (;;) {
       const raw = (await this.rl.question(`${color.cyan("?")} ${message}${suffix}: `)).trim();

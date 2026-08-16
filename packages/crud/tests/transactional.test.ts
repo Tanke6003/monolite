@@ -1,5 +1,5 @@
-import type { ITransactionContext, ITransactionScope, IUnitOfWork } from "@monolite/data";
-import { Transactional, TransactionalService, lockRow } from "@monolite/crud";
+import type { ITransactionContext, ITransactionScope, IUnitOfWork } from "monolite-data";
+import { Transactional, TransactionalService, lockRow } from "monolite-crud";
 
 /**
  * A fake unit of work and transaction context, chained the way the real ones

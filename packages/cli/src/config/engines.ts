@@ -17,7 +17,7 @@ export interface EngineSpec {
   /** What the prompt shows and what the README calls it. */
   label: string;
   family: DatabaseFamily;
-  /** Value written into `DATA_SOURCE`; `@monolite/data` resolves the driver from it. */
+  /** Value written into `DATA_SOURCE`; `monolite-data` resolves the driver from it. */
   dataSource: string;
   /** Port on the host. Matches what the generated compose file publishes. */
   defaultPort: number;

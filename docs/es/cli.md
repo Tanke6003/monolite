@@ -1,9 +1,9 @@
 # Referencia de la CLI
 
-> 🇬🇧 [Read in English](../en/cli.md) · paquete: `@monolite/cli`
+> 🇬🇧 [Read in English](../en/cli.md) · paquete: `monolite-cli`
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite new mi-api
 ```
 
@@ -69,7 +69,7 @@ valor real.
 
 | Bandera | Por defecto | Efecto |
 | --- | --- | --- |
-| `--auth` / `--no-auth` | sí | Añade `@monolite/auth`, un módulo de login y una guarda |
+| `--auth` / `--no-auth` | sí | Añade `monolite-auth`, un módulo de login y una guarda |
 | `--example` / `--no-example` | sí | Un módulo CRUD de ejemplo, de punta a punta |
 
 ### Después
@@ -169,6 +169,6 @@ Dos convenciones que conviene conocer si las editas:
   `.npmignore`, así que la plantilla nunca llegaría al tarball con su propio
   nombre. El renderizador le devuelve el punto al escribirla.
 - **Las plantillas quedan fuera del typecheck y del lint de este repositorio.** Son
-  TypeScript para el proyecto *generado*: importan paquetes `@monolite/*` que aquí
+  TypeScript para el proyecto *generado*: importan paquetes `monolite-*` que aquí
   no son dependencias, y contienen marcadores que no son sintaxis válida hasta que
   se renderizan.

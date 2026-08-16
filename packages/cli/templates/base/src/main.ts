@@ -3,7 +3,7 @@
 // late for half of it.
 import "dotenv/config";
 
-import type { IHealthProbe, ILogger } from "@monolite/core";
+import type { IHealthProbe, ILogger } from "monolite-core";
 import { container, root, TOKENS } from "./composition/container";
 import { readEnv, toInt } from "./config/env";
 import { Server } from "./server";

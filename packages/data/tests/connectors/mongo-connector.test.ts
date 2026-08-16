@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { MongoConnector, type MongoConnectionConfig } from "@monolite/data";
+import { MongoConnector, type MongoConnectionConfig } from "monolite-data";
 
 // The real driver would open an actual connection; here the only thing that
 // matters is what the connector asks it for and how it translates its answers.

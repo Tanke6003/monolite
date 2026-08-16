@@ -1,5 +1,5 @@
-import { AppError } from "@monolite/core";
-import { parseId } from "@monolite/http";
+import { AppError } from "monolite-core";
+import { parseId } from "monolite-http";
 
 describe("parseId", () => {
   it("accepts positive integers", () => {

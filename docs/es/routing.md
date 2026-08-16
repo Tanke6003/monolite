@@ -1,6 +1,6 @@
 # Rutas decoradas y OpenAPI
 
-> 🇬🇧 [Read in English](../en/routing.md) · paquete: `@monolite/http`
+> 🇬🇧 [Read in English](../en/routing.md) · paquete: `monolite-http`
 
 Un controlador declara sus propias rutas. De esa única declaración salen **tres**
 cosas a la vez: el enrutado de Express, la validación de la petición y el documento

@@ -7,7 +7,7 @@
 // driver hands the error over in —checked against the five real engines—,
 // including the wrapper Sequelize puts in `parent`/`original` and the one the
 // repository puts in `cause`.
-import { AppError, causeChain, normalizeError } from "@monolite/core";
+import { AppError, causeChain, normalizeError } from "monolite-core";
 
 /** Oracle driver error: the code travels in `code` and in the message. */
 const oracle = (code: string, message = "") =>

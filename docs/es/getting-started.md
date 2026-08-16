@@ -20,7 +20,7 @@ algo que ya tienes. Las dos están soportadas; ninguna es el camino menor.
 ## Camino A — generar un proyecto nuevo
 
 ```bash
-npm install -g @monolite/cli
+npm install -g monolite-cli
 monolite new mi-api
 ```
 
@@ -34,7 +34,7 @@ La CLI pregunta, en este orden:
 | Familia de base de datos | SQL | cuáles de las siguientes preguntas ves |
 | Motor | PostgreSQL | la dependencia del driver, el servicio de docker, el dialecto SQL, el esquema semilla |
 | Datos de conexión | valores por motor | `.env.example` (nunca una contraseña real) |
-| Autenticación | sí | añade `@monolite/auth`, un módulo de login y una guarda en las rutas de ejemplo |
+| Autenticación | sí | añade `monolite-auth`, un módulo de login y una guarda en las rutas de ejemplo |
 | Módulo CRUD de ejemplo | sí | una entidad de punta a punta, para que el patrón se vea |
 | Prefijo de la API | `/api/v1` | `API_PREFIX` en el entorno |
 | Gestor de paquetes | npm | el lockfile y el comando de instalación que ejecuta |
@@ -74,11 +74,11 @@ ninguno necesita la CLI.
 ### Sólo la capa de datos
 
 ```bash
-npm install @monolite/core @monolite/data pg
+npm install monolite-core monolite-data pg
 ```
 
 ```ts
-import { EntitySchema, SqlGenericRepository, postgresDialect } from "@monolite/data";
+import { EntitySchema, SqlGenericRepository, postgresDialect } from "monolite-data";
 
 const USERS = {
   table: "USERS",
@@ -105,11 +105,11 @@ SQL.
 ### Sólo el ruteo y OpenAPI
 
 ```bash
-npm install @monolite/core @monolite/http express zod
+npm install monolite-core monolite-http express zod
 ```
 
 ```ts
-import { ApiController, Get, buildOpenApiDocument, registerController } from "@monolite/http";
+import { ApiController, Get, buildOpenApiDocument, registerController } from "monolite-http";
 
 @ApiController("/reports", { tag: "Reports" })
 export class ReportsController {
@@ -124,7 +124,7 @@ todo lo demás.
 
 ### Sólo los errores y la identidad de la petición
 
-`@monolite/core` no tiene ninguna dependencia, así que se puede adoptar aislado por
+`monolite-core` no tiene ninguna dependencia, así que se puede adoptar aislado por
 `AppError` + `normalizeError` + el contexto de petición con `AsyncLocalStorage`,
 incluso en un proyecto que nunca vaya a usar el resto.
 

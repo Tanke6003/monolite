@@ -15,8 +15,8 @@ import {
   SqlUnitOfWork,
   type IGenericRepository,
   type ITransactionContext,
-} from "@monolite/data";
-import type { ILogger } from "@monolite/core";
+} from "monolite-data";
+import type { ILogger } from "monolite-core";
 import { FakeSqlExecutor, silentLogger } from "../support/fake-sql-executor";
 import { ITestItem, TEST_ENTITY } from "../support/test-entity";
 

@@ -1,6 +1,6 @@
 import type { Request, RequestHandler } from "express";
-import { AppError, type CurrentUser, type IRequestContext } from "@monolite/core";
-import { toCurrentUser as defaultToCurrentUser } from "@monolite/http";
+import { AppError, type CurrentUser, type IRequestContext } from "monolite-core";
+import { toCurrentUser as defaultToCurrentUser } from "monolite-http";
 import type { ITokenService, TokenClaims } from "./contracts.js";
 
 /**
@@ -16,7 +16,7 @@ const AUTHENTICATED_USER: unique symbol = Symbol.for("monolite.auth.currentUser"
 /**
  * What this middleware writes onto the request.
  *
- * `@monolite/http` declares `user` on Express's `Request` by declaration
+ * `monolite-http` declares `user` on Express's `Request` by declaration
  * merging, and its comment names this guard as the thing that fills it. That
  * declaration is global, though, and it is not reachable from the package's
  * entry point, so it only exists for a build that happens to include the file.
@@ -44,7 +44,7 @@ export interface RequireAuthOptions {
   /**
    * Claim mapping for an issuer this toolkit does not recognise.
    *
-   * The default is `toCurrentUser` from `@monolite/http`, which already knows
+   * The default is `toCurrentUser` from `monolite-http`, which already knows
    * the names the usual providers emit (OIDC, Azure AD / ADFS) and is the very
    * function the request context is built around. Replacing the mapping here
    * rather than growing those lists keeps one odd issuer from becoming a claim

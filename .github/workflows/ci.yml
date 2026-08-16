@@ -36,6 +36,12 @@ jobs:
       - name: Test
         run: npm test -- --coverage
 
+      # The release tooling decides a version nobody reviews and publishes
+      # something nobody can unpublish, so it is checked on the way in rather
+      # than on the way out.
+      - name: Test the release tooling
+        run: npm run test:scripts
+
   scaffold:
     # The CLI's real contract is that the project it writes builds and passes its
     # own tests. Checking that the CLI compiles proves nothing about its output,

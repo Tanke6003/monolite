@@ -9,7 +9,7 @@
  * environment, so the class no longer decides where configuration comes from.
  */
 import jwt from "jsonwebtoken";
-import { JwtTokenService } from "@monolite/auth";
+import { JwtTokenService } from "monolite-auth";
 
 const SECRET = "unit-test-secret";
 

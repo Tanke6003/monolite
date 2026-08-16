@@ -1,4 +1,4 @@
-import { HealthProbe } from "@monolite/core";
+import { HealthProbe } from "monolite-core";
 
 describe("HealthProbe", () => {
   afterEach(() => {

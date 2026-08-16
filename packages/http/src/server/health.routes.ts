@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import type { HealthReport, IHealthProbe } from "@monolite/core";
+import type { HealthReport, IHealthProbe } from "monolite-core";
 
 export interface HealthRoutesOptions {
   /**

@@ -6,8 +6,8 @@
  * reconstruct it, and that nothing internal escapes in production.
  */
 import { ZodError, z } from "zod";
-import { AppError, AsyncRequestContext, type ILogger } from "@monolite/core";
-import { REQUEST_ID_HEADER, errorHandler, notFoundHandler } from "@monolite/http";
+import { AppError, AsyncRequestContext, type ILogger } from "monolite-core";
+import { REQUEST_ID_HEADER, errorHandler, notFoundHandler } from "monolite-http";
 import type { NextFunction, Request, Response } from "express";
 
 type Logger = ILogger & {

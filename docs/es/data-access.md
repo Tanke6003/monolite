@@ -1,6 +1,6 @@
 # Acceso a datos
 
-> 🇬🇧 [Read in English](../en/data-access.md) · paquete: `@monolite/data`
+> 🇬🇧 [Read in English](../en/data-access.md) · paquete: `monolite-data`
 
 Describe una tabla una vez y obtienes el CRUD clásico, un lenguaje de filtros
 declarativo, consultas encadenables al estilo LINQ, paginación, borrado lógico y
@@ -55,7 +55,7 @@ responder 409 en vez de un 500 a secas.
 
 ### La garantía de que los motores concuerdan
 
-`@monolite/data` exporta un **kit de contrato de repositorio**: el conjunto de
+`monolite-data` exporta un **kit de contrato de repositorio**: el conjunto de
 aserciones que toda implementación tiene que pasar, invocado por cada driver con su
 propia factoría. Semántica del insert, operadores de filtro, ordenación,
 paginación, proyecciones, borrado lógico idempotente, `hardDeleteWhere` alcanzando
@@ -320,7 +320,7 @@ transacción, memoizado por entidad. Commit si sale bien, rollback si algo lanza
 el error original se propaga intacto. El registro de cambios sigue ese mismo
 ámbito: una operación revertida se lleva su línea de auditoría con ella.
 
-La forma ambiental —`@Transactional()`, en [`@monolite/crud`](crud.md)— publica la
+La forma ambiental —`@Transactional()`, en [`monolite-crud`](crud.md)— publica la
 transacción abierta en un `AsyncLocalStorage` para que los repositorios inyectados
 se sumen sin que se les pase nada. El mismo compromiso que con el contexto de
 petición: leyendo `repository.insert(...)` no puedes saber si corre dentro de una

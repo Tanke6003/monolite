@@ -4,14 +4,14 @@
  * records.
  *
  * The storage itself — surviving `await`, isolating concurrent requests — is
- * `AsyncRequestContext` in `@monolite/core` and is tested there. What matters
+ * `AsyncRequestContext` in `monolite-core` and is tested there. What matters
  * here is that this middleware really runs the rest of the request *inside* it,
  * which is the only reason a repository three layers down can see the user
  * without being handed it.
  */
 import type { NextFunction, Request, Response } from "express";
-import { AsyncRequestContext, SYSTEM_USER } from "@monolite/core";
-import { REQUEST_ID_HEADER, currentUserName, requestContext, toCurrentUser } from "@monolite/http";
+import { AsyncRequestContext, SYSTEM_USER } from "monolite-core";
+import { REQUEST_ID_HEADER, currentUserName, requestContext, toCurrentUser } from "monolite-http";
 
 describe("toCurrentUser", () => {
   it("takes the id, the name and the email from the usual claims", () => {

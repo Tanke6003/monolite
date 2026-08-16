@@ -1,4 +1,4 @@
-import type { IGenericRepository, WhereFilter } from "@monolite/data";
+import type { IGenericRepository, WhereFilter } from "monolite-data";
 
 /**
  * The equivalent of EF Core's `Include()` for this architecture.

@@ -8,7 +8,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       // The CLI's templates are TypeScript for the *generated* project, not for
-      // this repository: they import `@monolite/*` packages that are not
+      // this repository: they import `monolite-*` packages that are not
       // dependencies here and contain placeholders that are not valid syntax
       // until they are rendered.
       "**/templates/**",

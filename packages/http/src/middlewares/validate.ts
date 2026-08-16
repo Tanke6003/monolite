@@ -1,6 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import type { ZodType } from "zod";
-import { AppError } from "@monolite/core";
+import { AppError } from "monolite-core";
 
 /**
  * Translates a Zod failure into the application error and hands it to the

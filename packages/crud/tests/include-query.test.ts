@@ -7,8 +7,8 @@
  * `WHERE key IN (...)` per relation instead of one query per row, which is the
  * N+1 that turns a page of twenty into twenty-one round trips.
  */
-import type { IGenericRepository } from "@monolite/data";
-import { loadRelated } from "@monolite/crud";
+import type { IGenericRepository } from "monolite-data";
+import { loadRelated } from "monolite-crud";
 
 interface Parent {
   id: number;

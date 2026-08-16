@@ -91,7 +91,39 @@ nombres de archivo y cada página enlaza a su equivalente arriba del todo.
 
 ## Publicación
 
-Por ahora los paquetes se versionan juntos —`0.1.0` en todos— porque la API no es
-estable y las versiones independientes sólo fomentarían instalaciones
-descuadradas. Cuando la superficie se asiente pasarán a versiones independientes
-con rangos explícitos entre ellos.
+Nadie publica a mano. Un push a `master` ejecuta `.github/workflows/release.yml`,
+que lee los commits desde la última etiqueta `v*` y decide a cuánto suman:
+
+| Commit | Versión |
+| --- | --- |
+| `fix:`, `perf:`, `revert:` | patch — `0.1.0` → `0.1.1` |
+| `feat:` | minor — `0.1.0` → `0.2.0` |
+| `feat!:`, o un pie `BREAKING CHANGE:` | major, con la salvedad de abajo |
+| `docs:`, `test:`, `chore:`, `ci:`, `refactor:`, `style:` | ninguna |
+
+Gana el salto más fuerte del rango, y una rama que sólo mueve documentación y
+pruebas entra sin cortar versión — que es justo el sentido de la última fila.
+Por debajo de `1.0.0` un cambio rompedor mueve la minor: declarar estabilidad es
+una decisión que toma una persona, no un mensaje de commit.
+
+Ya decidido, el workflow escribe esa versión en los siete manifiestos, en los
+rangos que usan entre ellos y en `MONOLITE_VERSION` de la CLI, compila, lo
+registra como `chore(release): vX.Y.Z`, etiqueta, publica cada paquete en orden
+de dependencias y hace push. Publicar va al final, porque es el único paso que
+no se puede deshacer.
+
+Para ver qué publicaría un merge antes de hacerlo:
+
+```bash
+npm run release:dry
+```
+
+Los paquetes se versionan juntos —un solo número para los siete— porque la API
+no es estable y las versiones independientes sólo fomentarían instalaciones
+descuadradas. `MONOLITE_VERSION` en `packages/cli/src/config/answers.ts` es la
+misma decisión vista del otro lado: un scaffold que fijara `core` y `http` en
+minors distintas sería un ticket de soporte esperando a ocurrir.
+
+La decisión en sí está probada —`npm run test:scripts`, parte de `npm run
+check`— porque se toma una vez por merge, sin que nadie la mire, y una versión
+publicada no se puede retirar.

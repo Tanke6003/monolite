@@ -8,9 +8,9 @@
  */
 import express, { type Express } from "express";
 import { z } from "zod";
-import type { IRequestContext } from "@monolite/core";
-import { ApiController, errorHandler, registerController } from "@monolite/http";
-import { Crud, CrudController, type ICrudService } from "@monolite/crud";
+import type { IRequestContext } from "monolite-core";
+import { ApiController, errorHandler, registerController } from "monolite-http";
+import { Crud, CrudController, type ICrudService } from "monolite-crud";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 interface ItemDTO {

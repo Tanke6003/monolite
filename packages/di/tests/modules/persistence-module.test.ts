@@ -1,11 +1,11 @@
-import { HealthProbe, type IHealthProbe } from "@monolite/core";
+import { HealthProbe, type IHealthProbe } from "monolite-core";
 import {
   container as rootContainer,
   createContainer,
   registerPersistence,
   storeToken,
   TOKENS,
-} from "@monolite/di";
+} from "monolite-di";
 import {
   AUDIT_LOG_ENTITY,
   GADGET_ENTITY,
@@ -19,8 +19,8 @@ import {
  * every other test here reads a genuine report, and the tuning can be asserted
  * where it is actually handed over instead of by reaching into private fields.
  */
-jest.mock("@monolite/core", () => {
-  const actual = jest.requireActual<typeof import("@monolite/core")>("@monolite/core");
+jest.mock("monolite-core", () => {
+  const actual = jest.requireActual<typeof import("monolite-core")>("monolite-core");
 
   return {
     ...actual,

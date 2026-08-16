@@ -1,5 +1,5 @@
 /**
- * `@monolite/data` — one repository contract over six engines.
+ * `monolite-data` — one repository contract over six engines.
  *
  * The public surface is organised in four layers:
  *

@@ -1,5 +1,5 @@
-import { AsyncRequestContext, type IRequestContext } from "@monolite/core";
-import { MemoryGenericRepository, oracleDialect, SqlGenericRepository } from "@monolite/data";
+import { AsyncRequestContext, type IRequestContext } from "monolite-core";
+import { MemoryGenericRepository, oracleDialect, SqlGenericRepository } from "monolite-data";
 import { FakeSqlExecutor, silentLogger } from "../support/fake-sql-executor";
 import { AUDITED_ENTITY, AUDITED_SOFT_ENTITY, IAuditedItem } from "../support/test-entity";
 

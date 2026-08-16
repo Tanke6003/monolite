@@ -42,7 +42,7 @@ Three rules keep this honest:
 2. **No package depends on `di`.** The container is a leaf. Every other package
    takes its collaborators through the constructor, so a consumer who prefers
    Awilix, InversifyJS or plain `new` never installs tsyringe.
-3. **Database drivers are optional peer dependencies.** `@monolite/data` declares
+3. **Database drivers are optional peer dependencies.** `monolite-data` declares
    all six, all optional. A PostgreSQL project does not download the Oracle client.
 
 ---
@@ -54,13 +54,13 @@ Architecture, and the CLI scaffolds exactly this shape:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Presentation   controllers, middlewares            │  ← @monolite/http
+│  Presentation   controllers, middlewares            │  ← monolite-http
 ├─────────────────────────────────────────────────────┤
-│  Application    services, DTOs, use cases           │  ← @monolite/crud
+│  Application    services, DTOs, use cases           │  ← monolite-crud
 ├─────────────────────────────────────────────────────┤
 │  Domain         interfaces and models, no imports   │  ← your code only
 ├─────────────────────────────────────────────────────┤
-│  Infrastructure repositories, connectors, plugins   │  ← @monolite/data
+│  Infrastructure repositories, connectors, plugins   │  ← monolite-data
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -76,25 +76,25 @@ written. Your domain models and business rules stay yours.
 HTTP request
     │
     ▼
-Middleware chain                                          @monolite/http
+Middleware chain                                          monolite-http
     │  x-powered-by off → trust proxy → request context →
     │  helmet → rate limit → cors → body parsers → http log → static
     │
     ▼
-Router built from decorator metadata                      @monolite/http
+Router built from decorator metadata                      monolite-http
     │  auth guard, then Zod validation of body/query/params
     ▼
-Controller                                                yours, or @monolite/crud
+Controller                                                yours, or monolite-crud
     │  reads the request, calls the service
     ▼
-Service                                                   yours, or @monolite/crud
+Service                                                   yours, or monolite-crud
     │  business rules. Opens a transaction with @Transactional()
     │  when the use case writes in more than one place
     ▼
-Repository                                                yours (thin) + @monolite/data
+Repository                                                yours (thin) + monolite-data
     │  logs, wraps driver errors, delegates
     ▼
-Generic repository — SQL, MongoDB or in-memory            @monolite/data
+Generic repository — SQL, MongoDB or in-memory            monolite-data
     │  builds the query from the entity mapping; every value is a bind
     ▼
 Response, or an error through the single error handler
@@ -116,7 +116,7 @@ must be looking at the same store.
 
 ---
 
-## `@monolite/core` — the vocabulary
+## `monolite-core` — the vocabulary
 
 Everything here exists so the other packages can talk about the same concepts
 without depending on each other.
@@ -164,7 +164,7 @@ logged as an error, answered generically.
 
 ---
 
-## `@monolite/data` — one contract, six engines
+## `monolite-data` — one contract, six engines
 
 This is the package the rest of the project exists to make possible. Full detail is
 in [data-access.md](data-access.md); the architectural points are these:
@@ -195,7 +195,7 @@ SQL, and degrades honestly elsewhere.
 
 ---
 
-## `@monolite/http` — the metadata is the source of truth
+## `monolite-http` — the metadata is the source of truth
 
 A controller declares its routes on itself:
 
@@ -249,7 +249,7 @@ placed too early swallows Swagger.
 
 ---
 
-## `@monolite/crud` — five endpoints, all overridable
+## `monolite-crud` — five endpoints, all overridable
 
 `@Crud()` registers `list`, `getOne`, `create`, `update` and `softDelete` for an
 entity, each with validation, pagination and an OpenAPI entry. The decorator only
@@ -269,7 +269,7 @@ first read.
 
 ---
 
-## `@monolite/di` — a leaf on purpose
+## `monolite-di` — a leaf on purpose
 
 tsyringe resolves by string token, which means a typo in `@inject("IUsersServcie")`
 compiles cleanly and only explodes when that class is constructed. `TOKENS` exists

@@ -5,7 +5,7 @@
 // body of the method. What makes it worth having is the ambient transaction:
 // without it the block received its scope as a parameter and there was no way
 // to take it out of the signature.
-import type { ITransactionContext, IUnitOfWork } from "@monolite/data";
+import type { ITransactionContext, IUnitOfWork } from "monolite-data";
 
 /**
  * What the decorator needs to find on the service. Extending

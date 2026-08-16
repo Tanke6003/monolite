@@ -4,7 +4,7 @@ import {
   oracleDialect,
   SqlGenericRepository,
   SqlUnitOfWork,
-} from "@monolite/data";
+} from "monolite-data";
 import { FakeSqlExecutor, silentLogger } from "../support/fake-sql-executor";
 import { ITestItem, SEED, TEST_ENTITY } from "../support/test-entity";
 

@@ -1,4 +1,4 @@
-import { defineEntity, type IAuditLog } from "@monolite/data";
+import { defineEntity, type IAuditLog } from "monolite-data";
 
 /** Toy entity: it covers every column type the mapping supports. */
 export interface ITestItem {

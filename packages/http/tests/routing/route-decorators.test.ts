@@ -24,7 +24,7 @@ import {
   registeredControllers,
   sortedRoutes,
   type RouteMetadata,
-} from "@monolite/http";
+} from "monolite-http";
 
 const querySchema = z.object({ page: z.string().optional() });
 const bodySchema = z.object({ name: z.string().min(1) });
@@ -295,7 +295,7 @@ describe("sortedRoutes", () => {
 describe("controllersFromRegistry", () => {
   it("asks `resolve` who serves each controller and pairs it with its class", async () => {
     await jest.isolateModulesAsync(async () => {
-      const http = (await import("@monolite/http")) as typeof import("@monolite/http");
+      const http = (await import("monolite-http")) as typeof import("monolite-http");
 
       @http.ApiController("/users", { token: "IUsersController" })
       class UsersController {
@@ -317,7 +317,7 @@ describe("controllersFromRegistry", () => {
 
   it("fails loudly for a controller that declares no token", async () => {
     await jest.isolateModulesAsync(async () => {
-      const http = (await import("@monolite/http")) as typeof import("@monolite/http");
+      const http = (await import("monolite-http")) as typeof import("monolite-http");
 
       // Skipping it silently would surface much later as a 404 nobody can
       // explain: the controller exists, it is decorated, and it answers nothing.

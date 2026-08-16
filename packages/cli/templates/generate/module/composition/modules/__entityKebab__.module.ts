@@ -1,4 +1,4 @@
-import type { DependencyContainer, EntityRegistration } from "@monolite/di";
+import type { DependencyContainer, EntityRegistration } from "monolite-di";
 import { __entityName__Service } from "../../application/services/__entityKebab__.service";
 import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import { __entityConst__ } from "../../infrastructure/persistence/entities/__entityKebab__.entity";

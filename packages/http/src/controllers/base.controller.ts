@@ -1,4 +1,4 @@
-import { AppError, type CurrentUser, type IRequestContext } from "@monolite/core";
+import { AppError, type CurrentUser, type IRequestContext } from "monolite-core";
 
 /**
  * Base for controllers: it exposes the identity of the request without each one

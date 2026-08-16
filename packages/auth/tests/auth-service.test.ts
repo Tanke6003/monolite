@@ -19,7 +19,7 @@
  * there is nobody to verify against. The wall-clock comparison at the end of
  * this file is a second opinion, kept deliberately loose.
  */
-import { AppError } from "@monolite/core";
+import { AppError } from "monolite-core";
 import {
   AuthService,
   ScryptPasswordHasher,
@@ -27,7 +27,7 @@ import {
   type IPasswordHasher,
   type ITokenService,
   type IUserProvider,
-} from "@monolite/auth";
+} from "monolite-auth";
 
 const ana: AuthUserWithSecret = {
   id: "7",

@@ -1,4 +1,4 @@
-import { AppError } from "@monolite/core";
+import { AppError } from "monolite-core";
 
 /**
  * Turns a path parameter into a valid numeric id.

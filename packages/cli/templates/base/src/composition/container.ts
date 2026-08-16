@@ -1,6 +1,6 @@
 // Registering on import is deliberate: `main.ts`, the router and the tests all
 // assume that importing this file is enough to have a working container.
-import { createCompositionRoot, registerPersistence, registerPlugins } from "@monolite/di";
+import { createCompositionRoot, registerPersistence, registerPlugins } from "monolite-di";
 // #if auth
 import { registerAuth } from "./auth.module";
 // #endif
@@ -14,7 +14,7 @@ import { registerProducts } from "./modules/product.module";
 /**
  * Composition root.
  *
- * The wiring itself lives in `@monolite/di`: which class covers which contract
+ * The wiring itself lives in `monolite-di`: which class covers which contract
  * is decided per module, and the order the modules run in is decided here. That
  * order is not stylistic — the logger and the request context are what the
  * persistence layer is built with, and the request context is what the generic
@@ -22,7 +22,7 @@ import { registerProducts } from "./modules/product.module";
  * downwards it stops mattering: tsyringe resolves a dependency when someone
  * asks for it, not when it is registered.
  *
- * `reflect-metadata` is not imported here. `@monolite/di` loads it before
+ * `reflect-metadata` is not imported here. `monolite-di` loads it before
  * anything else it exports, which is early enough for every decorator in the
  * project, and importing it twice is how the polyfill ends up loaded in the
  * wrong order.
@@ -75,4 +75,4 @@ export const container = root.container;
 
 // Re-exported so the rest of the project has one import for the framework
 // tokens rather than a choice between two spellings of the same table.
-export { TOKENS } from "@monolite/di";
+export { TOKENS } from "monolite-di";

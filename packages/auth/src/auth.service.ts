@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { AppError } from "@monolite/core";
+import { AppError } from "monolite-core";
 import type {
   AuthResult,
   AuthUser,

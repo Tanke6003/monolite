@@ -1,4 +1,4 @@
-import { storeToken, TOKENS } from "@monolite/di";
+import { storeToken, TOKENS } from "monolite-di";
 
 describe("TOKENS", () => {
   /**

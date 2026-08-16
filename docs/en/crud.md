@@ -1,9 +1,9 @@
 # Generic CRUD
 
-> 🇪🇸 [Leer en español](../es/crud.md) · package: `@monolite/crud`
+> 🇪🇸 [Leer en español](../es/crud.md) · package: `monolite-crud`
 
-`@monolite/data` removed the repetition below the service: one repository
-implementation instead of six. `@monolite/crud` removes what was left above it —
+`monolite-data` removed the repetition below the service: one repository
+implementation instead of six. `monolite-crud` removes what was left above it —
 the controller that parses an id, wraps everything in `try/catch` and calls a
 service that only forwards to the repository.
 

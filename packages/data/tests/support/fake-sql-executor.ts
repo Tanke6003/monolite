@@ -1,4 +1,4 @@
-import type { ISqlExecutor, SqlExecuteOptions, SqlExecuteResult } from "@monolite/data";
+import type { ISqlExecutor, SqlExecuteOptions, SqlExecuteResult } from "monolite-data";
 
 export interface RecordedCall {
   sql: string;

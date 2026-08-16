@@ -3,13 +3,13 @@ import type { AddressInfo } from "node:net";
 import cors from "cors";
 import express, { type Application, type Request, type Response } from "express";
 import helmet from "helmet";
-import type { IHealthProbe, ILogger, IRequestContext } from "@monolite/core";
+import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 import {
   buildOpenApiDocument,
   errorHandler,
   notFoundHandler,
   requestContext,
-} from "@monolite/http";
+} from "monolite-http";
 import { container, TOKENS } from "./composition/container";
 import { areDocsEnabled, readEnv, resolveApiPrefix, resolveCorsOrigins, toInt } from "./config/env";
 import { registerRoutes } from "./presentation/routes";
@@ -20,7 +20,7 @@ import { registerRoutes } from "./presentation/routes";
  * The toolkit deliberately does not own this file: which middleware runs, in
  * which order, and what the health endpoints answer are decisions that change
  * per deployment, and a framework that hid them would have to grow a
- * configuration option for each. What comes from `@monolite/http` is the part
+ * configuration option for each. What comes from `monolite-http` is the part
  * that is genuinely the same everywhere — turning decorated controllers into
  * routes, and turning a thrown `AppError` into a response.
  */

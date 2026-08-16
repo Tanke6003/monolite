@@ -1,5 +1,5 @@
-import type { IRequestContext } from "@monolite/core";
-import { SYSTEM_USER } from "@monolite/core";
+import type { IRequestContext } from "monolite-core";
+import { SYSTEM_USER } from "monolite-core";
 import type {
   IGenericRepository,
   IQueryable,

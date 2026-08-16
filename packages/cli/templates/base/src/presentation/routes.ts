@@ -3,10 +3,10 @@ import { Router } from "express";
 import type { RequestHandler } from "express";
 // #endif
 // #if auth
-import { AUTH_TOKENS, requireAuth } from "@monolite/auth";
-import type { ITokenService } from "@monolite/auth";
+import { AUTH_TOKENS, requireAuth } from "monolite-auth";
+import type { ITokenService } from "monolite-auth";
 // #endif
-import { registerController, registeredControllers } from "@monolite/http";
+import { registerController, registeredControllers } from "monolite-http";
 import { container } from "../composition/container";
 
 // Importing a controller is what runs its decorators and puts it in the

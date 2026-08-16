@@ -3,7 +3,7 @@ import {
   MongoGenericRepository,
   MongoUnitOfWork,
   type IMongoTransactionRunner,
-} from "@monolite/data";
+} from "monolite-data";
 import { FakeMongoDataSource } from "../support/fake-mongo";
 import { silentLogger } from "../support/fake-sql-executor";
 import { ITestItem, TEST_ENTITY } from "../support/test-entity";

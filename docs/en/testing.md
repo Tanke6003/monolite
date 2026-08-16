@@ -20,7 +20,7 @@ Jest runs once from the repository root across all workspaces. One run means one
 coverage report, which is what actually tells you whether the toolkit is tested —
 seven separate reports each looking healthy can still hide a package nobody covers.
 
-Tests import packages by name (`@monolite/core`), and Jest maps those names to the
+Tests import packages by name (`monolite-core`), and Jest maps those names to the
 **sources**, not to `dist`. Pointing at build output would make every test run
 depend on a prior build, and a stale build silently tests yesterday's code.
 
@@ -65,11 +65,11 @@ Point `DATA_SOURCE` at a real engine to run the same suite against it.
 
 ## The contract test
 
-`@monolite/data` exports a **repository contract kit**: one suite that any
+`monolite-data` exports a **repository contract kit**: one suite that any
 `IGenericRepository` implementation must pass.
 
 ```ts
-import { runRepositoryContract } from "@monolite/data/testing";
+import { runRepositoryContract } from "monolite-data/testing";
 
 describe("MyCustomRepository", () => {
   runRepositoryContract({
@@ -140,7 +140,7 @@ the same way:
 
 ```ts
 import request from "supertest";
-import { createApp } from "@monolite/http";
+import { createApp } from "monolite-http";
 
 it("rejects a body that fails validation", async () => {
   const { app } = createApp({ controllers, /* ... */ });

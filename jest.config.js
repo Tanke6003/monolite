@@ -11,13 +11,13 @@ module.exports = {
   testMatch: ["**/tests/**/*.test.ts"],
 
   /**
-   * Packages import each other by name (`@monolite/core`), not by relative path,
+   * Packages import each other by name (`monolite-core`), not by relative path,
    * so the tests must resolve those names to the *sources*. Pointing at `dist`
    * would mean every test run depends on a prior build, and a stale build would
    * silently test yesterday's code.
    */
   moduleNameMapper: {
-    "^@monolite/([^/]+)$": "<rootDir>/packages/$1/src/index.ts",
+    "^monolite-([^/]+)$": "<rootDir>/packages/$1/src/index.ts",
 
     // Relative imports carry a `.js` extension because `moduleResolution:
     // nodenext` demands it in the emitted output. ts-jest resolves as CommonJS,

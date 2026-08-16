@@ -5,7 +5,7 @@ import {
   resolveApiPrefix,
   resolveLegacyPrefix,
   type EnvSource,
-} from "@monolite/http";
+} from "monolite-http";
 
 /** A fake environment: anything not declared answers "", as a real one does. */
 const envsOf = (values: Record<string, string> = {}): EnvSource => ({

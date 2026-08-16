@@ -7,7 +7,7 @@
  * which is exactly how a generator starts corrupting hand-written code.
  *
  * The framework's own identifiers —logger, request context, unit of work— are
- * not here either: they come from `TOKENS` in `@monolite/di`, and this table
+ * not here either: they come from `TOKENS` in `monolite-di`, and this table
  * holds only what belongs to this module.
  *
  * They also live *outside* `__entityKebab__.module.ts`, even though that is

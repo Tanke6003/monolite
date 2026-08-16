@@ -1,6 +1,6 @@
 # Decorated routes and OpenAPI
 
-> 🇪🇸 [Leer en español](../es/routing.md) · package: `@monolite/http`
+> 🇪🇸 [Leer en español](../es/routing.md) · package: `monolite-http`
 
 A controller declares its own routes. **Three** things come out of that single
 declaration at once: the Express routing, the request validation, and the OpenAPI

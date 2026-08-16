@@ -9,7 +9,7 @@ import { newCommand } from "../src/commands/new";
  *
  * Everything else about the CLI can be checked by reading a string: this cannot.
  * The templates are TypeScript that this package deliberately does not compile
- * —they import `@monolite/*` packages the CLI does not depend on and they hold
+ * —they import `monolite-*` packages the CLI does not depend on and they hold
  * placeholders that are not valid syntax— so before this file existed, nothing
  * anywhere ever type-checked the code the scaffold writes. It drifted: the
  * templates were still importing `SequelizeDbPlugin`, `OraclePlugin` and
@@ -17,7 +17,7 @@ import { newCommand } from "../src/commands/new";
  * generated project was broken on arrival.
  *
  * So this generates real projects into a scratch directory and runs the
- * compiler over them, with `@monolite/*` pointed at the sources in this
+ * compiler over them, with `monolite-*` pointed at the sources in this
  * repository. It is slower than every other test here put together and it is
  * the only one that can catch that class of mistake.
  */
@@ -94,7 +94,7 @@ const COMPILER_OPTIONS: ts.CompilerOptions = {
   paths: {
     // Resolve to the sources rather than to `dist`, for the same reason the
     // Jest config does: a stale build would type-check yesterday's packages.
-    "@monolite/*": [path.join(PACKAGES, "*", "src", "index.ts")],
+    "monolite-*": [path.join(PACKAGES, "*", "src", "index.ts")],
   },
 };
 
@@ -119,7 +119,7 @@ function filesOf(directory: string, extension?: string): string[] {
  *
  * Only the generated files are reported on. The program also pulls in the
  * toolkit's own sources —that is what the `paths` mapping is for— and those are
- * compiled by their own build, under their own options: `@monolite/data`
+ * compiled by their own build, under their own options: `monolite-data`
  * re-exports a testing helper written against Jest's globals, which is correct
  * for the package and produces a screenful of noise here. What is on trial is
  * the code the scaffold wrote.
@@ -144,7 +144,7 @@ function typeErrors(files: string[]): string[] {
 /**
  * Emits the project to `dist/`, the way its own `npm run build` would.
  *
- * The emitted `require("@monolite/di")` resolves through this repository's
+ * The emitted `require("monolite-di")` resolves through this repository's
  * workspace links, and Jest's module mapper then sends it at the package
  * sources — so what is served is the code in this working tree, not a build
  * from whenever `tsc` last ran.
@@ -240,7 +240,7 @@ describe("the projects `monolite new` writes", () => {
      * Express unbuilt — which type-checks, registers as ordinary middleware and
      * turns every failure into Express's default HTML page, stack trace and all.
      *
-     * So one variant is emitted to JavaScript and actually served. `@monolite/*`
+     * So one variant is emitted to JavaScript and actually served. `monolite-*`
      * resolves through this repository's own workspace links, which is why no
      * install is needed here.
      */

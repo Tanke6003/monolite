@@ -1,4 +1,4 @@
-import { MemoryGenericRepository } from "@monolite/data";
+import { MemoryGenericRepository } from "monolite-data";
 import { ITestItem, IPlainItem, PLAIN_ENTITY, SEED, TEST_ENTITY } from "../support/test-entity";
 
 describe("MemoryGenericRepository", () => {

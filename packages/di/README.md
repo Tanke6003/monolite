@@ -1,4 +1,4 @@
-# @monolite/di
+# monolite-di
 
 The toolkit's dependency-injection wiring, on [tsyringe](https://github.com/microsoft/tsyringe).
 
@@ -87,14 +87,14 @@ request context before persistence, because the user of the audit columns comes
 from it— and then hands over.
 
 ```ts
-import type { IHealthProbe } from "@monolite/core";
+import type { IHealthProbe } from "monolite-core";
 import {
   createCompositionRoot,
   createLogger,
   registerPersistence,
   registerPlugins,
   TOKENS,
-} from "@monolite/di";
+} from "monolite-di";
 import { USERS_ENTITY, USERS_SEED, AUDIT_LOG_ENTITY } from "./infrastructure/entities.js";
 import { DotenvEnvs } from "./infrastructure/dotenv.js";
 import { PinoLogger } from "./infrastructure/pino.js";
@@ -147,8 +147,8 @@ process.on("SIGTERM", async () => {
 A feature module of your own is three lines, and it never mentions an engine:
 
 ```ts
-import { registerClass } from "@monolite/di";
-import type { DependencyContainer } from "@monolite/di";
+import { registerClass } from "monolite-di";
+import type { DependencyContainer } from "monolite-di";
 import { APP_TOKENS } from "./tokens.js"; // your own table, next to TOKENS
 
 export function registerUsers(container: DependencyContainer): void {
@@ -208,14 +208,14 @@ would rather not use a container at all, build the same objects by hand — the
 factories here are plain functions and are perfectly usable on their own:
 
 ```ts
-import { createPersistenceLayer } from "@monolite/di";
+import { createPersistenceLayer } from "monolite-di";
 
 const persistence = createPersistenceLayer({ envs, logger, entities, auditLog });
 const users = new UsersService(persistence.store("USERS"), persistence.unitOfWork);
 ```
 
-And if you would rather not install this package either, `@monolite/core` and
-`@monolite/data` know nothing about it: the wiring is yours to write.
+And if you would rather not install this package either, `monolite-core` and
+`monolite-data` know nothing about it: the wiring is yours to write.
 
 ## License
 

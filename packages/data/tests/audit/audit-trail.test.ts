@@ -1,4 +1,4 @@
-import { AsyncRequestContext } from "@monolite/core";
+import { AsyncRequestContext } from "monolite-core";
 import {
   defineEntity,
   MemoryAuditTrail,
@@ -6,7 +6,7 @@ import {
   oracleDialect,
   SqlGenericRepository,
   type IAuditLog,
-} from "@monolite/data";
+} from "monolite-data";
 import { FakeSqlExecutor, silentLogger } from "../support/fake-sql-executor";
 import { AUDIT_LOG_ENTITY, ITestItem, TEST_ENTITY } from "../support/test-entity";
 

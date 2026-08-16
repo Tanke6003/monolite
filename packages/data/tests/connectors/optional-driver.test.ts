@@ -4,7 +4,7 @@
  * They are declared optional so that a project on PostgreSQL installs `pg` and
  * `sequelize` and nothing else. For a long time that was only a declaration:
  * every connector imported its driver at the top of the file, so importing
- * `@monolite/data` at all pulled in Oracle's driver, MongoDB's and Sequelize's,
+ * `monolite-data` at all pulled in Oracle's driver, MongoDB's and Sequelize's,
  * and a generated project refused to start with `Cannot find module 'oracledb'`
  * before a single line of its own code ran — on the in-memory driver.
  *
@@ -36,14 +36,14 @@ describe("importing the package", () => {
     expect(() => {
       jest.isolateModules(() => {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require("@monolite/data");
+        require("monolite-data");
       });
     }).not.toThrow();
   });
 
   it("still exposes every connector, driver or no driver", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const data = require("@monolite/data") as typeof import("@monolite/data");
+    const data = require("monolite-data") as typeof import("monolite-data");
 
     expect(typeof data.OracleConnector).toBe("function");
     expect(typeof data.MongoConnector).toBe("function");
@@ -59,7 +59,7 @@ describe("using an engine whose driver is missing", () => {
    */
   it("says what to install, for Oracle", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { OracleConnector } = require("@monolite/data") as typeof import("@monolite/data");
+    const { OracleConnector } = require("monolite-data") as typeof import("monolite-data");
 
     // Constructing is fine: nothing is needed until the pool is opened.
     const connector = new OracleConnector(
@@ -74,7 +74,7 @@ describe("using an engine whose driver is missing", () => {
 
   it("says what to install, for MongoDB", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MongoConnector } = require("@monolite/data") as typeof import("@monolite/data");
+    const { MongoConnector } = require("monolite-data") as typeof import("monolite-data");
 
     const connector = new MongoConnector(
       { host: "localhost", port: 27017, database: "testdb" },
@@ -92,7 +92,7 @@ describe("using an engine whose driver is missing", () => {
    */
   it("says what to install, for the engines Sequelize speaks", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { SequelizeConnector } = require("@monolite/data") as typeof import("@monolite/data");
+    const { SequelizeConnector } = require("monolite-data") as typeof import("monolite-data");
 
     expect(
       () =>
@@ -125,7 +125,7 @@ describe("a driver that is installed but broken", () => {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { MongoConnector } = require("@monolite/data") as typeof import("@monolite/data");
+      const { MongoConnector } = require("monolite-data") as typeof import("monolite-data");
       const connector = new MongoConnector(
         { host: "localhost", port: 27017, database: "testdb" },
         logger

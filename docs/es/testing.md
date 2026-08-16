@@ -21,7 +21,7 @@ Una ejecución significa un informe de cobertura, que es lo que de verdad te dic
 el toolkit está probado: siete informes separados con buena pinta cada uno pueden
 seguir escondiendo un paquete que nadie cubre.
 
-Las pruebas importan los paquetes por nombre (`@monolite/core`), y Jest mapea esos
+Las pruebas importan los paquetes por nombre (`monolite-core`), y Jest mapea esos
 nombres a las **fuentes**, no a `dist`. Apuntar a la salida de compilación haría
 que cada ejecución dependiera de un build previo, y un build viejo prueba en
 silencio el código de ayer.
@@ -71,11 +71,11 @@ contra él.
 
 ## La prueba de contrato
 
-`@monolite/data` exporta un **kit de contrato de repositorio**: una suite que
+`monolite-data` exporta un **kit de contrato de repositorio**: una suite que
 cualquier implementación de `IGenericRepository` tiene que pasar.
 
 ```ts
-import { runRepositoryContract } from "@monolite/data/testing";
+import { runRepositoryContract } from "monolite-data/testing";
 
 describe("MiRepositorioPropio", () => {
   runRepositoryContract({
@@ -146,7 +146,7 @@ eso de la misma forma:
 
 ```ts
 import request from "supertest";
-import { createApp } from "@monolite/http";
+import { createApp } from "monolite-http";
 
 it("rechaza un body que no pasa la validación", async () => {
   const { app } = createApp({ controllers, /* ... */ });

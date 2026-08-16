@@ -1,5 +1,5 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
-import { ApiController, Post } from "@monolite/http";
+import { ApiController, Post } from "monolite-http";
 import { z } from "zod";
 import type { Credentials, IAuthService } from "./contracts.js";
 import { AUTH_TOKENS } from "./tokens.js";

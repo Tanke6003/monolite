@@ -1,4 +1,4 @@
-import { EntitySchema, SqlWhereCompiler } from "@monolite/data";
+import { EntitySchema, SqlWhereCompiler } from "monolite-data";
 import { ITestItem, TEST_ENTITY } from "../support/test-entity";
 
 const schema = new EntitySchema<ITestItem>(TEST_ENTITY);

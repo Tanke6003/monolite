@@ -8,8 +8,8 @@ import {
   registerFactory,
   registerInstance,
   registerSingleton,
-} from "@monolite/di";
-import type { IManagedConnection } from "@monolite/di";
+} from "monolite-di";
+import type { IManagedConnection } from "monolite-di";
 
 class Counter {
   static built = 0;

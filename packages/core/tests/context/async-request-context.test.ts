@@ -3,7 +3,7 @@
 // Express middleware that opens the context per request, reads the trace header
 // and decodes the token into a `CurrentUser` belongs to the HTTP package, so
 // those assertions were left there.
-import { AsyncRequestContext, SYSTEM_USER, type CurrentUser } from "@monolite/core";
+import { AsyncRequestContext, SYSTEM_USER, type CurrentUser } from "monolite-core";
 
 const user = (name: string, id: string | null = "7"): CurrentUser => ({
   id,

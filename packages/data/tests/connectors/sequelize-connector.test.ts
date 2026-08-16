@@ -4,7 +4,7 @@
 // Sequelize is doubled, so no database is needed. What is checked is exactly
 // what this connector decides and cannot be seen from above: how it asks each
 // engine for the affected rows and the generated id, which is where they differ.
-import type { ILogger } from "@monolite/core";
+import type { ILogger } from "monolite-core";
 
 /** Sequelize instance returned by the doubled constructor. */
 const sequelize = {
@@ -20,7 +20,7 @@ jest.mock("sequelize", () => ({
 }));
 
 import { Sequelize } from "sequelize";
-import { SequelizeConnector, type SequelizeEngine } from "@monolite/data";
+import { SequelizeConnector, type SequelizeEngine } from "monolite-data";
 
 const logger = {
   info: jest.fn(),

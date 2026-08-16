@@ -36,7 +36,7 @@ export function printNewHelp(): void {
   line(heading("monolite new [name] [options]"));
   line(`Alias: ${flag("monolite init")}`);
   line();
-  line("Scaffolds a new backend project on the @monolite/* packages. Interactive by");
+  line("Scaffolds a new backend project on the monolite-* packages. Interactive by");
   line("default: every question below also has a flag, and a question whose flag was");
   line(`given is not asked. ${flag("--yes")} answers all of them with their defaults and`);
   line("prompts for nothing, which is what makes the command usable from CI.");
@@ -63,7 +63,7 @@ export function printNewHelp(): void {
   line(color.dim("  real one."));
   line();
   line(heading("Contents"));
-  line(`  ${flag("--auth")} / ${flag("--no-auth")}          Add @monolite/auth and a login module`);
+  line(`  ${flag("--auth")} / ${flag("--no-auth")}          Add monolite-auth and a login module`);
   line(`  ${flag("--example")} / ${flag("--no-example")}    Add a sample CRUD module, end to end`);
   line();
   line(heading("Afterwards"));

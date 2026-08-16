@@ -1,6 +1,6 @@
-import type { IGenericRepository, QueryOptions } from "@monolite/data";
-import { AppError } from "@monolite/core";
-import { CrudService, type EntityMapper } from "@monolite/crud";
+import type { IGenericRepository, QueryOptions } from "monolite-data";
+import { AppError } from "monolite-core";
+import { CrudService, type EntityMapper } from "monolite-crud";
 
 interface Item {
   pkItem: number;

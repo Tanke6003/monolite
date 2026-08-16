@@ -1,4 +1,4 @@
-import type { ILogger, IRequestContext } from "@monolite/core";
+import type { ILogger, IRequestContext } from "monolite-core";
 import {
   MemoryAuditTrail,
   MemoryGenericRepository,
@@ -16,7 +16,7 @@ import {
   oracleDialect,
   postgresDialect,
   sqlServerDialect,
-} from "@monolite/data";
+} from "monolite-data";
 import type {
   DbEngine,
   EntityMetadata,
@@ -30,7 +30,7 @@ import type {
   SequelizeConnectionConfig,
   SequelizeEngine,
   SqlDialect,
-} from "@monolite/data";
+} from "monolite-data";
 import type { IManagedConnection } from "./container.js";
 import type { IEnvs } from "./env.js";
 

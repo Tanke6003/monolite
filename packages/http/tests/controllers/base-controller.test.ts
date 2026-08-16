@@ -1,5 +1,5 @@
-import { AppError, AsyncRequestContext, SYSTEM_USER } from "@monolite/core";
-import { BaseController } from "@monolite/http";
+import { AppError, AsyncRequestContext, SYSTEM_USER } from "monolite-core";
+import { BaseController } from "monolite-http";
 
 /** Exposes the protected members so the test can look at them. */
 class ProbeController extends BaseController {

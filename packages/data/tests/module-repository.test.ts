@@ -1,4 +1,4 @@
-import { BaseModuleRepository, MemoryGenericRepository } from "@monolite/data";
+import { BaseModuleRepository, MemoryGenericRepository } from "monolite-data";
 import { ITestItem, SEED, TEST_ENTITY } from "./support/test-entity";
 
 class ItemsRepository extends BaseModuleRepository<ITestItem> {
