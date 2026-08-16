@@ -1,11 +1,14 @@
 /**
  * DI identifiers for the __entityKebab__ module.
  *
- * They live in their own file, and not in `composition/tokens.ts`, for one
- * practical reason: `monolite generate module` must never edit a file you
- * wrote. A central table would have to be reopened and appended to on every
- * generation, which is exactly how a generator starts corrupting hand-written
- * code.
+ * They live in their own file, and not in a central table, for one practical
+ * reason: `monolite generate module` must never rewrite a file you wrote. A
+ * shared table would have to be reopened and appended to on every generation,
+ * which is exactly how a generator starts corrupting hand-written code.
+ *
+ * The framework's own identifiers —logger, request context, unit of work— are
+ * not here either: they come from `TOKENS` in `@monolite/di`, and this table
+ * holds only what belongs to this module.
  *
  * They also live *outside* `__entityKebab__.module.ts`, even though that is
  * where they are registered, because the service and the controller need them

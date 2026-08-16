@@ -376,9 +376,12 @@ function scaffold(answers: ProjectAnswers, targetDirectory: string, force: boole
   // Order matters only in that later trees may legitimately overwrite earlier
   // ones; today none do, and `FileWriter` refuses to overwrite without --force,
   // so an accidental collision surfaces as a missing file in the summary.
+  // The in-memory driver contributes no files at all: with the persistence
+  // layer built by `@monolite/di` from `DATA_SOURCE`, what is left under
+  // `db/<engine>/` is the compose file, and there is no container to run.
   const trees = [
     templatePath("base"),
-    templatePath("db", answers.engine.templateDir ?? "memory"),
+    ...(answers.engine.templateDir ? [templatePath("db", answers.engine.templateDir)] : []),
     ...(answers.auth ? [templatePath("auth")] : []),
   ];
 

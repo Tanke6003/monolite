@@ -1,3 +1,5 @@
+import type { IEnvs } from "@monolite/di";
+
 /**
  * Reading configuration, and the conversions that go with it.
  *
@@ -13,6 +15,19 @@ export function readEnv(name: string, fallback = ""): string {
   const value = process.env[name];
   return value === undefined || value === "" ? fallback : value;
 }
+
+/**
+ * The whole contract `@monolite/di` needs in order to configure itself: a
+ * function that answers by name. Swapping `process.env` for a secrets manager
+ * is replacing this object, and nothing that reads configuration through the
+ * container notices.
+ *
+ * The import is type-only, so this file still has no runtime dependency on the
+ * toolkit and `tests/smoke.test.ts` can keep exercising it on its own.
+ */
+export const envs: IEnvs = {
+  getEnv: (name: string) => readEnv(name),
+};
 
 /**
  * For values that have no safe default. Failing loudly at startup beats

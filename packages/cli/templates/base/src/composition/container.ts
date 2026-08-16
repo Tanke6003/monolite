@@ -1,16 +1,12 @@
 // Registering on import is deliberate: `main.ts`, the router and the tests all
 // assume that importing this file is enough to have a working container.
-import "reflect-metadata";
-import { container } from "tsyringe";
-import { AsyncRequestContext, HealthProbe } from "@monolite/core";
-import type { IHealthProbe, ILogger, IRequestContext } from "@monolite/core";
+import { createCompositionRoot, registerPersistence, registerPlugins } from "@monolite/di";
 // #if auth
-import { registerAuth } from "@monolite/auth";
-import { SeedUserProvider } from "../auth/seed-user.provider";
+import { registerAuth } from "./auth.module";
 // #endif
+import { envs } from "../config/env";
 import { ConsoleLogger } from "../infrastructure/logger";
-import { createDataSource, type DataSource } from "../infrastructure/persistence/data-source";
-import { TOKENS } from "./tokens";
+import { ENTITIES } from "./entities";
 // #if example
 import { registerProducts } from "./modules/product.module";
 // #endif
@@ -18,58 +14,65 @@ import { registerProducts } from "./modules/product.module";
 /**
  * Composition root.
  *
- * The order in the first half is not stylistic: the logger and the request
- * context are what the persistence layer is built with, and the request context
- * is what the generic repository reads to fill the audit columns. From the
- * feature modules downwards order stops mattering — tsyringe resolves a
- * dependency when someone asks for it, not when it is registered.
+ * The wiring itself lives in `@monolite/di`: which class covers which contract
+ * is decided per module, and the order the modules run in is decided here. That
+ * order is not stylistic — the logger and the request context are what the
+ * persistence layer is built with, and the request context is what the generic
+ * repository reads to fill the audit columns. From the feature modules
+ * downwards it stops mattering: tsyringe resolves a dependency when someone
+ * asks for it, not when it is registered.
+ *
+ * `reflect-metadata` is not imported here. `@monolite/di` loads it before
+ * anything else it exports, which is early enough for every decorator in the
+ * project, and importing it twice is how the polyfill ends up loaded in the
+ * wrong order.
  */
+export const root = createCompositionRoot((root) => {
+  const plugins = registerPlugins({
+    container: root.container,
+    envs,
+    logger: new ConsoleLogger(),
+    // #if auth
+    // Fails at startup rather than signing tokens with whatever the fallback
+    // was: an application that boots without `JWT_SECRET` is one nobody notices
+    // until somebody forges a token against it.
+    validate: (source) => {
+      if (!source.getEnv("JWT_SECRET")) {
+        throw new Error("[config] JWT_SECRET is required and is not set");
+      }
+    },
+    // #endif
+  });
 
-const logger: ILogger = new ConsoleLogger();
-container.register<ILogger>(TOKENS.ILogger, { useValue: logger });
+  // Every entity's generic repository, the unit of work and the health probe,
+  // built over the engine `DATA_SOURCE` names. Nothing below this line knows
+  // which engine that is, which is what makes switching one a change of
+  // configuration instead of a change of code.
+  const persistence = registerPersistence({
+    container: root.container,
+    entities: ENTITIES,
+    logger: plugins.logger,
+    envs,
+    context: plugins.requestContext,
+    transactions: plugins.transactions,
+  });
 
-// A singleton is not a preference here: the AsyncLocalStorage that the request
-// middleware opens has to be the very same one the repository reads from.
-const requestContext: IRequestContext = new AsyncRequestContext();
-container.register<IRequestContext>(TOKENS.IRequestContext, { useValue: requestContext });
+  // The connection is not registered in the container: it is a resource of the
+  // process, not a dependency anybody injects. Handing it over here is what
+  // gets it opened on warm-up and closed on shutdown.
+  root.manage(persistence.connection);
+  // #if auth
 
-const dataSource = createDataSource(logger, requestContext);
-container.register<DataSource>(TOKENS.DataSource, { useValue: dataSource });
+  registerAuth(root.container);
+  // #endif
+  // #if example
 
-// The probe is built here because this is where the connection is. The
-// connection itself is not registered: it is a resource of the process, not a
-// dependency anybody injects.
-container.register<IHealthProbe>(TOKENS.IHealthProbe, {
-  useValue: new HealthProbe({
-    connection: dataSource.connection,
-    dataSource: dataSource.driver,
-  }),
+  registerProducts(root.container);
+  // #endif
 });
 
-// #if auth
-// The package brings the login route, the token service and the password
-// hasher; the application brings the one thing a framework cannot know, which
-// is where its users live.
-export const auth = registerAuth(container, { userProvider: SeedUserProvider });
-// #endif
+export const container = root.container;
 
-// #if example
-registerProducts();
-// #endif
-
-/**
- * Checks the database before the process accepts traffic, so a wrong password
- * or an unreachable host shows up in the startup log instead of in the first
- * user's request. In memory there is nothing to open and this does nothing.
- */
-export async function warmUpConnections(): Promise<void> {
-  await dataSource.connection?.authenticate();
-}
-
-/** Returns the pool during an orderly shutdown. */
-export async function shutdownConnections(): Promise<void> {
-  await dataSource.connection?.close();
-}
-
-export { container, dataSource };
-export { TOKENS } from "./tokens";
+// Re-exported so the rest of the project has one import for the framework
+// tokens rather than a choice between two spellings of the same table.
+export { TOKENS } from "@monolite/di";

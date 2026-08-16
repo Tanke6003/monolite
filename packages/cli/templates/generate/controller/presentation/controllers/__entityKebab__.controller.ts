@@ -1,6 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import type { IRequestContext } from "@monolite/core";
 import { Crud, CrudController } from "@monolite/crud";
+import { TOKENS } from "@monolite/di";
 import { ApiController } from "@monolite/http";
 import {
   create__entityName__Schema,
@@ -9,7 +10,6 @@ import {
 } from "../../application/dtos/__entityKebab__.dto";
 import type { __entityName__Service } from "../../application/services/__entityKebab__.service";
 import { __entityUpper___TOKENS } from "../../composition/modules/__entityKebab__.tokens";
-import { TOKENS } from "../../composition/tokens";
 
 /**
  * __entityPlural__. The whole HTTP module is this declaration.

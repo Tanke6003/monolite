@@ -2,10 +2,9 @@
 // environment while it does, so a `.env` loaded afterwards would arrive too
 // late for half of it.
 import "dotenv/config";
-import "reflect-metadata";
 
 import type { IHealthProbe, ILogger } from "@monolite/core";
-import { container, shutdownConnections, TOKENS, warmUpConnections } from "./composition/container";
+import { container, root, TOKENS } from "./composition/container";
 import { readEnv, toInt } from "./config/env";
 import { Server } from "./server";
 
@@ -31,7 +30,7 @@ void (async () => {
   // Check the database before accepting traffic, so a credentials or network
   // problem shows up here and not in the first user's request.
   try {
-    await warmUpConnections();
+    await root.warmUp();
   } catch (error) {
     logger.error("Could not reach the database", { error });
     process.exit(1);
@@ -87,7 +86,7 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
     await server.close();
     logger.info("Server closed, no requests in flight");
 
-    await shutdownConnections();
+    await root.shutdown();
     logger.info("Connections returned. Goodbye");
 
     clearTimeout(watchdog);

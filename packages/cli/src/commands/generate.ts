@@ -93,18 +93,24 @@ function emit(
 }
 
 /**
- * A generated module still needs two lines nobody can write for it: the call in
- * the composition root and the import that makes the controller's decorators
- * run. Editing the user's own files to add them is how a generator starts
- * mangling code it did not write, so the CLI prints them instead.
+ * A generated module still needs three lines nobody can write for it: its
+ * entity in the list the persistence layer is built from, the call in the
+ * composition root, and the import that makes the controller's decorators run.
+ * Editing the user's own files to add them is how a generator starts mangling
+ * code it did not write, so the CLI prints them instead.
  */
 function wiringReminder(name: string, sourceRoot: string): void {
   const registerName = `register${capitalizePlural(name)}`;
+  const moduleImport = `./modules/${kebab(name)}.module`;
+  const registration = `${upperSnakePlural(name)}_ENTITY_REGISTRATION`;
 
-  info("Two lines left, in your own files:");
+  info("Three lines left, in your own files:");
+  line(`  ${color.dim(path.join(sourceRoot, "composition", "entities.ts"))}`);
+  line(`    import { ${registration} } from "${moduleImport}";`);
+  line(`    ${color.dim("// ...and the same name inside the ENTITIES array")}`);
   line(`  ${color.dim(path.join(sourceRoot, "composition", "container.ts"))}`);
-  line(`    import { ${registerName} } from "./modules/${kebab(name)}.module";`);
-  line(`    ${registerName}();`);
+  line(`    import { ${registerName} } from "${moduleImport}";`);
+  line(`    ${registerName}(root.container);`);
   line(`  ${color.dim(path.join(sourceRoot, "presentation", "routes.ts"))}`);
   line(`    import "./controllers/${kebab(name)}.controller";`);
   line();
@@ -126,6 +132,11 @@ function capitalizePlural(raw: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join("");
   return /[^aeiou]y$/i.test(pascal) ? `${pascal.slice(0, -1)}ies` : `${pascal}s`;
+}
+
+/** `invoice` -> `INVOICES`, the spelling the entity registration is named with. */
+function upperSnakePlural(raw: string): string {
+  return kebab(capitalizePlural(raw)).replace(/-/g, "_").toUpperCase();
 }
 
 /**

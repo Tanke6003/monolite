@@ -56,7 +56,10 @@ src/
   config/env.ts               Reading configuration; pure, and unit tested
   composition/
     container.ts              Composition root: what implements what
-    tokens.ts                 Framework-level DI identifiers
+    entities.ts               The entities the persistence layer is built from
+<!-- #if auth -->
+    auth.module.ts            Login, token service and hasher, wired up
+<!-- #endif -->
     modules/                  One registration file per feature module
   domain/models/              Entities, as plain interfaces
   application/
@@ -64,9 +67,7 @@ src/
     services/                 Use cases
   infrastructure/
     logger.ts                 ILogger over stdout, dependency free
-    persistence/
-      data-source.ts          Builds the repositories for __engineLabel__
-      entities/               Entity to table mapping
+    persistence/entities/     Entity to table mapping
   presentation/
     routes.ts                 Mounts every decorated controller
     controllers/              One controller per module
@@ -119,9 +120,14 @@ npx monolite generate module invoice
 
 That writes the entity, its table mapping, the DTO with its validation, the service, the
 controller and the registration file — the same seven files the example module is made
-of. The CLI prints the two lines you then add yourself, in `composition/container.ts`
-and `presentation/routes.ts`: a generator that edits your own files is a generator that
-eventually mangles them.
+of. The CLI prints the three lines you then add yourself, in `composition/entities.ts`,
+`composition/container.ts` and `presentation/routes.ts`: a generator that edits your own
+files is a generator that eventually mangles them.
+
+The entity has to be listed in `composition/entities.ts` rather than registering itself,
+and that is not an oversight: the unit of work indexes the repositories by entity name
+when the persistence layer is assembled, so an entity that arrived later would have a
+store and no seat in any transaction.
 
 The individual pieces are available too: `generate entity`, `generate service`,
 `generate controller`.

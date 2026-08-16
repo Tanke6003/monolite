@@ -3,10 +3,14 @@ import type { AddressInfo } from "node:net";
 import cors from "cors";
 import express, { type Application, type Request, type Response } from "express";
 import helmet from "helmet";
-import { container } from "tsyringe";
 import type { IHealthProbe, ILogger, IRequestContext } from "@monolite/core";
-import { buildOpenApiSpec, errorHandler, notFoundHandler, requestContext } from "@monolite/http";
-import { TOKENS } from "./composition/tokens";
+import {
+  buildOpenApiDocument,
+  errorHandler,
+  notFoundHandler,
+  requestContext,
+} from "@monolite/http";
+import { container, TOKENS } from "./composition/container";
 import { areDocsEnabled, readEnv, resolveApiPrefix, resolveCorsOrigins, toInt } from "./config/env";
 import { registerRoutes } from "./presentation/routes";
 
@@ -110,7 +114,16 @@ export class Server {
       // the routes, so the description cannot drift from the implementation.
       // Point Swagger UI or Scalar at this URL.
       this.app.get("/openapi.json", (_req: Request, res: Response) => {
-        res.json(buildOpenApiSpec());
+        res.json(
+          buildOpenApiDocument({
+            title: "__serviceName__",
+            version: "__projectVersion__",
+            description: "__projectDescription__",
+            // Published as the server rather than baked into every path, so
+            // moving `API_PREFIX` keeps "Try it out" pointing at this instance.
+            apiPrefix: prefix,
+          })
+        );
       });
     }
   }

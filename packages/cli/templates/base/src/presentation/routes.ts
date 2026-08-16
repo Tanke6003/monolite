@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { container } from "tsyringe";
-import { registerController, registeredControllers } from "@monolite/http";
-// #if auth
-import { auth } from "../composition/container";
+// #if !auth
+import type { RequestHandler } from "express";
 // #endif
+// #if auth
+import { AUTH_TOKENS, requireAuth } from "@monolite/auth";
+import type { ITokenService } from "@monolite/auth";
+// #endif
+import { registerController, registeredControllers } from "@monolite/http";
+import { container } from "../composition/container";
 
 // Importing a controller is what runs its decorators and puts it in the
 // registry. This is the only list left —one line per module— and it cannot be
@@ -12,6 +16,21 @@ import { auth } from "../composition/container";
 // the controller itself.
 // #if example
 import "./controllers/product.controller";
+// #endif
+
+// #if !auth
+/**
+ * Stands in for the authentication guard in a project generated without it.
+ *
+ * The router asks for one because the decision of which routes are public is
+ * the controller's —`public: true` on the route— and a mounting that could
+ * silently skip the guard would make that decision meaningless. With no
+ * authentication in the project every route is open anyway, and this states it
+ * in one place instead of leaving it implied.
+ */
+const openToEveryone: RequestHandler = (_req, _res, next) => {
+  next();
+};
 // #endif
 
 /**
@@ -25,6 +44,15 @@ import "./controllers/product.controller";
 export function registerRoutes(): Router {
   const router = Router();
 
+  // #if auth
+  // Every route is behind the guard unless its decorator marked it `public`. If
+  // leaving one open is going to be an oversight, let the oversight be closing
+  // it rather than the other way round.
+  const guard = requireAuth(container.resolve<ITokenService>(AUTH_TOKENS.ITokenService));
+  // #else
+  const guard = openToEveryone;
+  // #endif
+
   for (const [type, metadata] of registeredControllers()) {
     if (!metadata.token) {
       throw new Error(
@@ -33,14 +61,7 @@ export function registerRoutes(): Router {
       );
     }
 
-    // #if auth
-    // Every route is behind the guard unless its decorator marked it `public`.
-    // If leaving one open is going to be an oversight, let the oversight be
-    // closing it rather than the other way round.
-    registerController(router, type, container.resolve(metadata.token), auth.guard);
-    // #else
-    registerController(router, type, container.resolve(metadata.token));
-    // #endif
+    registerController(router, type, container.resolve(metadata.token), guard);
   }
 
   return router;

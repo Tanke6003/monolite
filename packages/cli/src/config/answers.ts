@@ -66,6 +66,7 @@ export function dependenciesFor(answers: ProjectAnswers): Record<string, string>
     "@monolite/core": MONOLITE_VERSION,
     "@monolite/crud": MONOLITE_VERSION,
     "@monolite/data": MONOLITE_VERSION,
+    "@monolite/di": MONOLITE_VERSION,
     "@monolite/http": MONOLITE_VERSION,
     ...(answers.auth ? { "@monolite/auth": MONOLITE_VERSION } : {}),
     ...BASE_DEPENDENCIES,

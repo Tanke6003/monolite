@@ -1,9 +1,8 @@
-import { container } from "tsyringe";
+import type { DependencyContainer, EntityRegistration } from "@monolite/di";
 import { __entityName__Service } from "../../application/services/__entityKebab__.service";
-import type { DataSource } from "../../infrastructure/persistence/data-source";
+import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import { __entityConst__ } from "../../infrastructure/persistence/entities/__entityKebab__.entity";
 import { __entityName__Controller } from "../../presentation/controllers/__entityKebab__.controller";
-import { TOKENS } from "../tokens";
 import { __entityUpper___TOKENS } from "./__entityKebab__.tokens";
 
 // #if memory
@@ -19,27 +18,38 @@ const SEED = [
 // #endif
 
 /**
- * The three layers of the __entityKebab__ module.
+ * What the persistence layer needs in order to build this entity's repository.
+ *
+ * It is data rather than a call because the layer is assembled once, over every
+ * entity at the same time: that is what lets the unit of work hand a service
+ * the *same* repository inside a transaction as outside one. Add this constant
+ * to the list in `composition/entities.ts` and the store is registered under
+ * the token below with no further wiring.
+ */
+export const __entityPluralUpper___ENTITY_REGISTRATION: EntityRegistration<I__entityName__> = {
+  // The logical name the unit of work indexes by. It matches the table so that
+  // a service asking a transaction for `"__entityPluralUpper__"` is asking for
+  // the obvious thing.
+  name: "__entityPluralUpper__",
+  metadata: __entityConst__,
+  token: __entityUpper___TOKENS.store,
+  // #if memory
+  seed: SEED,
+  // #endif
+};
+
+/**
+ * The two layers of the __entityKebab__ module the container builds.
  *
  * Transient on purpose: they hold no state between requests, and the router
  * resolves each controller once at startup, so making them singletons would
  * save nothing and would hide an accidental field the day somebody adds one.
  *
- * The store is the exception, and it is a value rather than a class: it is the
- * generic repository already bound to the active engine, and building a second
- * one per request would mean a second connection pool.
+ * The repository is not here — it is registered by the persistence layer from
+ * the registration above, because it is the one object that must be shared: a
+ * second one per request would mean a second connection pool.
  */
-export function __registerFn__(): void {
-  const dataSource = container.resolve<DataSource>(TOKENS.DataSource);
-
-  container.register(__entityUpper___TOKENS.store, {
-    // #if memory
-    useValue: dataSource.repository(__entityConst__, SEED),
-    // #else
-    useValue: dataSource.repository(__entityConst__),
-    // #endif
-  });
-
+export function __registerFn__(container: DependencyContainer): void {
   container.register(__entityUpper___TOKENS.service, { useClass: __entityName__Service });
   container.register(__entityUpper___TOKENS.controller, { useClass: __entityName__Controller });
 }
