@@ -20,15 +20,19 @@ Then:
 
 ```bash
 curl http://localhost:3000/health/ready
+<!-- #if example -->
 curl http://localhost:3000__apiPrefix__/products
+<!-- #endif -->
 ```
 
 <!-- #if docker -->
 > `.env.example` ships placeholder credentials. Put the real password in `.env`, which is
 > git-ignored — that is the whole reason the two files exist.
+
 <!-- #endif -->
 <!-- #if auth -->
 > Set `JWT_SECRET` in `.env` before starting. Generate one with `openssl rand -hex 32`.
+
 <!-- #endif -->
 
 ## Scripts
@@ -73,6 +77,11 @@ src/
 tests/
   smoke.test.ts               Proves the toolchain runs
 ```
+
+<!-- #if !example -->
+The module directories are empty for now: this project was generated without the example
+module. `monolite generate module <name>` fills them in.
+<!-- #endif -->
 
 The layering rule is the usual one and it is worth keeping: `domain` knows nothing,
 `application` knows `domain`, `infrastructure` and `presentation` know both, and only

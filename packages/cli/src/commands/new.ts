@@ -114,7 +114,16 @@ export async function newCommand(argv: string[]): Promise<number> {
     process.cwd(),
     str(values, "directory") ?? positional ?? "."
   );
-  const defaultName = toPackageName(positional ?? path.basename(targetDirectory));
+
+  const rawName = positional ?? path.basename(targetDirectory);
+  const defaultName = toPackageName(rawName);
+
+  // Normalising beats refusing —`My App` is a perfectly clear intention— but it
+  // has to be said out loud, or the directory and the package end up with two
+  // different names and nobody knows which one the CLI decided.
+  if (defaultName !== rawName) {
+    warn(`"${rawName}" is not a valid npm package name; using "${defaultName}"`);
+  }
 
   const prompter = interactive ? new Prompter() : null;
 

@@ -147,7 +147,10 @@ function collapseBlankRuns(source: string): string {
 
 export function renderText(source: string, context: RenderContext, origin: string): string {
   const conditioned = collapseBlankRuns(applyConditionals(source, context.flags, origin));
-  return substitute(conditioned, context.vars, origin);
+  // Exactly one trailing newline, for the same reason `.editorconfig` asks for
+  // one: a conditional at the end of a file otherwise leaves a ragged tail that
+  // every editor and every diff will then want to fix.
+  return `${substitute(conditioned, context.vars, origin).replace(/\n+$/, "")}\n`;
 }
 
 /** Path segments only ever get substitution; a directory cannot hold a `#if`. */
