@@ -90,7 +90,17 @@ function tristate(values: Values, positive: OptionName, negative: OptionName): b
   return undefined;
 }
 
-export async function newCommand(argv: string[]): Promise<number> {
+/**
+ * `prompter` exists so the wizard can be run by a test.
+ *
+ * Two bugs in a row got through here —a choice list that answered no key, and
+ * a project written to the directory the command was run from rather than the
+ * one it was named after— and both were invisible to every test in the package
+ * because nothing could reach the interactive path at all. `--yes` and a full
+ * set of flags is a different route through this function, and it was the only
+ * one under test.
+ */
+export async function newCommand(argv: string[], prompterForTest?: Prompter): Promise<number> {
   let parsed;
   try {
     parsed = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: true });
@@ -107,7 +117,7 @@ export async function newCommand(argv: string[]): Promise<number> {
   }
 
   const yes = Boolean(values.yes);
-  const interactive = !yes && canPrompt();
+  const interactive = !yes && (Boolean(prompterForTest) || canPrompt());
 
   if (!yes && !interactive) {
     fail("stdin is not a terminal, so the questions cannot be asked");
@@ -116,28 +126,61 @@ export async function newCommand(argv: string[]): Promise<number> {
   }
 
   const positional = parsed.positionals[0];
-  const targetDirectory = path.resolve(
-    process.cwd(),
-    str(values, "directory") ?? positional ?? "."
-  );
+  const namedDirectory = str(values, "directory") ?? positional;
 
-  const rawName = positional ?? path.basename(targetDirectory);
+  const rawName = positional ?? path.basename(path.resolve(process.cwd(), namedDirectory ?? "."));
   const defaultName = toPackageName(rawName);
 
-  const notice = packageNameNotice(rawName, defaultName, interactive && !positional);
+  const nameWillBeAsked = interactive && !positional;
+
+  const notice = packageNameNotice(rawName, defaultName, nameWillBeAsked);
   if (notice) warn(notice);
 
-  const prompter = interactive ? new Prompter() : null;
+  const prompter = interactive ? (prompterForTest ?? new Prompter()) : null;
 
   try {
     const answers = await collect(values, defaultName, Boolean(positional), prompter);
-    return scaffold(answers, targetDirectory, Boolean(values.force));
+
+    return scaffold(
+      answers,
+      targetDirectory(process.cwd(), namedDirectory, answers.name, nameWillBeAsked),
+      Boolean(values.force)
+    );
   } catch (error) {
     fail((error as Error).message);
     return 1;
   } finally {
-    prompter?.close();
+    // A prompter that was handed in belongs to whoever handed it in.
+    if (!prompterForTest) prompter?.close();
   }
+}
+
+/**
+ * Where the project is written.
+ *
+ * A directory named on the command line wins, whether it arrived as
+ * `--directory` or as the positional: `monolite new billing-api` and
+ * `monolite new .` both say plainly where they mean.
+ *
+ * With neither, a name typed at the prompt names the folder too. Answering
+ * "Project name" and then finding the project poured into whatever directory
+ * the command happened to be run from is nobody's idea of what they asked for
+ * — and in a directory that already holds something it does not even get that
+ * far, it stops on "not empty" after every question has been answered.
+ *
+ * `--yes` with no name is the exception and stays as it was: nobody was asked
+ * anything, so the only directory the command can mean is the one it is in.
+ */
+export function targetDirectory(
+  cwd: string,
+  namedDirectory: string | undefined,
+  projectName: string,
+  nameWasAsked: boolean
+): string {
+  if (namedDirectory) return path.resolve(cwd, namedDirectory);
+  if (nameWasAsked) return path.resolve(cwd, projectName);
+
+  return path.resolve(cwd, ".");
 }
 
 /**
