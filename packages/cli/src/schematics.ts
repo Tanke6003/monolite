@@ -62,7 +62,10 @@ export function entityVars(rawName: string): Record<string, string> {
     registerFn: `register${plural}`,
     dtoName: `${singular}DTO`,
     mapperName: `${toCamelCase(singular)}Mapper`,
-    resourceLabel: `the ${toKebabCase(rawName).replace(/-/g, " ")}`,
+    // No article: `@Crud` builds its own prose around it —"Create <resource>",
+    // "No <resource> found with that id"— and a label that carried one produced
+    // "No the product found with that id" in every generated document.
+    resourceLabel: toKebabCase(rawName).replace(/-/g, " "),
   };
 }
 
