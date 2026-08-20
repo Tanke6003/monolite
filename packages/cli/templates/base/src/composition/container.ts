@@ -1,6 +1,11 @@
 // Registering on import is deliberate: `main.ts`, the router and the tests all
 // assume that importing this file is enough to have a working container.
-import { createCompositionRoot, registerPersistence, registerPlugins } from "monolite-di";
+import {
+  createCompositionRoot,
+  registerPersistence,
+  registerPlugins,
+  validateDataSourceEnv,
+} from "monolite-di";
 // #if auth
 import { registerAuth } from "./auth.module";
 // #endif
@@ -32,16 +37,26 @@ export const root = createCompositionRoot((root) => {
     container: root.container,
     envs,
     logger: new ConsoleLogger(),
-    // #if auth
-    // Fails at startup rather than signing tokens with whatever the fallback
-    // was: an application that boots without `JWT_SECRET` is one nobody notices
-    // until somebody forges a token against it.
+    /**
+     * Everything the process cannot honestly start without, checked here rather
+     * than discovered later.
+     *
+     * A missing credential does not stop an application: it degrades it. The
+     * database one surfaces at whichever request first touches the database, by
+     * which point the cause is three layers from the symptom, and the signing
+     * one never surfaces at all — tokens get signed with the fallback and
+     * nobody finds out until somebody forges one.
+     */
     validate: (source) => {
+      // #if auth
       if (!source.getEnv("JWT_SECRET")) {
         throw new Error("[config] JWT_SECRET is required and is not set");
       }
+      // #endif
+      // Only what the engine named in `DATA_SOURCE` needs: nobody should have
+      // to configure five engines in order to run the one they chose.
+      validateDataSourceEnv(source);
     },
-    // #endif
   });
 
   // Every entity's generic repository, the unit of work and the health probe,

@@ -131,6 +131,13 @@ matter, with the defaults this project was generated with:
 
 The health checks are exempt from the limiter, so a load balancer probing every few
 seconds does not exhaust the quota of its own address.
+<!-- #if db -->
+
+The process refuses to start when a variable the configured engine cannot connect
+without is missing — `DATA_SOURCE=__engineId__` needs its password — and says which
+one in the boot log. Only the engine in `DATA_SOURCE` is checked; the others are
+nobody's problem until they are chosen.
+<!-- #endif -->
 
 Changing `API_PREFIX` moves the whole surface; it does not create a version. A real v2
 means a second router, because the contract is the code.
