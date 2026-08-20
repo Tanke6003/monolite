@@ -90,16 +90,19 @@ export { DEFAULT_API_PREFIX, DEFAULT_LEGACY_PREFIX, resolveApiPrefix, resolveLeg
 
 export {
   DEFAULT_CSP_DIRECTIVES,
+  SCALAR_CDN_ORIGIN,
   SECURITY_DEFAULTS,
   areDocsEnabled,
   buildAuthRateLimiter,
   buildCorsOptions,
   buildHelmetOptions,
   buildRateLimiter,
+  docsCspDirectives,
   resolveAllowedOrigins,
   resolveBodyLimit,
   resolveTrustProxy,
 } from "./config/security.config.js";
+export type { DocsReader } from "./config/security.config.js";
 
 export { processEnv } from "./config/env-source.js";
 export type { EnvSource } from "./config/env-source.js";
