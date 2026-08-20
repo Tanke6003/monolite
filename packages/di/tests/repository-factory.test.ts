@@ -4,7 +4,9 @@ import {
   buildSequelizeConfig,
   createPersistenceLayer,
   isOracleDriver,
+  missingDataSourceEnv,
   resolveDriver,
+  validateDataSourceEnv,
 } from "monolite-di";
 import {
   AUDIT_LOG_ENTITY,
@@ -393,5 +395,75 @@ describe("createPersistenceLayer, across the engines", () => {
     expect(layer.auditLogStore).toBeDefined();
     // Everything but memory owns a pool the process has to open and close.
     expect(layer.connection === undefined).toBe(driver === "memory");
+  });
+});
+
+/**
+ * The check that turns "the password was never set" into a line in the boot log
+ * rather than a connection error at whichever request first touches the
+ * database — by which point the cause is three layers away from the symptom.
+ */
+describe("missingDataSourceEnv", () => {
+  it("asks for nothing when the engine is memory", () => {
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: "memory" }))).toEqual([]);
+  });
+
+  it.each([
+    ["postgres", "POSTGRES_PASSWORD"],
+    ["mysql", "MYSQL_PASSWORD"],
+    ["sqlserver", "DB_PASSWORD"],
+    ["oracle", "ORACLE_PASSWORD"],
+  ])("names the password %s cannot start without", (dataSource, variable) => {
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: dataSource }))).toEqual([variable]);
+  });
+
+  it("is satisfied once it is set", () => {
+    expect(
+      missingDataSourceEnv(envsFrom({ DATA_SOURCE: "postgres", POSTGRES_PASSWORD: "s3cret" }))
+    ).toEqual([]);
+  });
+
+  it("reads a variable set to nothing as one somebody meant to fill in", () => {
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: "mysql", MYSQL_PASSWORD: "  " }))).toEqual([
+      "MYSQL_PASSWORD",
+    ]);
+  });
+
+  it("asks Mongo for nothing, because its development container has no auth", () => {
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: "mongodb" }))).toEqual([]);
+  });
+
+  it("does ask Mongo for the password that goes with a user", () => {
+    // The halfway state is always a mistake: the connector would build a URI
+    // with a username and no credentials to go with it.
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: "mongo", MONGO_USER: "app" }))).toEqual([
+      "MONGO_PASSWORD",
+    ]);
+  });
+
+  it("only checks the engine that is configured", () => {
+    // Nobody should have to set credentials for five engines they are not
+    // running in order to start the one they are.
+    expect(missingDataSourceEnv(envsFrom({ DATA_SOURCE: "memory", MONGO_USER: "app" }))).toEqual([]);
+  });
+
+  it("refuses a DATA_SOURCE it does not know rather than assuming memory", () => {
+    expect(() => missingDataSourceEnv(envsFrom({ DATA_SOURCE: "postgress" }))).toThrow(
+      /Unknown DATA_SOURCE/
+    );
+  });
+});
+
+describe("validateDataSourceEnv", () => {
+  it("says which engine, which variables, and that it is not starting", () => {
+    expect(() => validateDataSourceEnv(envsFrom({ DATA_SOURCE: "postgres" }))).toThrow(
+      /DATA_SOURCE=postgres needs POSTGRES_PASSWORD/
+    );
+  });
+
+  it("passes silently when everything it needs is there", () => {
+    expect(() =>
+      validateDataSourceEnv(envsFrom({ DATA_SOURCE: "oracle", ORACLE_PASSWORD: "x" }))
+    ).not.toThrow();
   });
 });
