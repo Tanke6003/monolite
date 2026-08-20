@@ -8,8 +8,9 @@ import {
 import type { IAuthService, IPasswordHasher, ITokenService, IUserProvider } from "monolite-auth";
 import { registerInstance, registerSingleton } from "monolite-di";
 import type { DependencyContainer } from "monolite-di";
+import { buildAuthRateLimiter } from "monolite-http";
 import { SeedUserProvider } from "../auth/seed-user.provider";
-import { readEnv, requireEnv, toInt } from "../config/env";
+import { envs, readEnv, requireEnv, toInt } from "../config/env";
 
 /**
  * Everything the login flow needs, in one place you own.
@@ -51,8 +52,16 @@ export function registerAuth(container: DependencyContainer): void {
 
   // The controller declares this token in its own decorator, which is how the
   // router —which mounts every decorated controller it finds— knows who serves
-  // it. The second argument is the extra middleware for the login route: a rate
-  // limiter belongs there, and login is the one endpoint whose whole attack is
-  // to be called a great many times.
-  registerInstance(container, AUTH_TOKENS.IAuthController, new AuthController(auth, []));
+  // it. The second argument is the extra middleware for the login route.
+  //
+  // The limiter is its own, and far narrower than the general one: login is the
+  // endpoint whose entire attack is to be called a great many times, and hashing
+  // on purpose makes each of those calls expensive for this side too.
+  // `AUTH_RATE_LIMIT_MAX=0` switches it off.
+  const loginLimiter = buildAuthRateLimiter(envs);
+  registerInstance(
+    container,
+    AUTH_TOKENS.IAuthController,
+    new AuthController(auth, loginLimiter ? [loginLimiter] : [])
+  );
 }
