@@ -72,6 +72,18 @@ on outside production.
 | `__pmRun__ typecheck` | `tsc --noEmit` |
 | `__pmRun__ check` | Typecheck, lint and test — what CI should run |
 
+## Tests
+
+`__pmRun__ test` runs both suites and needs nothing running: `tests/setup/test-env.ts`
+forces `DATA_SOURCE=memory`, so the end-to-end tests get the real repository, the real
+services and the real routes without a container to bring up first. Point that variable
+at an engine to run the very same tests against one.
+
+They drive the application in memory through supertest — no port is bound, so the suite
+runs beside a `__pmRun__ dev` that is already going. What they exercise is everything
+above the socket: the middleware chain in its real order, the routes the decorators
+produced, the validation, the error envelope and the document.
+
 ## Layout
 
 ```
@@ -101,7 +113,18 @@ src/
     seed-user.provider.ts     Where the login looks users up. Replace this.
 <!-- #endif -->
 tests/
-  smoke.test.ts               Proves the toolchain runs
+  setup/test-env.ts           The environment every test runs in
+  smoke.test.ts               Configuration helpers, with nothing standing up
+  e2e/
+    support/api.ts            The application, configured once and never listening
+    health.e2e.test.ts        Liveness, readiness and the shape of a failure
+    openapi.e2e.test.ts       The document, and that every `$ref` in it resolves
+<!-- #if auth -->
+    auth.e2e.test.ts          Login, and the guard in front of everything else
+<!-- #endif -->
+<!-- #if example -->
+    product.e2e.test.ts       The example module, through the whole chain
+<!-- #endif -->
 ```
 
 <!-- #if !example -->

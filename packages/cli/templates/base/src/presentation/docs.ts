@@ -90,7 +90,20 @@ export async function mountDocs(
   // import becomes a `require()` of an ES module — which Node only tolerates
   // from v22, while this project supports v20. A dynamic `import()` is the one
   // spelling that works on both.
-  const { apiReference } = await import("@scalar/express-api-reference");
-  app.use("__scalarPath__", apiReference({ url: "/openapi.json" }));
+  //
+  // And it is allowed to fail. Jest's CommonJS runtime refuses a dynamic import
+  // without `--experimental-vm-modules`, so this line throws under the project's
+  // own test suite; taking the whole application down with it would mean the
+  // documentation reader deciding whether the API starts. The document is still
+  // published either way, which is the part a client actually consumes.
+  try {
+    const { apiReference } = await import("@scalar/express-api-reference");
+    app.use("__scalarPath__", apiReference({ url: "/openapi.json" }));
+  } catch (error) {
+    logger?.warn("The Scalar reader could not be loaded; __scalarPath__ is not mounted", {
+      error,
+      hint: "the document is still served at /openapi.json",
+    });
+  }
 #endif
 }

@@ -140,18 +140,33 @@ verdad está mejor que uno al 95% rellenado con aserciones sobre getters.
 
 ## Probar tu propio proyecto
 
-Un proyecto generado por la CLI viene con `jest.config.js`, el mismo mapeo a
-fuentes en vez de a `dist`, y una prueba de humo que pasa a la primera. Añade sobre
-eso de la misma forma:
+Un proyecto generado por la CLI llega con dos suites y las dos pasan a la primera:
+una unitaria sobre los ayudantes de configuración y otra de extremo a extremo sobre
+la aplicación misma — salud, el documento de OpenAPI, el módulo de ejemplo y, en un
+proyecto con autenticación, la ruta de login y el guardia que hay delante de todo
+lo demás.
+
+No necesitan nada levantado. `tests/setup/test-env.ts` fuerza `DATA_SOURCE=memory`
+antes de que se cargue un solo módulo, así que las pruebas reciben el repositorio
+real, los servicios reales y las rutas reales sobre el driver en memoria. Apunta esa
+variable a un motor y las mismas pruebas corren contra él: la metadata de la entidad
+no cambia.
+
+La aplicación se maneja en memoria, no por un socket:
 
 ```ts
-import request from "supertest";
-import { createApp } from "monolite-http";
+import { api, API, headers, type Api } from "./support/api";
+
+let http: Api;
+let auth: Record<string, string>;
+
+beforeAll(async () => {
+  http = await api();       // Server.configure(), nunca Server.run()
+  auth = await headers();   // un token real, de la ruta de login real
+});
 
 it("rechaza un body que no pasa la validación", async () => {
-  const { app } = createApp({ controllers, /* ... */ });
-
-  const response = await request(app).post("/api/v1/branches").send({ name: "" });
+  const response = await http.post(`${API}/branches`).set(auth).send({ name: "" });
 
   expect(response.status).toBe(400);
   expect(response.body).toMatchObject({ code: "VALIDATION_ERROR" });
@@ -159,8 +174,12 @@ it("rechaza un body que no pasa la validación", async () => {
 });
 ```
 
+`Server.configure()` es `run()` sin ponerse a escuchar, que es lo que permite correr
+la suite junto a un servidor de `dev` sin pelearse con él por el puerto. La cadena
+que monta es la misma, en el mismo orden.
+
 Una advertencia que conviene conocer: un manejador de errores de Express sólo cubre
 las rutas registradas **antes** que él. Si montas una app a mano en una prueba en
-vez de usar `createApp`, registra el manejo de errores al final o tus errores se
-escaparán como el HTML por defecto de Express y la aserción de arriba fallará por
-un motivo que no tiene nada que ver con la validación.
+vez de usar `createApp` o el `Server` generado, registra el manejo de errores al
+final o tus errores se escaparán como el HTML por defecto de Express y la aserción
+de arriba fallará por un motivo que no tiene nada que ver con la validación.

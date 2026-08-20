@@ -36,6 +36,7 @@ import { registerRoutes } from "./presentation/routes";
 export class Server {
   public readonly app: Application = express();
   private httpServer?: http.Server;
+  private configured = false;
 
   constructor(private readonly port: number) {}
 
@@ -143,10 +144,27 @@ export class Server {
     );
   }
 
-  async run(): Promise<void> {
+  /**
+   * Everything but the listening.
+   *
+   * Separate from `run` so a test can drive the application in memory —
+   * supertest takes the Express instance and never binds a port, which is what
+   * lets the end-to-end suite run beside a `dev` server without clashing with
+   * it. What it exercises is the same chain, in the same order.
+   */
+  async configure(): Promise<void> {
+    // Registering the chain twice would run every middleware twice, and the
+    // symptom —two access log lines, two request ids— is a puzzle to read.
+    if (this.configured) return;
+    this.configured = true;
+
     this.configureMiddleware();
     await this.configureRoutes();
     this.configureErrorHandling();
+  }
+
+  async run(): Promise<void> {
+    await this.configure();
 
     const logger = container.resolve<ILogger>(TOKENS.ILogger);
     const prefix = resolveApiPrefix(readEnv("API_PREFIX"));

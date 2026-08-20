@@ -492,6 +492,11 @@ function scaffold(answers: ProjectAnswers, targetDirectory: string, force: boole
     templatePath("base"),
     ...(answers.engine.templateDir ? [templatePath("db", answers.engine.templateDir)] : []),
     ...(answers.auth ? [templatePath("auth")] : []),
+    // The example module's own code comes from the schematic below, the same
+    // one `generate module` runs. What lives here is what the schematic cannot
+    // write: its end-to-end test, which belongs under `tests/` and not under
+    // the source root the schematic renders into.
+    ...(answers.example ? [templatePath("example")] : []),
   ];
 
   for (const source of trees) {

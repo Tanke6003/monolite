@@ -4,10 +4,12 @@ module.exports = {
 
   testMatch: ["**/tests/**/*.test.ts"],
 
-  // tsyringe reads the metadata the compiler emits, and it has to be patched in
-  // before the first decorated class is loaded — which happens at import time,
-  // so a `beforeAll` would already be too late.
-  setupFiles: ["reflect-metadata"],
+  // Both of these run before a single module is imported, and both have to:
+  // tsyringe reads the metadata the compiler emits and needs the polyfill in
+  // place before the first decorated class loads, and the composition root
+  // reads the environment while it registers itself, which also happens at
+  // import time. A `beforeAll` would be too late for either.
+  setupFiles: ["reflect-metadata", "<rootDir>/tests/setup/test-env.ts"],
 
   // Off by default. Coverage instruments every file under `src`, including the
   // composition root, so `--coverage` needs the whole dependency tree to be

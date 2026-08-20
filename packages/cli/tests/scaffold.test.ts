@@ -114,7 +114,10 @@ const COMPILER_OPTIONS: ts.CompilerOptions = {
   // here is the generated code.
   skipLibCheck: true,
   noEmit: true,
-  types: ["node"],
+  // `jest` because the generated project ships tests of its own, and they are
+  // compiled here too: a scaffold that writes a test suite which does not
+  // compile is worse than one that writes none.
+  types: ["node", "jest"],
   baseUrl: SCRATCH,
   paths: {
     // Resolve to the sources rather than to `dist`, for the same reason the
@@ -266,6 +269,19 @@ describe("the projects `monolite new` writes", () => {
       expect(sources.length).toBeGreaterThan(0);
 
       expect(typeErrors(sources)).toEqual([]);
+    });
+
+    /**
+     * The tests the scaffold writes are code it wrote, and they drifted the same
+     * way the source did before this file existed — with the added twist that a
+     * generated suite which does not compile fails on `npm test`, which is the
+     * first command anybody runs in a new project.
+     */
+    it("writes a test suite that compiles", () => {
+      const tests = filesOf(path.join(target, "tests"), ".ts");
+      expect(tests.length).toBeGreaterThan(0);
+
+      expect(typeErrors(tests)).toEqual([]);
     });
 
     /**
