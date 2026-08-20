@@ -81,6 +81,7 @@ to read it with.
 | --- | --- | --- |
 | `swagger` | Swagger UI at `/docs` | Bundles its own assets, so it works offline |
 | `scalar` | Scalar at `/docs` | Loads the reader from a CDN; point `cdn` at a local copy if there is no outbound internet |
+| `both` | Swagger UI at `/docs` and Scalar at `/reference` | Two pages over one document; they fetch it rather than carry a copy |
 | `none` | nothing | `/openapi.json` is still served |
 
 Both readers are pointed at `/openapi.json` rather than handed the document, so

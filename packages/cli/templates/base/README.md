@@ -27,12 +27,21 @@ curl http://localhost:3000__apiPrefix__/products
 ```
 <!-- #if docs -->
 
-The API describes itself. __docsUiLabel__ is mounted at
-[http://localhost:3000__docsPath__](http://localhost:3000__docsPath__), reading the
-same OpenAPI document `/openapi.json` serves — which is generated from the decorator
-metadata that produced the routes, so it cannot drift from them.
+The API describes itself:
+<!-- #if swagger -->
 
-Both are governed by `DOCS_ENABLED`, on outside production.
+- Swagger UI — [http://localhost:3000__swaggerPath__](http://localhost:3000__swaggerPath__)
+<!-- #endif -->
+<!-- #if scalar -->
+- Scalar — [http://localhost:3000__scalarPath__](http://localhost:3000__scalarPath__)
+<!-- #endif -->
+- the document itself — [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
+
+The readers fetch that same document rather than carrying a copy, and it is
+generated from the decorator metadata that produced the routes, so none of the
+three can drift from the API or from each other.
+
+All of them are governed by `DOCS_ENABLED`, on outside production.
 <!-- #else -->
 
 `/openapi.json` is the API's own description, generated from the decorator metadata

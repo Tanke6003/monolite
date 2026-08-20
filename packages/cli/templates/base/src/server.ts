@@ -68,7 +68,7 @@ export class Server {
     // and when it is on the directives already account for the documentation
     // reader this project was scaffolded with. Helmet's own default policy is
     // the one thing that would quietly break it.
-    this.app.use(helmet(buildHelmetOptions(envs, docsCspDirectives("__docsUiId__"))));
+    this.app.use(helmet(buildHelmetOptions(envs, docsCspDirectives("__docsCspReader__"))));
 
     // Before the body parsers: a request that is going to be rejected does not
     // get its body read, which is exactly the work an abuse is trying to cause.
@@ -161,8 +161,11 @@ export class Server {
           // Not announced when the documentation is switched off: with
           // `DOCS_ENABLED=false` these addresses answer a 404.
           openapi: docsPublished ? `${base}/openapi.json` : undefined,
-#if docs
-          docs: docsPublished ? `${base}__docsPath__` : undefined,
+#if swagger
+          swagger: docsPublished ? `${base}__swaggerPath__` : undefined,
+#endif
+#if scalar
+          scalar: docsPublished ? `${base}__scalarPath__` : undefined,
 #endif
           health: `${base}/health/ready`,
         });

@@ -12,7 +12,8 @@ import { areDocsEnabled, readEnv } from "../config/env";
  * The document is generated from the same decorator metadata that produced the
  * routes, so it cannot drift from the implementation, and it is published
  * whether or not a reader is mounted: a client generator wants the JSON, not a
- * page.
+ * page. Two readers can sit over it at once — they fetch it rather than carry a
+ * copy, so there is still only one description of this API.
  *
  * `DOCS_ENABLED` governs both, and is on outside production — the document
  * describes the whole surface of the API, validation rules included, which is
@@ -69,7 +70,7 @@ export async function mountDocs(
   // there is one source for it and the page cannot show a spec the API stopped
   // serving. Swagger UI bundles its own assets, so this works offline.
   app.use(
-    "__docsPath__",
+    "__swaggerPath__",
     swaggerUi.serve,
     swaggerUi.setup(undefined, { swaggerOptions: { url: "/openapi.json" } })
   );
@@ -90,6 +91,6 @@ export async function mountDocs(
   // from v22, while this project supports v20. A dynamic `import()` is the one
   // spelling that works on both.
   const { apiReference } = await import("@scalar/express-api-reference");
-  app.use("__docsPath__", apiReference({ url: "/openapi.json" }));
+  app.use("__scalarPath__", apiReference({ url: "/openapi.json" }));
 #endif
 }

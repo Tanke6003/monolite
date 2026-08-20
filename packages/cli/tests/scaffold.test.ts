@@ -67,6 +67,16 @@ const VARIANTS: Variant[] = [
     // only one that generates the mongo tree.
     args: ["--database=mongo", "--no-auth", "--example", "--docs=scalar"],
   },
+  /**
+   * Two readers over one document. Worth a run of its own because it is the
+   * only answer that turns on both conditional blocks at once, and a template
+   * that mounted them at the same path would compile perfectly and then have
+   * one shadow the other.
+   */
+  {
+    name: "both-readers",
+    args: ["--database=none", "--no-auth", "--example", "--docs=both"],
+  },
   // The one that is actually run. In memory and with the example module, so it
   // serves real routes without a container to bring up first.
   {
@@ -225,6 +235,16 @@ describe("the projects `monolite new` writes", () => {
 
     it("is written without the command failing", () => {
       expect(exitCode).toBe(0);
+    });
+
+    it("mounts each chosen reader at an address of its own", () => {
+      const docs = path.join(target, "src", "presentation", "docs.ts");
+      if (!fs.existsSync(docs)) return;
+
+      const source = fs.readFileSync(docs, "utf8");
+      const mounted = [...source.matchAll(/app\.use\(\s*"([^"]+)"/g)].map((match) => match[1]);
+
+      expect(mounted).toEqual([...new Set(mounted)]);
     });
 
     it("leaves no placeholder or conditional behind", () => {
