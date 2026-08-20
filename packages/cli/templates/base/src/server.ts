@@ -1,12 +1,24 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import cors from "cors";
-import express, { type Application, type Request, type Response } from "express";
+import express, { type Application } from "express";
 import helmet from "helmet";
 import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
-import { errorHandler, notFoundHandler, requestContext } from "monolite-http";
+import {
+  buildCorsOptions,
+  buildHelmetOptions,
+  buildRateLimiter,
+  docsCspDirectives,
+  errorHandler,
+  healthRoutes,
+  httpLogger,
+  notFoundHandler,
+  requestContext,
+  resolveBodyLimit,
+  resolveTrustProxy,
+} from "monolite-http";
 import { container, TOKENS } from "./composition/container";
-import { readEnv, resolveApiPrefix, resolveCorsOrigins, toInt } from "./config/env";
+import { areDocsEnabled, envs, readEnv, resolveApiPrefix } from "./config/env";
 import { mountDocs } from "./presentation/docs";
 import { registerRoutes } from "./presentation/routes";
 
@@ -14,11 +26,12 @@ import { registerRoutes } from "./presentation/routes";
  * The HTTP surface, and it is yours.
  *
  * The toolkit deliberately does not own this file: which middleware runs, in
- * which order, and what the health endpoints answer are decisions that change
- * per deployment, and a framework that hid them would have to grow a
- * configuration option for each. What comes from `monolite-http` is the part
- * that is genuinely the same everywhere — turning decorated controllers into
- * routes, and turning a thrown `AppError` into a response.
+ * which order, and what is mounted where are decisions that change per
+ * deployment, and a framework that hid them would have to grow a configuration
+ * option for each. What comes from `monolite-http` is the part that is
+ * genuinely the same everywhere — turning decorated controllers into routes,
+ * turning a thrown `AppError` into a response, and the security policy, which
+ * is read from the environment rather than written here.
  */
 export class Server {
   public readonly app: Application = express();
@@ -41,72 +54,69 @@ export class Server {
     // How many trusted proxies sit in front. Get it wrong and anything that
     // works per client IP either sees only the load balancer or believes an
     // address the client chose for itself.
-    this.app.set("trust proxy", toInt(readEnv("TRUST_PROXY_HOPS"), 0));
+    this.app.set("trust proxy", resolveTrustProxy(envs));
 
     // First of all, before the body is even parsed: this way a malformed JSON
     // is rejected with its own request id, and every layer after it —logs,
     // error handler, audit columns— sees the context.
     this.app.use(requestContext(context));
 
-    // Before anything that answers, so the headers also travel with a rejected
-    // CORS preflight.
-    this.app.use(helmet());
+    // Before anything that answers, so the headers also travel with a 429 or a
+    // rejected CORS preflight.
+    //
+    // The Content-Security-Policy is off unless `CSP_ENABLED=true` asks for it,
+    // and when it is on the directives already account for the documentation
+    // reader this project was scaffolded with. Helmet's own default policy is
+    // the one thing that would quietly break it.
+    this.app.use(helmet(buildHelmetOptions(envs, docsCspDirectives("__docsUiId__"))));
 
-    // Before the body parsers: a preflight carries no body.
-    this.app.use(cors({ origin: resolveCorsOrigins(readEnv("CORS_ORIGINS")), credentials: true }));
+    // Before the body parsers: a request that is going to be rejected does not
+    // get its body read, which is exactly the work an abuse is trying to cause.
+    // `RATE_LIMIT_MAX=0` switches it off.
+    const limiter = buildRateLimiter(envs);
+    if (limiter) this.app.use(limiter);
 
-    const bodyLimit = readEnv("BODY_LIMIT", "1mb");
+    // Before the body parsers as well: a preflight carries none. The allow-list
+    // is `CORS_ORIGINS`; a request with no `Origin` —curl, a probe, the docs
+    // page itself— is never a cross-origin one and always passes.
+    this.app.use(cors(buildCorsOptions(envs, logger)));
+
+    const bodyLimit = resolveBodyLimit(envs);
     this.app.use(express.json({ limit: bodyLimit }));
     this.app.use(express.urlencoded({ limit: bodyLimit, extended: false }));
 
-    this.app.use((req, _res, next) => {
-      logger.debug("request", { method: req.method, url: req.originalUrl });
-      next();
-    });
+    // One line per request, with its id, its status and how long it took.
+    this.app.use(httpLogger(logger));
   }
 
   /**
-   * Business routes plus the two health questions.
+   * Business routes, the health questions and the API's own description.
    *
-   * They are two questions and not one because an orchestrator does opposite
+   * Health is two questions and not one because an orchestrator does opposite
    * things with each: a process that is not *alive* gets restarted, a process
    * that is not *ready* gets taken out of rotation. With the database down the
    * second is the correct answer — restarting fixes nothing, and moving the
    * traffic sends it to a replica that can actually serve it.
    */
-  private configureRoutes(): void {
-    const probe = container.resolve<IHealthProbe>(TOKENS.IHealthProbe);
+  private async configureRoutes(): Promise<void> {
     const prefix = resolveApiPrefix(readEnv("API_PREFIX"));
-
-    /** Liveness: says the process answers. It never touches the database. */
-    this.app.get("/health/live", (_req: Request, res: Response) => {
-      res.status(200).json({
-        status: "ok",
-        timestamp: new Date().toISOString(),
-        uptime: Math.floor(process.uptime()),
-      });
-    });
-
-    /** Readiness: 503 while the database is down or the process is draining. */
-    this.app.get("/health/ready", async (_req: Request, res: Response) => {
-      const report = await probe.report();
-
-      res.status(report.ready ? 200 : 503).json({
-        status: report.ready ? "ok" : report.shuttingDown ? "shutting_down" : "degraded",
-        dataSource: report.dataSource,
-        database: report.database,
-        // Published rather than assumed: `API_PREFIX` is configurable, so a
-        // client can discover where this instance actually serves.
-        apiPrefix: prefix,
-        timestamp: new Date().toISOString(),
-        uptime: Math.floor(process.uptime()),
-      });
-    });
 
     this.app.use(prefix, registerRoutes());
 
-    // The OpenAPI document, and __docsSentence__.
-    mountDocs(this.app, prefix);
+    // `/health/live`, `/health/ready`, and `/health` as an alias for readiness
+    // — which is the path a load balancer configured with the bare one expects.
+    this.app.use(
+      "/health",
+      healthRoutes({
+        probe: container.resolve<IHealthProbe>(TOKENS.IHealthProbe),
+        apiPrefix: prefix,
+      })
+    );
+
+    // The OpenAPI document, and __docsSentence__. Awaited because the reader may
+    // have to be imported before it can be mounted, and it has to be in place
+    // before the 404 handler below, which would otherwise swallow it.
+    await mountDocs(this.app, prefix, container.resolve<ILogger>(TOKENS.ILogger));
   }
 
   /**
@@ -135,11 +145,12 @@ export class Server {
 
   async run(): Promise<void> {
     this.configureMiddleware();
-    this.configureRoutes();
+    await this.configureRoutes();
     this.configureErrorHandling();
 
     const logger = container.resolve<ILogger>(TOKENS.ILogger);
     const prefix = resolveApiPrefix(readEnv("API_PREFIX"));
+    const docsPublished = areDocsEnabled(readEnv("DOCS_ENABLED"), readEnv("NODE_ENV", "development"));
 
     await new Promise<void>((resolve) => {
       this.httpServer = this.app.listen(this.port, () => {
@@ -147,6 +158,12 @@ export class Server {
         logger.info("Server listening", {
           port: this.port,
           api: `${base}${prefix}`,
+          // Not announced when the documentation is switched off: with
+          // `DOCS_ENABLED=false` these addresses answer a 404.
+          openapi: docsPublished ? `${base}/openapi.json` : undefined,
+#if docs
+          docs: docsPublished ? `${base}__docsPath__` : undefined,
+#endif
           health: `${base}/health/ready`,
         });
         resolve();

@@ -76,24 +76,6 @@ export function resolveApiPrefix(raw: string | undefined, fallback = "__apiPrefi
 }
 
 /**
- * CORS origins. Returns `false` —same origin only— rather than `true` when
- * nothing is configured: a default that reflects any origin is the kind of
- * setting nobody revisits until it is being exploited.
- */
-export function resolveCorsOrigins(raw: string | undefined): string[] | boolean {
-  const value = (raw ?? "").trim();
-  if (!value) return false;
-  if (value === "*") return true;
-
-  const origins = value
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  return origins.length > 0 ? origins : false;
-}
-
-/**
  * The OpenAPI document describes the whole surface, input schemas included, so
  * outside development it is published only when explicitly asked for.
  */

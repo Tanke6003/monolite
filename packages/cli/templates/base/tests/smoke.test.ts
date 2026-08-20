@@ -1,10 +1,4 @@
-import {
-  areDocsEnabled,
-  resolveApiPrefix,
-  resolveCorsOrigins,
-  toBool,
-  toInt,
-} from "../src/config/env";
+import { areDocsEnabled, resolveApiPrefix, toBool, toInt } from "../src/config/env";
 
 /**
  * The one test the scaffold ships with, and it is deliberately about
@@ -68,24 +62,6 @@ describe("configuration helpers", () => {
 
     it("collapses a bare slash to the root", () => {
       expect(resolveApiPrefix("/")).toBe("/");
-    });
-  });
-
-  describe("resolveCorsOrigins", () => {
-    it("defaults to same-origin rather than to a wildcard", () => {
-      expect(resolveCorsOrigins(undefined)).toBe(false);
-      expect(resolveCorsOrigins("")).toBe(false);
-    });
-
-    it("treats an explicit asterisk as the wildcard", () => {
-      expect(resolveCorsOrigins("*")).toBe(true);
-    });
-
-    it("splits and trims a list", () => {
-      expect(resolveCorsOrigins("http://a.test, http://b.test")).toEqual([
-        "http://a.test",
-        "http://b.test",
-      ]);
     });
   });
 

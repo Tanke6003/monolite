@@ -118,12 +118,19 @@ matter, with the defaults this project was generated with:
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma separated. Empty = same origin only |
 | `BODY_LIMIT` | `1mb` | Maximum JSON body |
 | `TRUST_PROXY_HOPS` | `0` | Trusted proxies in front of the app |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Window of the per-IP quota |
+| `RATE_LIMIT_MAX` | `120` | Requests per window. `0` disables the limiter |
+| `CSP_ENABLED` | `false` | Content-Security-Policy. Off so the docs page renders |
 | `DOCS_ENABLED` | unset | Empty = on everywhere except production |
 | `LOG_LEVEL` | `debug` | `trace` to `error` |
 | `SHUTDOWN_DELAY_MS` | `0` | Gap before the socket closes, for rolling deploys |
 <!-- #if auth -->
 | `JWT_SECRET` | placeholder | Signing key. Required |
+| `AUTH_RATE_LIMIT_MAX` | `10` | Login attempts per window. `0` disables it |
 <!-- #endif -->
+
+The health checks are exempt from the limiter, so a load balancer probing every few
+seconds does not exhaust the quota of its own address.
 
 Changing `API_PREFIX` moves the whole surface; it does not create a version. A real v2
 means a second router, because the contract is the code.
