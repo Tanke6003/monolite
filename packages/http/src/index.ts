@@ -63,6 +63,8 @@ export type { BuildOpenApiDocumentOptions, OpenApiServer } from "./openapi/docum
 
 export { buildDtoComponents, defineDto, definePagedDto } from "./openapi/dto.registry.js";
 
+export { missingSchemaRefs } from "./openapi/refs.js";
+
 // ----------------------------------------------------------  middlewares  ---
 export { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
 export type { ErrorHandlerOptions } from "./middlewares/error-handler.js";
