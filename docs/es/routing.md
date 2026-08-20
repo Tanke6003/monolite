@@ -163,10 +163,17 @@ nada que mantuviera los dos al mismo paso.
 el esquema del elemento en vez de copiarlo dentro.
 
 **La trampa:** un DTO se registra cuando su módulo se **carga**, y el resto del
-código importa los DTOs como *tipos*, que TypeScript borra al compilar. Por eso los
-proyectos generados traen un barril `dtos/index.ts` y por eso el constructor del
-documento lo importa. Un DTO que falte en el barril falta en la documentación, y el
-fallo es silencioso.
+código suele importar los DTOs como *tipos*, que TypeScript borra al compilar. Un
+DTO cuyo módulo nunca se carga por su *valor* falta en la documentación, y el fallo
+es silencioso: las operaciones lo siguen referenciando y el documento sigue
+respondiendo un 200.
+
+En un proyecto generado el controlador importa sus esquemas por valor, así que el
+módulo se ejecuta y el DTO que está a su lado se registra. Cualquier otro caso —un
+DTO sin esquemas, un módulo cuyo controlador se borró— se carga desde un barril
+`dtos/index.ts` importado donde se construye el documento. En cualquier caso,
+`mountDocs` lo comprueba al arrancar y registra lo que se referencia y no se
+declara; `missingSchemaRefs(document)` es esa misma comprobación, para un test.
 
 ---
 
@@ -174,7 +181,8 @@ fallo es silencioso.
 
 1. Decora su controlador con `@ApiController("/loquesea", { tag, token })` y cada
    manejador con su verbo.
-2. Declara sus DTOs con `defineDto` y añádelos al barril.
+2. Declara sus DTOs con `defineDto` —y `definePagedDto` para el listado—,
+   asegurándote de que el módulo se importa en algún sitio por su valor.
 3. Añade una línea de `import` donde se recogen los controladores: eso es lo que
    ejecuta los decoradores y mete la clase en el registro.
 

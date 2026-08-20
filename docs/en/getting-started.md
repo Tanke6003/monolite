@@ -48,9 +48,10 @@ cp .env.example .env      # fill in the password
 npm run dev
 ```
 
-`GET /health/ready` answers once the database is reachable. The OpenAPI document
-is at `/docs` (Scalar) and `/swagger` (Swagger UI), both generated from the route
-decorators.
+`GET /health/ready` answers once the database is reachable — `/health` and
+`/health/live` answer too. The OpenAPI document is at `/openapi.json`, generated
+from the route decorators, and the reader chosen at the prompt is mounted over it
+at `/docs`.
 
 ### Without prompts
 

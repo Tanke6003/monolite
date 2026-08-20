@@ -164,10 +164,17 @@ YAML, with nothing keeping the two in step.
 item schema rather than inlining it.
 
 **The one gotcha:** a DTO registers when its module is **loaded**, and the rest of
-the code imports DTOs as *types*, which TypeScript erases at compile time. That is
-why generated projects have a `dtos/index.ts` barrel and why the document builder
-imports it. A DTO missing from the barrel is missing from the documentation, and
-the failure is silent.
+the code tends to import DTOs as *types*, which TypeScript erases at compile time.
+A DTO whose module is never loaded for its *value* is missing from the
+documentation, and the failure is silent: the operations still reference it and
+the document still serves a 200.
+
+In a generated project the controller imports its schemas by value, so the module
+runs and the DTO beside them registers. Load anything else — a DTO with no
+schemas, a module whose controller was deleted — from a `dtos/index.ts` barrel
+imported wherever the document is built. Either way, `mountDocs` checks at startup
+and logs whatever is referenced and not declared; `missingSchemaRefs(document)` is
+that check on its own, for a test to assert on.
 
 ---
 
@@ -175,7 +182,8 @@ the failure is silent.
 
 1. Decorate the controller with `@ApiController("/whatever", { tag, token })` and
    each handler with its verb.
-2. Declare its DTOs with `defineDto` and add them to the barrel.
+2. Declare its DTOs with `defineDto` — and `definePagedDto` for the listing —
+   making sure the module is imported somewhere for its value.
 3. Add one `import` line where controllers are collected — that is what runs the
    decorators and puts the class in the registry.
 
