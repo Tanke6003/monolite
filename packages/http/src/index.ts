@@ -56,7 +56,7 @@ export {
   ERROR_SCHEMA_NAME,
   buildOpenApiPaths,
 } from "./openapi/openapi.builder.js";
-export type { OpenApiPaths } from "./openapi/openapi.builder.js";
+export type { BuildPathsOptions, OpenApiPaths } from "./openapi/openapi.builder.js";
 
 export { DEFAULT_SECURITY_SCHEMES, buildOpenApiDocument } from "./openapi/document.builder.js";
 export type { BuildOpenApiDocumentOptions, OpenApiServer } from "./openapi/document.builder.js";

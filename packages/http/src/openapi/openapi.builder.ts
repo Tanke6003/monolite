@@ -132,7 +132,7 @@ function contentOf(spec: Exclude<ResponseSpec, string>): Record<string, unknown>
  *  - the 401 on any route that goes through the guard;
  *  - the error body on every 4xx and 5xx that does not describe another one.
  */
-function responsesOf(route: RouteMetadata): Record<string, unknown> {
+function responsesOf(route: RouteMetadata, options: BuildPathsOptions): Record<string, unknown> {
   const declared: Record<string, unknown> = {};
 
   for (const [code, spec] of Object.entries(route.responses ?? { 200: "OK" })) {
@@ -140,7 +140,7 @@ function responsesOf(route: RouteMetadata): Record<string, unknown> {
     declared[code] = { description: normalized.description, ...contentOf(normalized) };
   }
 
-  if (!route.public && !declared["401"]) {
+  if (options.secured !== false && !route.public && !declared["401"]) {
     declared["401"] = { description: "The token is missing or not valid" };
   }
 
@@ -185,7 +185,11 @@ function requestBodyOf(route: RouteMetadata): Record<string, unknown> {
   return {};
 }
 
-function operationOf(route: RouteMetadata, tag?: string): Record<string, unknown> {
+function operationOf(
+  route: RouteMetadata,
+  options: BuildPathsOptions,
+  tag?: string
+): Record<string, unknown> {
   const parameters = [
     ...pathParameters(route.params),
     ...(route.query ? queryParameters(route.query) : []),
@@ -199,11 +203,26 @@ function operationOf(route: RouteMetadata, tag?: string): Record<string, unknown
     operationId: route.handler,
     ...(route.summary ? { summary: route.summary } : {}),
     ...(route.description ? { description: route.description } : {}),
-    ...(route.public ? {} : { security: [{ bearerAuth: [] }] }),
+    ...(options.secured === false || route.public ? {} : { security: [{ bearerAuth: [] }] }),
     ...(parameters.length > 0 ? { parameters } : {}),
     ...requestBodyOf(route),
-    responses: responsesOf(route),
+    responses: responsesOf(route, options),
   };
+}
+
+export interface BuildPathsOptions {
+  /**
+   * Whether the API authenticates at all. `true` by default, which is what the
+   * decorators assume: a route is closed unless it declares itself `public`, so
+   * every other one gets `security: [{ bearerAuth: [] }]` and a 401.
+   *
+   * An application scaffolded or deployed with no authentication passes
+   * `false`, and the whole of that disappears from the document. It is not a
+   * cosmetic difference: a reader that shows "Auth Required" and asks for a
+   * bearer token on an API that has none sends every reader looking for a login
+   * endpoint that does not exist.
+   */
+  secured?: boolean;
 }
 
 /**
@@ -212,7 +231,10 @@ function operationOf(route: RouteMetadata, tag?: string): Record<string, unknown
  * Two routes with the same path and different verbs share an entry, which is
  * how OpenAPI expects them.
  */
-export function buildOpenApiPaths(controllers: ControllerMetadata[]): OpenApiPaths {
+export function buildOpenApiPaths(
+  controllers: ControllerMetadata[],
+  options: BuildPathsOptions = {}
+): OpenApiPaths {
   const paths: OpenApiPaths = {};
 
   for (const controller of controllers) {
@@ -220,7 +242,7 @@ export function buildOpenApiPaths(controllers: ControllerMetadata[]): OpenApiPat
     for (const route of [...controller.routes].sort(bySpecificity)) {
       const path = toOpenApiPath(joinPath(controller.prefix, route.path));
       paths[path] ??= {};
-      paths[path][route.method] = operationOf(route, controller.tag);
+      paths[path][route.method] = operationOf(route, options, controller.tag);
     }
   }
 

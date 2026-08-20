@@ -215,6 +215,25 @@ describe("buildOpenApiPaths", () => {
       expect(open.security).toBeUndefined();
     });
 
+    /**
+     * An API with no authentication in it at all.
+     *
+     * The decorators cannot know: they close every route that does not declare
+     * itself public, which is the right default and the wrong document for a
+     * project scaffolded with `--no-auth`. A reader that shows "Authorize" and
+     * a 401 on an API with no way to issue a token sends everybody looking for
+     * a login endpoint that was never written.
+     */
+    it("declares no security at all when the API is not secured", () => {
+      const open = buildOpenApiPaths([metadata], { secured: false });
+      const list = (open["/things"] as Loose).get as Loose;
+
+      expect(list.security).toBeUndefined();
+      expect(list.responses["401"]).toBeUndefined();
+      // The responses the route declared for itself stay exactly as they were.
+      expect(list.responses["200"]).toBeDefined();
+    });
+
     it("does not overwrite a 401 the route described itself", () => {
       @ApiController("/own")
       class OwnController {
@@ -357,6 +376,19 @@ describe("buildOpenApiDocument", () => {
     expect(behindAProxy.servers).toEqual([
       { url: "https://api.example.com/v1", description: "Production" },
     ]);
+  });
+
+  it("drops the schemes and the top-level security when the API is not secured", () => {
+    const unsecured = buildOpenApiDocument({
+      title: "t",
+      version: "1",
+      secured: false,
+      controllers: [metadata],
+    }) as Loose;
+
+    expect(unsecured.security).toBeUndefined();
+    expect(unsecured.components.securitySchemes).toBeUndefined();
+    expect((unsecured.paths["/things"] as Loose).get.security).toBeUndefined();
   });
 
   /**
