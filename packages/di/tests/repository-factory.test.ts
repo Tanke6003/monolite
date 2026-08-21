@@ -16,6 +16,7 @@ import {
   WIDGET_ENTITY,
   type IWidget,
 } from "./support/test-entity";
+import { defineEntity } from "monolite-data";
 
 describe("resolveDriver", () => {
   it("accepts the spellings people actually write", () => {
@@ -465,5 +466,59 @@ describe("validateDataSourceEnv", () => {
     expect(() =>
       validateDataSourceEnv(envsFrom({ DATA_SOURCE: "oracle", ORACLE_PASSWORD: "x" }))
     ).not.toThrow();
+  });
+});
+
+/**
+ * A relation that points nowhere.
+ *
+ * Relations are metadata: the repository never reads one, so nothing at query
+ * time would ever notice a `to` with a typo in it. What *would* notice is the
+ * DDL generator, with a `FOREIGN KEY` against a table that is not there, and an
+ * include that silently resolves nothing — both a long way from the line that
+ * caused them. So it is checked while the layer is being assembled, which is
+ * the same trade the composition root makes for `JWT_SECRET`.
+ */
+describe("relations declared in the metadata", () => {
+  const widgetWithRelation = defineEntity<IWidget>({
+    ...WIDGET_ENTITY,
+    relations: {
+      gadget: { to: "GADGETS", localKey: "name", foreignKey: "code" },
+    },
+  });
+
+  const layerOf = (entities: { name: string; metadata: ReturnType<typeof defineEntity> }[]) =>
+    createPersistenceLayer({
+      dataSource: "memory",
+      logger: silentLogger(),
+      entities: entities as never,
+    });
+
+  it("assembles when the related entity is registered", () => {
+    const layer = layerOf([
+      { name: "WIDGETS", metadata: widgetWithRelation as never },
+      { name: "GADGETS", metadata: GADGET_ENTITY as never },
+    ]);
+
+    expect(layer.store<IWidget>("WIDGETS")).toBeDefined();
+  });
+
+  it("refuses to assemble when it points at an entity nobody registered", () => {
+    expect(() => layerOf([{ name: "WIDGETS", metadata: widgetWithRelation as never }])).toThrow(
+      /WIDGETS\.gadget -> GADGETS/
+    );
+  });
+
+  it("says what is registered, so the typo is visible beside the truth", () => {
+    expect(() => layerOf([{ name: "WIDGETS", metadata: widgetWithRelation as never }])).toThrow(
+      /Registered: WIDGETS/
+    );
+  });
+
+  /** Nothing changes for an entity that declares none, which is most of them. */
+  it("leaves an entity with no relations exactly as it was", () => {
+    const layer = layerOf([{ name: "WIDGETS", metadata: WIDGET_ENTITY as never }]);
+
+    expect(layer.store<IWidget>("WIDGETS")).toBeDefined();
   });
 });

@@ -385,6 +385,41 @@ resolver. Aquí `withDeleted` vale `true` por defecto: un registro debe seguir
 mostrando el nombre de su padre después de que el padre se haya borrado
 lógicamente.
 
+Nada de lo de arriba lee la metadata, porque hasta ahora la metadata no tenía
+nada que decir al respecto: una clave ajena era una columna `kind: "number"` con
+un nombre que casualmente lo parecía. Declarar la relación le pone nombre:
+
+```ts
+export const BOOKS_ENTITY = defineEntity<IBook>({
+  table: "BOOKS",
+  primaryKey: "pkBook",
+  columns: {
+    pkBook: { name: "PK_BOOK", kind: "number", insertable: false, updatable: false },
+    name: { name: "NAME", kind: "string" },
+    authorId: { name: "FK_AUTHOR", kind: "number" },
+  },
+  relations: {
+    author: { to: "AUTHORS", localKey: "authorId", foreignKey: "pkAuthor", onDelete: "restrict" },
+  },
+});
+```
+
+**El repositorio sigue sin leer esto.** Conoce una tabla, no hace ningún join, y
+una relación no cambia nada de cómo se selecciona, se inserta o se filtra una
+fila. `onDelete` es lo que debe decir el DDL generado y nada más — no hay cascada
+que ejecutar en tiempo de consulta, porque nadie mira.
+
+Lo que gana es una única declaración de un hecho que se estaba haciendo tres
+veces: la restricción en el DDL generado, la relación que `monolite generate
+module` necesita para andamiar un módulo relacionado, y las claves que si no hay
+que ir a buscar leyendo dos ficheros. Una relación que apunta a una entidad que
+nadie registró falla mientras se ensambla la capa de persistencia, nombrando
+ambos lados — no más tarde, cuando algo la siga, porque nunca la sigue nadie.
+
+El include que declara un servicio sigue nombrando sus propias claves. La
+metadata conoce la propiedad de la *entidad*; un include necesita la del *DTO*, y
+sólo el mapper sabe cómo se corresponden esas dos.
+
 ### Una segunda interfaz para el SQL extra
 
 Un módulo recibe el repositorio genérico **más** su propia interfaz sólo cuando

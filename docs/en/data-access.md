@@ -376,6 +376,41 @@ Null foreign keys are skipped and nothing is queried when there is nothing to
 resolve. `withDeleted` defaults to `true` here: a record should still display its
 parent's name after the parent has been logically deleted.
 
+Nothing above reads the metadata, because until now the metadata had nothing to
+say about it: a foreign key was a `kind: "number"` column with a name that
+happened to look like one. Declaring the relation gives it a name:
+
+```ts
+export const BOOKS_ENTITY = defineEntity<IBook>({
+  table: "BOOKS",
+  primaryKey: "pkBook",
+  columns: {
+    pkBook: { name: "PK_BOOK", kind: "number", insertable: false, updatable: false },
+    name: { name: "NAME", kind: "string" },
+    authorId: { name: "FK_AUTHOR", kind: "number" },
+  },
+  relations: {
+    author: { to: "AUTHORS", localKey: "authorId", foreignKey: "pkAuthor", onDelete: "restrict" },
+  },
+});
+```
+
+**The repository still does not read this.** It knows one table, fires no join,
+and a relation changes nothing about how a row is selected, inserted or
+filtered. `onDelete` is what the generated DDL should say and nothing else —
+there is no cascade to run at query time, because nothing looks.
+
+What it buys is one statement of a fact that was being made three times: the
+constraint in generated DDL, the relation `monolite generate module` needs in
+order to scaffold a related module, and the keys a reader would otherwise have to
+find by reading two files. A relation pointing at an entity nobody registered
+fails while the persistence layer is being assembled, naming both sides — not
+later, when something follows it, because nothing ever does.
+
+The include a service declares still names its own keys. The metadata knows the
+*entity* property; an include needs the *DTO* property, and only the mapper knows
+how those two correspond.
+
 ### A second interface for extra SQL
 
 A module gets the generic repository **plus** its own interface only when it needs

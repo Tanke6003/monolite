@@ -157,6 +157,17 @@ a minor release. Pin exact versions.
   repeating a signature down to the Express generics — both documented examples
   got it wrong. `public override create: CrudHandler = async (req, res, next) =>`
   infers all three parameters.
+- **Relations declared in the entity metadata.** `relations: { author: { to,
+  localKey, foreignKey, onDelete } }` gives a foreign key a name, where before it
+  was a `kind: "number"` column that happened to look like one. It is
+  declarative and inert — the repository does not read it, knows one table and
+  fires no join — and `onDelete` is what the generated DDL should say and
+  nothing more, since there is no cascade to run at query time. What it replaces
+  is one fact stated three times: the constraint in generated DDL, the relation
+  the module generator needs to scaffold a related module, and the keys a reader
+  would otherwise find by reading two files. A relation pointing at an entity
+  nobody registered fails while the persistence layer is being assembled, naming
+  both sides — not later, when something follows it, because nothing does.
 
 ## [0.1.0] — 2026-08-15
 
