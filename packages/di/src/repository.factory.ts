@@ -152,6 +152,70 @@ export function resolveDriver(dataSource?: string): PersistenceDriver {
   return driver;
 }
 
+/**
+ * The variables an engine cannot be reached without, by driver.
+ *
+ * Only the ones with no honest default. Hosts, ports, users and database names
+ * all default to the values in the compose file this repository ships, so a
+ * developer who has just run `docker compose up` needs none of them; a password
+ * cannot have a default, because any default it had would be one that works.
+ *
+ * The table lives here, beside the functions that read those very variables,
+ * for the reason such tables usually drift: an engine added in one place and
+ * forgotten in the other is a project that starts with no credentials and
+ * fails, much later, as a connection error nobody can place.
+ */
+const REQUIRED_ENV: Record<PersistenceDriver, string[]> = {
+  memory: [],
+  oracle: ["ORACLE_PASSWORD"],
+  // SQL Server reads the unprefixed `DB_*` set; the others use their own name.
+  mssql: ["DB_PASSWORD"],
+  postgres: ["POSTGRES_PASSWORD"],
+  mysql: ["MYSQL_PASSWORD"],
+  // MongoDB is the exception and it is deliberate: its development container
+  // runs with authentication off, so demanding a password would stop the normal
+  // local setup from starting at all. What is checked instead is the halfway
+  // state — a user with no password — because that one is always a mistake.
+  mongodb: [],
+};
+
+/**
+ * Which of them are missing for the configured engine. Empty means the process
+ * has what it needs to connect.
+ *
+ * A variable set to an empty string counts as missing: `MYSQL_PASSWORD=` in a
+ * `.env` is a line somebody meant to fill in.
+ */
+export function missingDataSourceEnv(envs: IEnvs, dataSource?: string): string[] {
+  const driver = resolveDriver(dataSource ?? envs.getEnv("DATA_SOURCE"));
+
+  const missing = REQUIRED_ENV[driver].filter((name) => envs.getEnv(name).trim() === "");
+
+  if (driver === "mongodb" && envs.getEnv("MONGO_USER").trim() !== "") {
+    if (envs.getEnv("MONGO_PASSWORD").trim() === "") missing.push("MONGO_PASSWORD");
+  }
+
+  return missing;
+}
+
+/**
+ * The same check, as a start-up assertion. Hand it to `registerPlugins`'s
+ * `validate` and a misconfigured deployment stops in the boot log, with the
+ * names in it, instead of at whichever request first touches the database.
+ */
+export function validateDataSourceEnv(envs: IEnvs, dataSource?: string): void {
+  const missing = missingDataSourceEnv(envs, dataSource);
+  if (missing.length === 0) return;
+
+  const driver = resolveDriver(dataSource ?? envs.getEnv("DATA_SOURCE"));
+
+  throw new Error(
+    `[config] DATA_SOURCE=${driver} needs ${missing.join(", ")}, and ` +
+      `${missing.length === 1 ? "it is" : "they are"} not set. ` +
+      "Refusing to start rather than failing at the first query."
+  );
+}
+
 export function isOracleDriver(dataSource?: string): boolean {
   return resolveDriver(dataSource) === "oracle";
 }

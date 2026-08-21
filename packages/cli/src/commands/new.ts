@@ -10,7 +10,9 @@ import {
 } from "../config/answers.js";
 import {
   DOCS_UIS,
+  docsSentence,
   docsUiAliases,
+  primaryDocsPath,
   resolveDocsUi,
   type DocsUiSpec,
 } from "../config/docs.js";
@@ -363,7 +365,10 @@ async function resolveEngineAnswer(values: Values, prompter: Prompter | null): P
  *
  * Swagger UI leads because it is the one most people already know, and because
  * it bundles its assets — Scalar fetches itself from a CDN, which is a
- * different answer in an air-gapped deployment.
+ * different answer in an air-gapped deployment. "Both" is offered and is not
+ * the default: two pages over one document cost nothing to run, but a scaffold
+ * that installs a dependency nobody asked for is a scaffold people start
+ * deleting from.
  */
 async function resolveDocsAnswer(
   values: Values,
@@ -487,6 +492,11 @@ function scaffold(answers: ProjectAnswers, targetDirectory: string, force: boole
     templatePath("base"),
     ...(answers.engine.templateDir ? [templatePath("db", answers.engine.templateDir)] : []),
     ...(answers.auth ? [templatePath("auth")] : []),
+    // The example module's own code comes from the schematic below, the same
+    // one `generate module` runs. What lives here is what the schematic cannot
+    // write: its end-to-end test, which belongs under `tests/` and not under
+    // the source root the schematic renders into.
+    ...(answers.example ? [templatePath("example")] : []),
   ];
 
   for (const source of trees) {
@@ -524,8 +534,8 @@ function report(answers: ProjectAnswers, targetDirectory: string, writer: FileWr
   info(`Database: ${color.bold(answers.engine.label)} (DATA_SOURCE=${answers.engine.dataSource})`);
   info(`API mounted at ${color.bold(answers.apiPrefix)}`);
   info(
-    answers.docsUi.path
-      ? `Documentation: ${color.bold(answers.docsUi.label)} at ${answers.docsUi.path}, document at /openapi.json`
+    answers.docsUi.mounts.length > 0
+      ? `Documentation: ${color.bold(docsSentence(answers.docsUi))}, document at /openapi.json`
       : "Documentation: /openapi.json, with no reader mounted"
   );
   info(`Authentication: ${answers.auth ? "included" : "not included"}`);
@@ -580,8 +590,8 @@ function nextSteps(answers: ProjectAnswers, targetDirectory: string): void {
   line(`  ${runScript} dev`);
   line();
   hint("then GET http://localhost:3000/health/ready");
-  if (answers.docsUi.path) {
-    hint(`and read the API at http://localhost:3000${answers.docsUi.path}`);
+  if (answers.docsUi.mounts.length > 0) {
+    hint(`and read the API at http://localhost:3000${primaryDocsPath(answers.docsUi)}`);
   } else {
     hint("and fetch the API description from http://localhost:3000/openapi.json");
   }

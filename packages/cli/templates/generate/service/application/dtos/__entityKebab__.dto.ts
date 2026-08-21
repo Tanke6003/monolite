@@ -1,3 +1,4 @@
+import { defineDto, definePagedDto } from "monolite-http";
 import { z } from "zod";
 
 /**
@@ -13,11 +14,38 @@ import { z } from "zod";
  * description that starts lying the first time either one changes.
  */
 
-export interface __dtoName__ {
-  id: number;
-  name: string;
-  description?: string | null;
-}
+/**
+ * The shape the API answers with, published as an OpenAPI component.
+ *
+ * `defineDto` is what puts it in `components.schemas`, and it is not optional:
+ * `@Crud({ dto: "__entityName__" })` documents its responses as a `$ref` to
+ * that name, so without this the document points at a component nobody
+ * declared. The result still serves with a 200 and the reader is the only thing
+ * that notices — Swagger UI shows the operation with an empty body, Scalar
+ * shows nothing.
+ *
+ * The type comes out of the schema rather than being declared beside it, for
+ * the same reason: two declarations of one shape drift.
+ */
+export const __entityCamel__Dto = defineDto(
+  "__entityName__",
+  z.object({
+    id: z.int().meta({ examples: [1] }),
+    name: z.string().meta({ examples: ["__entityName__ one"] }),
+    description: z.string().nullish(),
+  })
+);
+
+/**
+ * The page the listing answers with. `Paginated__entityName__` is the name
+ * `@Crud` references for its 200, and the item travels inside it by reference.
+ */
+export const paginated__entityName__Dto = definePagedDto(
+  "Paginated__entityName__",
+  __entityCamel__Dto
+);
+
+export type __dtoName__ = z.infer<typeof __entityCamel__Dto>;
 
 const shape = {
   name: z.string().min(1, "name is required").max(150, "name is too long"),

@@ -42,8 +42,22 @@ export interface BuildOpenApiDocumentOptions {
    * Authentication schemes. The default declares the `bearerAuth` that
    * non-public operations reference, so a document generated with no
    * configuration is already consistent with what the decorators emit.
+   *
+   * Ignored when `secured` is `false`: an API with no authentication declares
+   * no schemes.
    */
   securitySchemes?: Record<string, unknown>;
+  /**
+   * Whether the API authenticates at all. `true` by default, matching what the
+   * route decorators assume — every route is closed unless it says otherwise.
+   *
+   * A project generated without authentication passes `false`, and the schemes,
+   * the per-operation `security` and the automatic 401 all disappear. Leaving
+   * them in is not a cosmetic slip: the reader shows an "Authorize" button and
+   * every operation as requiring a token, on an API that has no way to issue
+   * one.
+   */
+  secured?: boolean;
   /**
    * Controllers to document. Defaults to every decorated controller loaded so
    * far, which is the same list the router mounts — importing the controller is
@@ -87,10 +101,16 @@ export function buildOpenApiDocument(options: BuildOpenApiDocumentOptions): Reco
     description,
     apiPrefix,
     servers,
+    secured = true,
     securitySchemes = DEFAULT_SECURITY_SCHEMES,
     controllers = registeredControllers().map(([, metadata]) => metadata),
     schemas = {},
   } = options;
+
+  // An unauthenticated API declares no schemes, whatever was passed: the
+  // alternative is a document whose components advertise a way in that the
+  // operations never reference.
+  const schemes = secured ? securitySchemes : {};
 
   const resolvedServers =
     servers ??
@@ -118,7 +138,7 @@ export function buildOpenApiDocument(options: BuildOpenApiDocumentOptions): Reco
     },
     ...(resolvedServers.length > 0 ? { servers: resolvedServers } : {}),
     components: {
-      securitySchemes,
+      ...(Object.keys(schemes).length > 0 ? { securitySchemes: schemes } : {}),
       schemas: {
         ...buildDtoComponents(),
         // The error envelope is common to the whole API, so it is declared once
@@ -127,7 +147,9 @@ export function buildOpenApiDocument(options: BuildOpenApiDocumentOptions): Reco
         ...schemas,
       },
     },
-    security: Object.keys(securitySchemes).map((name) => ({ [name]: [] })),
-    paths: buildOpenApiPaths(controllers),
+    ...(Object.keys(schemes).length > 0
+      ? { security: Object.keys(schemes).map((name) => ({ [name]: [] })) }
+      : {}),
+    paths: buildOpenApiPaths(controllers, { secured }),
   };
 }

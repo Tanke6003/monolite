@@ -56,12 +56,14 @@ export {
   ERROR_SCHEMA_NAME,
   buildOpenApiPaths,
 } from "./openapi/openapi.builder.js";
-export type { OpenApiPaths } from "./openapi/openapi.builder.js";
+export type { BuildPathsOptions, OpenApiPaths } from "./openapi/openapi.builder.js";
 
 export { DEFAULT_SECURITY_SCHEMES, buildOpenApiDocument } from "./openapi/document.builder.js";
 export type { BuildOpenApiDocumentOptions, OpenApiServer } from "./openapi/document.builder.js";
 
 export { buildDtoComponents, defineDto, definePagedDto } from "./openapi/dto.registry.js";
+
+export { missingSchemaRefs } from "./openapi/refs.js";
 
 // ----------------------------------------------------------  middlewares  ---
 export { errorHandler, notFoundHandler } from "./middlewares/error-handler.js";
@@ -88,16 +90,19 @@ export { DEFAULT_API_PREFIX, DEFAULT_LEGACY_PREFIX, resolveApiPrefix, resolveLeg
 
 export {
   DEFAULT_CSP_DIRECTIVES,
+  SCALAR_CDN_ORIGIN,
   SECURITY_DEFAULTS,
   areDocsEnabled,
   buildAuthRateLimiter,
   buildCorsOptions,
   buildHelmetOptions,
   buildRateLimiter,
+  docsCspDirectives,
   resolveAllowedOrigins,
   resolveBodyLimit,
   resolveTrustProxy,
 } from "./config/security.config.js";
+export type { DocsReader } from "./config/security.config.js";
 
 export { processEnv } from "./config/env-source.js";
 export type { EnvSource } from "./config/env-source.js";

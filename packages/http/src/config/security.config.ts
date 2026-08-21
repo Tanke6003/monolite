@@ -248,6 +248,53 @@ export const DEFAULT_CSP_DIRECTIVES: Record<string, string[]> = {
 };
 
 /**
+ * Where Scalar fetches its own bundle from. It renders client-side out of a
+ * CDN script, which is the one thing a policy of `'self'` cannot allow.
+ */
+export const SCALAR_CDN_ORIGIN = "https://cdn.jsdelivr.net";
+
+/** A documentation reader, as far as the policy is concerned. */
+export type DocsReader = "swagger" | "scalar" | "none";
+
+/**
+ * The directives a project needs in order to serve its documentation with the
+ * CSP switched **on**.
+ *
+ * Swagger UI needs nothing beyond the defaults: it ships its assets and loads
+ * them from the same origin, and the inline styles it injects are already
+ * allowed. Scalar is the opposite — the page is a CDN `<script>` plus an inline
+ * one that calls it — so serving it under `'self'` alone produces a blank page
+ * and a console full of CSP violations, with a 200 on the way in to make it
+ * look like the documentation is up.
+ *
+ * The CDN is named here rather than left to whoever turns the policy on,
+ * because the alternative is what happens in practice: the page goes blank, the
+ * policy gets switched off wholesale, and every other directive goes with it.
+ */
+export function docsCspDirectives(
+  reader: DocsReader,
+  directives: Record<string, string[]> = DEFAULT_CSP_DIRECTIVES
+): Record<string, string[]> {
+  if (reader !== "scalar") return directives;
+
+  const widen = (key: string, ...values: string[]): string[] => [
+    ...new Set([...(directives[key] ?? []), ...values]),
+  ];
+
+  return {
+    ...directives,
+    // `'unsafe-inline'`: the page bootstraps itself with an inline `<script>`
+    // that hands the reader its configuration. A nonce would be the tighter
+    // answer, and it is not this function's to mint — one is generated per
+    // response, and this runs once at startup.
+    "script-src": widen("script-src", SCALAR_CDN_ORIGIN, "'unsafe-inline'"),
+    "style-src": widen("style-src", SCALAR_CDN_ORIGIN),
+    "font-src": widen("font-src", SCALAR_CDN_ORIGIN, "data:"),
+    "img-src": widen("img-src", SCALAR_CDN_ORIGIN, "data:"),
+  };
+}
+
+/**
  * The CSP comes **switched off** unless `CSP_ENABLED=true` asks for it.
  *
  * This is not laziness: helmet's default CSP breaks Swagger UI (inline styles)

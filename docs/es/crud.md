@@ -12,19 +12,23 @@ que sólo reenvía al repositorio.
 ## Un módulo entero
 
 ```ts
-@ApiController("/branches", { tag: "Branches", token: TOKENS.IBranchesController })
-@Crud({ resource: "branch", dto: branchDto, paged: true, schemas: branchSchemas })
-export class BranchesController extends CrudController<IBranch, BranchDto> {
-  constructor(service: IBranchesService, context: IRequestContext) {
-    super(service, context);
+@injectable()
+@ApiController("/branches", { tag: "Branches", token: BRANCH_TOKENS.controller })
+@Crud({ resource: "branch", dto: "Branch", schemas: branchSchemas })
+export class BranchesController extends CrudController {
+  constructor(
+    @inject(BRANCH_TOKENS.service) service: BranchesService,
+    @inject(TOKENS.IRequestContext) context: IRequestContext
+  ) {
+    super(service, context, "branch");
   }
 }
 ```
 
 ```ts
-export class BranchesService extends CrudService<IBranch, BranchDto> {
-  constructor(repository: IBranchesRepository, mapper: EntityMapper<IBranch, BranchDto>) {
-    super(repository, mapper);
+export class BranchesService extends CrudService<IBranch, BranchDTO> {
+  constructor(@inject(BRANCH_TOKENS.store) store: IGenericRepository<IBranch>) {
+    super(store, branchMapper, { field: "pkBranch", direction: "asc" });
   }
 }
 ```
@@ -49,15 +53,29 @@ ruta que registraría un controlador escrito a mano.
 
 | Opción | Significado |
 | --- | --- |
-| `resource` | Nombre en singular, usado en mensajes y en los resúmenes generados |
-| `dto` | El DTO al que referencian las respuestas |
-| `paged` | Si `list` devuelve el sobre paginado o un arreglo plano |
+| `resource` | Nombre en singular, usado en mensajes y en los resúmenes generados. Sin artículo: el decorador construye la frase a su alrededor |
+| `dto` | **El nombre del componente de OpenAPI** al que referencian las respuestas — una cadena, no el objeto del esquema |
+| `paged` | Nombre del componente de la página. Por defecto, `Paginated<dto>` |
 | `schemas` | `{ create, update, query }` — los esquemas de Zod que se montan como validación |
 | `verbs` | Cuáles de los cinco registrar. Omítelo para todos |
 
+`dto` es un nombre y no un esquema porque el decorador sólo escribe un `$ref` con
+él. Registrar el componente es un paso aparte, y obligatorio:
+
+```ts
+export const branchDto = defineDto("Branch", z.object({ /* ... */ }));
+export const paginatedBranchesDto = definePagedDto("PaginatedBranch", branchDto);
+```
+
+Si se omite, el documento se sigue sirviendo, con cada operación apuntando a un
+componente que no existe — Swagger UI muestra un cuerpo vacío y Scalar no muestra
+nada. `mountDocs`, en un proyecto generado, comprueba justo eso al arrancar y
+registra los nombres que faltan; `missingSchemaRefs(document)` es la misma
+comprobación, para un test.
+
 ```ts
 // Un recurso de sólo lectura: dos endpoints, y nada puede escribirlo por HTTP.
-@Crud({ resource: "auditLog", dto: auditDto, paged: true, verbs: ["list", "getOne"] })
+@Crud({ resource: "audit log", dto: "AuditLog", verbs: ["list", "getOne"] })
 ```
 
 ---
@@ -68,9 +86,9 @@ El decorador sólo rellena huecos. Declara un método con el mismo nombre y gana
 tuyo — sin bandera y sin lista de exclusión:
 
 ```ts
-@ApiController("/appointments", { tag: "Appointments", token: TOKENS.IAppointmentsController })
-@Crud({ resource: "appointment", dto: appointmentDto, paged: true, schemas })
-export class AppointmentsController extends CrudController<IAppointment, AppointmentDto> {
+@ApiController("/appointments", { tag: "Appointments", token: APPOINTMENT_TOKENS.controller })
+@Crud({ resource: "appointment", dto: "Appointment", schemas })
+export class AppointmentsController extends CrudController {
   // Reemplaza el create genérico: reservar tiene una regla que el genérico no puede saber.
   @Post("/", { body: bookSchema, responses: { 201: { ref: "Appointment" }, 409: "Horario ocupado" } })
   public create = async (req: Request, res: Response, next: NextFunction) => {

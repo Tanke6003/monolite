@@ -10,7 +10,16 @@
  * mounted to read it with, and which.
  */
 
-export type DocsUiId = "swagger" | "scalar" | "none";
+export type DocsUiId = "swagger" | "scalar" | "both" | "none";
+
+/** A reader, as the template and the security policy know it. */
+export type DocsReader = "swagger" | "scalar";
+
+export interface DocsMount {
+  reader: DocsReader;
+  /** Where it is served. */
+  path: string;
+}
 
 export interface DocsUiSpec {
   id: DocsUiId;
@@ -22,8 +31,8 @@ export interface DocsUiSpec {
   dependencies: Record<string, string>;
   /** Types for a package that does not bundle its own. */
   devDependencies: Record<string, string>;
-  /** Where the reader is served. Absent when there is nothing to serve. */
-  path?: string;
+  /** What gets mounted, and where. Empty when there is nothing to read with. */
+  mounts: DocsMount[];
 }
 
 /**
@@ -31,22 +40,42 @@ export interface DocsUiSpec {
  * generates against, so a scaffolded project starts on a combination known to
  * work rather than on whatever `latest` is that morning.
  */
+const SWAGGER_DEPENDENCIES = { "swagger-ui-express": "^5.0.1" };
+const SWAGGER_DEV_DEPENDENCIES = { "@types/swagger-ui-express": "^4.1.8" };
+const SCALAR_DEPENDENCIES = { "@scalar/express-api-reference": "^0.10.14" };
+
 export const DOCS_UIS: DocsUiSpec[] = [
   {
     id: "swagger",
     label: "Swagger UI",
     hint: "the familiar one, with Try it out",
-    dependencies: { "swagger-ui-express": "^5.0.1" },
-    devDependencies: { "@types/swagger-ui-express": "^4.1.8" },
-    path: "/docs",
+    dependencies: SWAGGER_DEPENDENCIES,
+    devDependencies: SWAGGER_DEV_DEPENDENCIES,
+    mounts: [{ reader: "swagger", path: "/docs" }],
   },
   {
     id: "scalar",
     label: "Scalar",
     hint: "modern reader, dark mode, built-in client",
-    dependencies: { "@scalar/express-api-reference": "^0.10.14" },
+    dependencies: SCALAR_DEPENDENCIES,
     devDependencies: {},
-    path: "/docs",
+    mounts: [{ reader: "scalar", path: "/docs" }],
+  },
+  {
+    id: "both",
+    label: "Both",
+    hint: "Swagger UI at /docs, Scalar at /reference",
+    dependencies: { ...SWAGGER_DEPENDENCIES, ...SCALAR_DEPENDENCIES },
+    devDependencies: SWAGGER_DEV_DEPENDENCIES,
+    // One document, two pages over it. They cost nothing to run side by side —
+    // both fetch `/openapi.json` rather than carrying a copy — and which one a
+    // reader reaches for is a matter of taste that a scaffold should not have
+    // to settle. Swagger UI keeps `/docs` so the address does not move when
+    // this is chosen instead of the first row.
+    mounts: [
+      { reader: "swagger", path: "/docs" },
+      { reader: "scalar", path: "/reference" },
+    ],
   },
   {
     id: "none",
@@ -54,6 +83,7 @@ export const DOCS_UIS: DocsUiSpec[] = [
     hint: "still serves /openapi.json, just nothing to read it with",
     dependencies: {},
     devDependencies: {},
+    mounts: [],
   },
 ];
 
@@ -61,6 +91,7 @@ export const DOCS_UIS: DocsUiSpec[] = [
 const ALIASES: Record<string, DocsUiId> = {
   "swagger-ui": "swagger",
   swaggerui: "swagger",
+  all: "both",
   openapi: "none",
   no: "none",
   off: "none",
@@ -81,9 +112,41 @@ export function resolveDocsUi(raw: string): DocsUiSpec | undefined {
   return DOCS_UIS.find((ui) => ui.id === id);
 }
 
+/** Where a given reader is served, if it is. */
+export function docsPathOf(ui: DocsUiSpec, reader: DocsReader): string {
+  return ui.mounts.find((mount) => mount.reader === reader)?.path ?? "";
+}
+
+/**
+ * The address to point someone at. The first mount, because that is the one the
+ * prompt's own wording leads with.
+ */
+export function primaryDocsPath(ui: DocsUiSpec): string {
+  return ui.mounts[0]?.path ?? "";
+}
+
+/**
+ * Which reader the Content-Security-Policy has to accommodate.
+ *
+ * Scalar wins whenever it is mounted: its page loads from a CDN, which is the
+ * wider of the two policies, and a project serving both needs the wider one.
+ */
+export function docsCspReader(ui: DocsUiSpec): DocsReader | "none" {
+  if (ui.mounts.some((mount) => mount.reader === "scalar")) return "scalar";
+  return ui.mounts.length > 0 ? "swagger" : "none";
+}
+
 /** What the prompt and the README call it, in a sentence. */
 export function docsSentence(ui: DocsUiSpec): string {
-  return ui.path
-    ? `${ui.label}, served at ${ui.path}`
-    : "the OpenAPI document only, with no reader mounted";
+  if (ui.mounts.length === 0) return "the OpenAPI document only, with no reader mounted";
+
+  const readers = new Intl.ListFormat("en").format(
+    ui.mounts.map((mount) => `${label(mount.reader)} at ${mount.path}`)
+  );
+
+  return readers;
+}
+
+function label(reader: DocsReader): string {
+  return reader === "swagger" ? "Swagger UI" : "Scalar";
 }

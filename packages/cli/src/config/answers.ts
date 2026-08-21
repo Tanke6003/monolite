@@ -1,5 +1,5 @@
 import type { DocsUiSpec } from "./docs.js";
-import { docsSentence } from "./docs.js";
+import { docsCspReader, docsPathOf, docsSentence, primaryDocsPath } from "./docs.js";
 import type { EngineSpec } from "./engines.js";
 import type { RenderContext } from "../util/render.js";
 import { toPascalCase } from "../util/naming.js";
@@ -56,8 +56,10 @@ const BASE_DEV_DEPENDENCIES: Record<string, string> = {
   "@types/express": "^5.0.3",
   "@types/jest": "^30.0.0",
   "@types/node": "^24.5.0",
+  "@types/supertest": "^6.0.3",
   eslint: "^9.36.0",
   jest: "^30.1.3",
+  supertest: "^7.1.4",
   "ts-jest": "^29.4.4",
   tsx: "^4.20.5",
   typescript: "^5.9.2",
@@ -116,9 +118,10 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
   const flags = new Set<string>();
   if (answers.auth) flags.add("auth");
   // `docs` is "a reader is mounted", which is not the same as "the document is
-  // published" — that always is.
-  if (answers.docsUi.id !== "none") flags.add("docs");
-  flags.add(answers.docsUi.id);
+  // published" — that always is. The reader flags are one per mount rather than
+  // one per answer, so "both" turns on the two blocks the single answers do.
+  if (answers.docsUi.mounts.length > 0) flags.add("docs");
+  for (const mount of answers.docsUi.mounts) flags.add(mount.reader);
   if (answers.example) flags.add("example");
   if (isMemory) flags.add("memory");
   else {
@@ -150,7 +153,14 @@ export function buildRenderContext(answers: ProjectAnswers): RenderContext {
       engineSentence: engineSentence(engine),
       docsUiId: answers.docsUi.id,
       docsUiLabel: answers.docsUi.label,
-      docsPath: answers.docsUi.path ?? "",
+      // The address to send someone to, and the two the template mounts. A
+      // reader that is not mounted leaves its own empty, and the `#if` around
+      // the only line that uses it is what keeps that out of the output.
+      docsPath: primaryDocsPath(answers.docsUi),
+      swaggerPath: docsPathOf(answers.docsUi, "swagger"),
+      scalarPath: docsPathOf(answers.docsUi, "scalar"),
+      // The wider of the mounted readers' policies; see `docsCspReader`.
+      docsCspReader: docsCspReader(answers.docsUi),
       docsSentence: docsSentence(answers.docsUi),
       // The compose service is named after the image, which is not always the
       // engine id: `mongodb` runs in a service called `mongo`.

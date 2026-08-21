@@ -53,9 +53,9 @@ CRUD module once `monolite-crud` is in place:
 import { Crud } from "monolite-crud";
 import { ApiController } from "monolite-http";
 
-@ApiController("/branches", { tag: "Branches" })
-@Crud({ resource: "branch", dto: BranchDto, paged: true })
-export class BranchesController extends CrudController<Branch, BranchDto> {}
+@ApiController("/branches", { tag: "Branches", token: BRANCH_TOKENS.controller })
+@Crud({ resource: "branch", dto: "Branch", schemas: branchSchemas })
+export class BranchesController extends CrudController {}
 ```
 
 Five endpoints — list, get one, create, update, soft delete — with validation,

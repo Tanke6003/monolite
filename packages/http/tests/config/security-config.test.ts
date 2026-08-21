@@ -16,6 +16,8 @@ import {
   buildCorsOptions,
   buildHelmetOptions,
   buildRateLimiter,
+  docsCspDirectives,
+  SCALAR_CDN_ORIGIN,
   resolveAllowedOrigins,
   resolveBodyLimit,
   resolveTrustProxy,
@@ -247,6 +249,51 @@ describe("buildHelmetOptions", () => {
     // Swagger UI injects its styles inline and there is no way around it short
     // of not serving Swagger at all.
     expect(DEFAULT_CSP_DIRECTIVES["style-src"]).toContain("'unsafe-inline'");
+  });
+});
+
+describe("docsCspDirectives", () => {
+  it("leaves the defaults alone for Swagger UI, which ships its own assets", () => {
+    expect(docsCspDirectives("swagger")).toBe(DEFAULT_CSP_DIRECTIVES);
+    expect(docsCspDirectives("none")).toBe(DEFAULT_CSP_DIRECTIVES);
+  });
+
+  /**
+   * The failure this prevents: Scalar's page is a CDN `<script>` plus an inline
+   * one that calls it, so under `script-src 'self'` the reader never loads. The
+   * response is a 200 and the page is blank, which reads as "the documentation
+   * is broken" and never as "a header blocked it".
+   */
+  it("lets Scalar's CDN through, script and inline bootstrap alike", () => {
+    const directives = docsCspDirectives("scalar");
+
+    expect(directives["script-src"]).toEqual(
+      expect.arrayContaining(["'self'", SCALAR_CDN_ORIGIN, "'unsafe-inline'"])
+    );
+    expect(directives["style-src"]).toContain(SCALAR_CDN_ORIGIN);
+    expect(directives["font-src"]).toContain(SCALAR_CDN_ORIGIN);
+  });
+
+  it("widens only what the reader needs and leaves the rest shut", () => {
+    const directives = docsCspDirectives("scalar");
+
+    expect(directives["object-src"]).toEqual(["'none'"]);
+    expect(directives["default-src"]).toEqual(["'self'"]);
+    // The document is fetched from the API itself, so nothing outbound.
+    expect(directives["connect-src"]).toEqual(["'self'"]);
+    // And the source set is not mutated on the way past.
+    expect(DEFAULT_CSP_DIRECTIVES["script-src"]).toEqual(["'self'"]);
+  });
+
+  it("widens whichever set it was handed, not only the default one", () => {
+    const own = { "script-src": ["'self'", "https://analytics.example.com"] };
+
+    expect(docsCspDirectives("scalar", own)["script-src"]).toEqual([
+      "'self'",
+      "https://analytics.example.com",
+      SCALAR_CDN_ORIGIN,
+      "'unsafe-inline'",
+    ]);
   });
 });
 

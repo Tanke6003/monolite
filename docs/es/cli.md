@@ -82,6 +82,7 @@ es que se monta algo— para leerlo.
 | --- | --- | --- |
 | `swagger` | Swagger UI en `/docs` | Trae sus propios recursos, así que funciona sin conexión |
 | `scalar` | Scalar en `/docs` | Carga el lector de un CDN; apunta `cdn` a una copia local si no hay salida a internet |
+| `both` | Swagger UI en `/docs` y Scalar en `/reference` | Dos páginas sobre un documento; lo piden en vez de llevar una copia |
 | `none` | nada | `/openapi.json` se sigue sirviendo |
 
 Los dos lectores apuntan a `/openapi.json` en vez de recibir el documento, para

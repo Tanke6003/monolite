@@ -48,7 +48,9 @@ export {
   buildSequelizeConfig,
   createPersistenceLayer,
   isOracleDriver,
+  missingDataSourceEnv,
   resolveDriver,
+  validateDataSourceEnv,
 } from "./repository.factory.js";
 export type {
   AnyEntityRegistration,

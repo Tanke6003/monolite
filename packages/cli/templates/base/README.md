@@ -27,12 +27,21 @@ curl http://localhost:3000__apiPrefix__/products
 ```
 <!-- #if docs -->
 
-The API describes itself. __docsUiLabel__ is mounted at
-[http://localhost:3000__docsPath__](http://localhost:3000__docsPath__), reading the
-same OpenAPI document `/openapi.json` serves — which is generated from the decorator
-metadata that produced the routes, so it cannot drift from them.
+The API describes itself:
+<!-- #if swagger -->
 
-Both are governed by `DOCS_ENABLED`, on outside production.
+- Swagger UI — [http://localhost:3000__swaggerPath__](http://localhost:3000__swaggerPath__)
+<!-- #endif -->
+<!-- #if scalar -->
+- Scalar — [http://localhost:3000__scalarPath__](http://localhost:3000__scalarPath__)
+<!-- #endif -->
+- the document itself — [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
+
+The readers fetch that same document rather than carrying a copy, and it is
+generated from the decorator metadata that produced the routes, so none of the
+three can drift from the API or from each other.
+
+All of them are governed by `DOCS_ENABLED`, on outside production.
 <!-- #else -->
 
 `/openapi.json` is the API's own description, generated from the decorator metadata
@@ -63,6 +72,18 @@ on outside production.
 | `__pmRun__ typecheck` | `tsc --noEmit` |
 | `__pmRun__ check` | Typecheck, lint and test — what CI should run |
 
+## Tests
+
+`__pmRun__ test` runs both suites and needs nothing running: `tests/setup/test-env.ts`
+forces `DATA_SOURCE=memory`, so the end-to-end tests get the real repository, the real
+services and the real routes without a container to bring up first. Point that variable
+at an engine to run the very same tests against one.
+
+They drive the application in memory through supertest — no port is bound, so the suite
+runs beside a `__pmRun__ dev` that is already going. What they exercise is everything
+above the socket: the middleware chain in its real order, the routes the decorators
+produced, the validation, the error envelope and the document.
+
 ## Layout
 
 ```
@@ -92,7 +113,18 @@ src/
     seed-user.provider.ts     Where the login looks users up. Replace this.
 <!-- #endif -->
 tests/
-  smoke.test.ts               Proves the toolchain runs
+  setup/test-env.ts           The environment every test runs in
+  smoke.test.ts               Configuration helpers, with nothing standing up
+  e2e/
+    support/api.ts            The application, configured once and never listening
+    health.e2e.test.ts        Liveness, readiness and the shape of a failure
+    openapi.e2e.test.ts       The document, and that every `$ref` in it resolves
+<!-- #if auth -->
+    auth.e2e.test.ts          Login, and the guard in front of everything else
+<!-- #endif -->
+<!-- #if example -->
+    product.e2e.test.ts       The example module, through the whole chain
+<!-- #endif -->
 ```
 
 <!-- #if !example -->
@@ -118,11 +150,25 @@ matter, with the defaults this project was generated with:
 | `CORS_ORIGINS` | `http://localhost:3000` | Comma separated. Empty = same origin only |
 | `BODY_LIMIT` | `1mb` | Maximum JSON body |
 | `TRUST_PROXY_HOPS` | `0` | Trusted proxies in front of the app |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | Window of the per-IP quota |
+| `RATE_LIMIT_MAX` | `120` | Requests per window. `0` disables the limiter |
+| `CSP_ENABLED` | `false` | Content-Security-Policy. Off so the docs page renders |
 | `DOCS_ENABLED` | unset | Empty = on everywhere except production |
 | `LOG_LEVEL` | `debug` | `trace` to `error` |
 | `SHUTDOWN_DELAY_MS` | `0` | Gap before the socket closes, for rolling deploys |
 <!-- #if auth -->
 | `JWT_SECRET` | placeholder | Signing key. Required |
+| `AUTH_RATE_LIMIT_MAX` | `10` | Login attempts per window. `0` disables it |
+<!-- #endif -->
+
+The health checks are exempt from the limiter, so a load balancer probing every few
+seconds does not exhaust the quota of its own address.
+<!-- #if db -->
+
+The process refuses to start when a variable the configured engine cannot connect
+without is missing — `DATA_SOURCE=__engineId__` needs its password — and says which
+one in the boot log. Only the engine in `DATA_SOURCE` is checked; the others are
+nobody's problem until they are chosen.
 <!-- #endif -->
 
 Changing `API_PREFIX` moves the whole surface; it does not create a version. A real v2

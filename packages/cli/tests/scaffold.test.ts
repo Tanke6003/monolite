@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { missingSchemaRefs } from "monolite-http";
 
 import { newCommand } from "../src/commands/new";
 
@@ -40,6 +41,8 @@ interface Variant {
   args: string[];
   /** Whether this one is also compiled to JavaScript and served over HTTP. */
   boot?: boolean;
+  /** Which reader a booted variant mounts, and the word its page must contain. */
+  reader?: { path: string; contains: string };
 }
 
 const VARIANTS: Variant[] = [
@@ -64,14 +67,34 @@ const VARIANTS: Variant[] = [
     // only one that generates the mongo tree.
     args: ["--database=mongo", "--no-auth", "--example", "--docs=scalar"],
   },
+  /**
+   * Two readers over one document. Worth a run of its own because it is the
+   * only answer that turns on both conditional blocks at once, and a template
+   * that mounted them at the same path would compile perfectly and then have
+   * one shadow the other.
+   */
+  {
+    name: "both-readers",
+    args: ["--database=none", "--no-auth", "--example", "--docs=both"],
+  },
   // The one that is actually run. In memory and with the example module, so it
   // serves real routes without a container to bring up first.
   {
     name: "memory",
     args: ["--database=none", "--no-auth", "--example", "--docs=swagger"],
     boot: true,
+    reader: { path: "/docs/", contains: "swagger" },
   },
 ];
+
+/**
+ * Scalar is compiled but not served here, and the reason is Jest rather than
+ * the template: the package is ESM-only and this suite runs the emitted
+ * CommonJS through Jest's own loader, which cannot `require()` an ES module the
+ * way Node itself now can. What the reader needs from the server —a policy that
+ * does not blank its CDN out— is asserted on the variant that does boot, and
+ * the directives themselves are covered in `security-config.test.ts`.
+ */
 
 /**
  * `strict`, and matching what the generated `tsconfig.json` asks for. Checking
@@ -91,7 +114,10 @@ const COMPILER_OPTIONS: ts.CompilerOptions = {
   // here is the generated code.
   skipLibCheck: true,
   noEmit: true,
-  types: ["node"],
+  // `jest` because the generated project ships tests of its own, and they are
+  // compiled here too: a scaffold that writes a test suite which does not
+  // compile is worse than one that writes none.
+  types: ["node", "jest"],
   baseUrl: SCRATCH,
   paths: {
     // Resolve to the sources rather than to `dist`, for the same reason the
@@ -166,7 +192,16 @@ function emitJavaScript(target: string): void {
   // `rootDir`, so a blanket emit writes a `.js` next to every `.ts` in this
   // repository. Naming each file keeps the output inside the generated project.
   for (const source of sources) {
-    const emitted = program.emit(program.getSourceFile(source));
+    const file = program.getSourceFile(source);
+
+    // `emit(undefined)` *is* the blanket emit, so a file the program does not
+    // recognise has to stop this rather than fall through to it. It has
+    // happened: the run leaves a `.js` beside every source in the repository
+    // and, because the project's own output never lands where it is expected,
+    // fails several tests later as a module that cannot be found.
+    if (!file) throw new Error(`[tests] ${source} is not part of the program`);
+
+    const emitted = program.emit(file);
     expect(emitted.emitSkipped).toBe(false);
   }
 }
@@ -214,6 +249,16 @@ describe("the projects `monolite new` writes", () => {
       expect(exitCode).toBe(0);
     });
 
+    it("mounts each chosen reader at an address of its own", () => {
+      const docs = path.join(target, "src", "presentation", "docs.ts");
+      if (!fs.existsSync(docs)) return;
+
+      const source = fs.readFileSync(docs, "utf8");
+      const mounted = [...source.matchAll(/app\.use\(\s*"([^"]+)"/g)].map((match) => match[1]);
+
+      expect(mounted).toEqual([...new Set(mounted)]);
+    });
+
     it("leaves no placeholder or conditional behind", () => {
       const offenders: string[] = [];
       const leftovers = /__[a-z][A-Za-z0-9]*__|^[ \t]*(?:\/\/|<!--)?[ \t]*#(?:if|else|elif|endif)\b/gm;
@@ -233,6 +278,19 @@ describe("the projects `monolite new` writes", () => {
       expect(sources.length).toBeGreaterThan(0);
 
       expect(typeErrors(sources)).toEqual([]);
+    });
+
+    /**
+     * The tests the scaffold writes are code it wrote, and they drifted the same
+     * way the source did before this file existed — with the added twist that a
+     * generated suite which does not compile fails on `npm test`, which is the
+     * first command anybody runs in a new project.
+     */
+    it("writes a test suite that compiles", () => {
+      const tests = filesOf(path.join(target, "tests"), ".ts");
+      expect(tests.length).toBeGreaterThan(0);
+
+      expect(typeErrors(tests)).toEqual([]);
     });
 
     /**
@@ -303,10 +361,93 @@ describe("the projects `monolite new` writes", () => {
       });
 
       it("serves the reader that was chosen", async () => {
-        const response = await fetch(`${base}/docs/`);
+        const response = await fetch(`${base}${variant.reader!.path}`);
 
         expect(response.status).toBe(200);
-        expect(await response.text()).toContain("swagger");
+        expect(await response.text()).toContain(variant.reader!.contains);
+      });
+
+      /**
+       * The header that decides whether the reader is a documentation page or a
+       * blank one.
+       *
+       * Helmet's own default policy is `script-src 'self'`, which stops Scalar's
+       * CDN bundle and its inline bootstrap dead. The response is still a 200,
+       * so the only symptom is an empty page and a console nobody is reading.
+       * The toolkit therefore leaves the CSP off until `CSP_ENABLED=true` asks
+       * for it, and this is the assertion that keeps it that way.
+       */
+      it("does not ship a policy that would blank the reader out", async () => {
+        const response = await fetch(`${base}${variant.reader!.path}`);
+
+        expect(response.headers.get("content-security-policy")).toBeNull();
+      });
+
+      /**
+       * A `$ref` to a component nobody declared is the one way this document
+       * breaks while still serving a valid 200: the reader shows the operation
+       * with an empty body and says only that it could not resolve a reference.
+       * It shipped exactly that way — the DTO template declared a plain
+       * interface, so `Product` and `PaginatedProduct` were referenced by every
+       * operation and defined by none.
+       */
+      it("publishes a document whose every reference resolves", async () => {
+        const document = await (await fetch(`${base}/openapi.json`)).json();
+
+        expect(missingSchemaRefs(document)).toEqual([]);
+      });
+
+      it("declares the example module's DTOs as components", async () => {
+        const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
+          components: { schemas: Record<string, unknown> };
+        };
+
+        expect(Object.keys(document.components.schemas).sort()).toEqual([
+          "ErrorResponse",
+          "PaginatedProduct",
+          "Product",
+        ]);
+      });
+
+      /**
+       * Generated with `--no-auth`, so the document says so. The decorators
+       * close every route that does not declare itself public, which is the
+       * right default and the wrong document here: an "Authorize" button and a
+       * 401 on every operation send the reader looking for a login endpoint
+       * this project does not have.
+       */
+      it("invents no authentication for a project generated without it", async () => {
+        const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
+          security?: unknown;
+          components: { securitySchemes?: unknown };
+          paths: Record<string, Record<string, { security?: unknown; responses: object }>>;
+        };
+
+        expect(document.security).toBeUndefined();
+        expect(document.components.securitySchemes).toBeUndefined();
+        expect(document.paths["/products"].get.security).toBeUndefined();
+        expect(document.paths["/products"].get.responses).not.toHaveProperty("401");
+      });
+
+      /**
+       * `/health` alongside `/health/live` and `/health/ready`: it is the path a
+       * load balancer configured with the bare one expects, and answering a 404
+       * there reads to it as an instance that is down.
+       */
+      it("answers readiness on the bare health path too", async () => {
+        const response = await fetch(`${base}/health`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ status: "ok" });
+      });
+
+      /** The quota is on, and the health checks are exempt from it. */
+      it("counts requests against a per-IP quota", async () => {
+        const limited = await fetch(`${base}/api/v1/products`);
+        expect(limited.headers.get("ratelimit-policy")).toMatch(/^120;w=60$/);
+
+        const health = await fetch(`${base}/health/live`);
+        expect(health.headers.get("ratelimit")).toBeNull();
       });
 
       it("serves the example module, seeded", async () => {
