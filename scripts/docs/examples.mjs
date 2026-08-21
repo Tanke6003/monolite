@@ -111,14 +111,17 @@ export function extractBlocks(markdown, file = "<inline>") {
  * Most examples in these pages are fragments — the body of an overridden hook,
  * a decorator on its own — and wrapping them in enough context to compile would
  * make the page worse to read than it is to check. So a block that stands on
- * its own is type-checked, and one that does not is required to *parse* as one
- * of the shapes a fragment takes. That still catches an unbalanced brace or a
- * mistyped keyword, and it never asks an author to pad an example.
+ * its own is type-checked, and one that does not is required to *parse* as a
+ * class member. That still catches an unbalanced brace or a mistyped keyword,
+ * and it never asks an author to pad an example.
+ *
+ * There is no third tier for a loose run of statements, and there is no point
+ * in one: the parser accepts a bare `return` at the top of a file and reports it
+ * later as a grammar error, so nothing would ever reach it.
  */
 export function classify(code) {
   if (parses(code)) return "module";
   if (parses(`class __Fragment__ {\n${code}\n  private __anchor__ = 0;\n}`)) return "member";
-  if (parses(`async function __fragment__() {\n${code}\n}`)) return "statements";
   return "broken";
 }
 

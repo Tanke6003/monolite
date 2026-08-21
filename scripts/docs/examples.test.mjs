@@ -65,11 +65,12 @@ describe("classify", () => {
     assert.equal(classify('@Crud({ resource: "audit log", dto: "AuditLog" })'), "member");
   });
 
-  it("recognises a run of statements", () => {
-    // `return` outside a function is what makes this one a fragment. Top-level
-    // `await` would not: it is perfectly valid in a module, and a block using
-    // it is type-checked like any other.
-    assert.equal(classify("if (ready) {\n  return null;\n}"), "statements");
+  it("reads a loose run of statements as a module, because the parser does", () => {
+    // Top-level `await` really is valid in a module, and a bare `return` is
+    // accepted by the parser and rejected later as a grammar error. Neither
+    // reaches a fragment tier, which is why there is no third one.
+    assert.equal(classify("await thing();\nconst x = 1;"), "module");
+    assert.equal(classify("return null;"), "module");
   });
 
   it("calls an unbalanced block broken", () => {
