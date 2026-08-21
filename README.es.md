@@ -55,7 +55,11 @@ import { ApiController } from "monolite-http";
 
 @ApiController("/branches", { tag: "Branches", token: BRANCH_TOKENS.controller })
 @Crud({ resource: "branch", dto: "Branch", schemas: branchSchemas })
-export class BranchesController extends CrudController {}
+export class BranchesController extends CrudController {
+  constructor(service: BranchesService, context: IRequestContext) {
+    super(service, context, "branch");
+  }
+}
 ```
 
 Cinco endpoints — listar, obtener uno, crear, actualizar, borrar lógico — con

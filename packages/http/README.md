@@ -98,7 +98,10 @@ export class UsersController extends BaseController {
     responses: { 200: { description: "The user", ref: "User" }, 404: "Not found" },
   })
   getOne = async (req: Request, res: Response) => {
-    res.json(await this.users.getOne(parseId(req.params.id, "user")));
+    // Express 5 allows a path parameter to repeat, so its declared type is
+    // `string | string[]`; a repeated `:id` is not an id.
+    const raw = typeof req.params.id === "string" ? req.params.id : undefined;
+    res.json(await this.users.getOne(parseId(raw, "user")));
   };
 
   @Post("/", {

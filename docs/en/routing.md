@@ -11,7 +11,7 @@ document. You do not write them separately, and they cannot disagree.
 ## What it looks like
 
 ```ts
-@ApiController("/users", { tag: "Users", token: TOKENS.IUsersController })
+@ApiController("/users", { tag: "Users", token: USER_TOKENS.controller })
 export class UsersController extends BaseController {
   constructor(private readonly users: IUsersService, context: IRequestContext) {
     super(context);
@@ -20,7 +20,7 @@ export class UsersController extends BaseController {
   @Get("/", {
     summary: "Paginated list of users",
     query: paginationSchema,
-    responses: { 200: { ref: "PaginatedUsers" } },
+    responses: { 200: { description: "A page of users", ref: "PaginatedUsers" } },
   })
   public getAll = async (req: Request, res: Response, next: NextFunction) => {
     // ...
@@ -29,7 +29,7 @@ export class UsersController extends BaseController {
   @Post("/", {
     summary: "Create a user",
     body: createUserSchema,
-    responses: { 201: { ref: "User" }, 400: "Validation error" },
+    responses: { 201: { description: "Created", ref: "User" }, 400: "Validation error" },
   })
   public create = async (req: Request, res: Response, next: NextFunction) => {
     // ...
@@ -41,6 +41,10 @@ Mounting is generic — nothing per module:
 
 ```ts
 for (const [type, metadata] of registeredControllers()) {
+  // A controller with no token is discovered and then cannot be served, so it
+  // is refused at startup rather than at the first request that needs it.
+  if (!metadata.token) throw new Error(`${type.name} declares no token`);
+
   registerController(router, type, container.resolve(metadata.token), authGuard);
 }
 ```

@@ -89,9 +89,19 @@ tuyo — sin bandera y sin lista de exclusión:
 @ApiController("/appointments", { tag: "Appointments", token: APPOINTMENT_TOKENS.controller })
 @Crud({ resource: "appointment", dto: "Appointment", schemas })
 export class AppointmentsController extends CrudController {
+  constructor(
+    private readonly appointments: AppointmentsService,
+    context: IRequestContext
+  ) {
+    super(appointments, context, "appointment");
+  }
+
   // Reemplaza el create genérico: reservar tiene una regla que el genérico no puede saber.
-  @Post("/", { body: bookSchema, responses: { 201: { ref: "Appointment" }, 409: "Horario ocupado" } })
-  public create = async (req: Request, res: Response, next: NextFunction) => {
+  @Post("/", {
+    body: bookSchema,
+    responses: { 201: { description: "Reservada", ref: "Appointment" }, 409: "Horario ocupado" },
+  })
+  public override create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       res.status(201).json(await this.appointments.book(req.body));
     } catch (error) {
@@ -217,19 +227,31 @@ firmas en beneficio de los pocos métodos que lo usan, así que la transacción 
 
 ```ts
 export class AppointmentsService extends CrudService<IAppointment, AppointmentDto> {
+  constructor(
+    repository: IGenericRepository<IAppointment>,
+    // Inyectado, no heredado: `lockRow` es una función suelta precisamente para
+    // que un servicio que ya extiende `CrudService` no tenga que meterse en una
+    // segunda clase base. Ver la nota de abajo.
+    private readonly transactions: ITransactionContext
+  ) {
+    super(repository, appointmentMapper);
+  }
+
   @Transactional()
   public async book(input: BookInput): Promise<AppointmentDto> {
     // Bloquear la fila de la sucursal es la primera sentencia a propósito — ver abajo.
     await lockRow(this.transactions, ENTITY.BRANCHES, input.fkBranch);
 
-    const clash = await this.repository.findOverlapping(input);
+    const clash = await this.repository.firstOrDefault({
+      where: { fkBranch: input.fkBranch, startsAt: input.startsAt },
+    });
     if (clash) {
       throw new AppError(`La sucursal ya tiene la cita #${clash.pk} en ese horario`, 409, true, {
         code: "APPOINTMENT_OVERLAP",
       });
     }
 
-    return this.mapper.toDto(await this.repository.insert(input));
+    return this.mapper.toDTO(await this.repository.insert(input));
   }
 }
 ```

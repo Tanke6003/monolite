@@ -89,9 +89,19 @@ no flag, no opt-out list:
 @ApiController("/appointments", { tag: "Appointments", token: APPOINTMENT_TOKENS.controller })
 @Crud({ resource: "appointment", dto: "Appointment", schemas })
 export class AppointmentsController extends CrudController {
+  constructor(
+    private readonly appointments: AppointmentsService,
+    context: IRequestContext
+  ) {
+    super(appointments, context, "appointment");
+  }
+
   // Replaces the generic create: booking has a rule the generic one cannot know.
-  @Post("/", { body: bookSchema, responses: { 201: { ref: "Appointment" }, 409: "Slot taken" } })
-  public create = async (req: Request, res: Response, next: NextFunction) => {
+  @Post("/", {
+    body: bookSchema,
+    responses: { 201: { description: "Booked", ref: "Appointment" }, 409: "Slot taken" },
+  })
+  public override create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       res.status(201).json(await this.appointments.book(req.body));
     } catch (error) {
@@ -214,19 +224,31 @@ for the benefit of the few methods that use it, so the transaction is **ambient*
 
 ```ts
 export class AppointmentsService extends CrudService<IAppointment, AppointmentDto> {
+  constructor(
+    repository: IGenericRepository<IAppointment>,
+    // Injected rather than inherited: `lockRow` is a standalone function exactly
+    // so that a service already extending `CrudService` is not forced into a
+    // second base class. See the note below.
+    private readonly transactions: ITransactionContext
+  ) {
+    super(repository, appointmentMapper);
+  }
+
   @Transactional()
   public async book(input: BookInput): Promise<AppointmentDto> {
     // Locking the branch row is the first statement on purpose — see below.
     await lockRow(this.transactions, ENTITY.BRANCHES, input.fkBranch);
 
-    const clash = await this.repository.findOverlapping(input);
+    const clash = await this.repository.firstOrDefault({
+      where: { fkBranch: input.fkBranch, startsAt: input.startsAt },
+    });
     if (clash) {
       throw new AppError(`The branch already has appointment #${clash.pk} in that slot`, 409, true, {
         code: "APPOINTMENT_OVERLAP",
       });
     }
 
-    return this.mapper.toDto(await this.repository.insert(input));
+    return this.mapper.toDTO(await this.repository.insert(input));
   }
 }
 ```

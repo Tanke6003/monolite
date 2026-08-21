@@ -42,7 +42,7 @@ const auth = new AuthService(new SqlUserProvider(repository), hasher, tokens);
 const controller = new AuthController(auth, [loginRateLimiter]);
 
 // Guarding routes.
-app.use("/api", requireAuth(tokens, { context: requestContext }));
+app.use("/api", requireAuth(tokens, { context }));
 app.use("/api/admin", requireRoles("admin"));
 ```
 
@@ -154,7 +154,7 @@ asking without threading the user through every signature.
 
 ```ts
 requireAuth(tokens, {
-  context: requestContext,
+  context,
   // For an issuer whose claims the toolkit does not recognise. The default is
   // `toCurrentUser` from monolite-http, which already knows what OIDC and
   // Azure AD emit — and is the same function the request context is built on.

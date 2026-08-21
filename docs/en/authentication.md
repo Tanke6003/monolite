@@ -47,15 +47,13 @@ import {
 const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
 
-const auth = new AuthService({
-  users: new MyUserProvider(usersRepository),   // yours
-  hasher,
-  tokens,
-});
+const auth = new AuthService(new MyUserProvider(usersRepository), hasher, tokens);
 
 const app = createApp({
   controllers: [...controllers, new AuthController(auth)],
   guard: requireAuth(tokens),
+  logger,
+  context,
 });
 ```
 
@@ -110,10 +108,16 @@ unreadable. A corrupted row must fail the login, not the request.
 
 ```ts
 // Everything the app mounts, unless a route declares itself public.
-createApp({ guard: requireAuth(tokens) });
+createApp({ controllers, guard: requireAuth(tokens), logger, context });
+```
 
-// Or per route.
-@Get("/admin/reports", { use: [requireRoles("admin")] })
+Or one route at a time, with the guard as extra middleware:
+
+```ts
+class ReportsController {
+  @Get("/admin/reports", { use: [requireRoles("admin")] })
+  public reports = async (req: Request, res: Response) => { /* ... */ };
+}
 ```
 
 `requireAuth` reads `Authorization: Bearer …`, verifies the token, and publishes
