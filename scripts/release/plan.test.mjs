@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { nextVersion, parseCommit, plan, releaseType } from "./plan.mjs";
+import {
+  baseVersion,
+  compareVersions,
+  nextVersion,
+  parseCommit,
+  plan,
+  releaseType,
+} from "./plan.mjs";
 
 /**
  * Run by `npm run test:scripts`, on Node's own test runner rather than Jest.
@@ -113,5 +120,54 @@ describe("plan", () => {
 
   it("is null when the range releases nothing", () => {
     assert.equal(plan("0.1.0", ["docs: rewrite the readme"]), null);
+  });
+});
+
+/**
+ * The half-finished release, and the loop it caused.
+ *
+ * A run published and tagged v0.4.0 and then failed to push its version commit.
+ * Every run after it read 0.3.0 from the manifest, decided on 0.4.0 again and
+ * died on a tag that already existed. Reading the higher of the two is what
+ * turns that into a release nobody has to repair by hand.
+ */
+describe("baseVersion", () => {
+  it("takes the manifest when the two agree", () => {
+    assert.equal(baseVersion("0.4.0", "v0.4.0"), "0.4.0");
+  });
+
+  it("takes the tag when the manifest is behind it", () => {
+    assert.equal(baseVersion("0.3.0", "v0.4.0"), "0.4.0");
+  });
+
+  it("keeps the manifest when it is ahead, which is the ordinary run", () => {
+    // The version commit is written before the tag is read again, so this is
+    // what every healthy release looks like from the inside.
+    assert.equal(baseVersion("0.5.0", "v0.4.0"), "0.5.0");
+  });
+
+  it("takes the manifest on a repository that has never released", () => {
+    assert.equal(baseVersion("0.1.0", null), "0.1.0");
+  });
+
+  /** The bump that unsticks the real repository, end to end. */
+  it("plans the next release from the tag rather than from the stale manifest", () => {
+    const decision = plan(baseVersion("0.3.0", "v0.4.0"), ["feat(crud): declare a relation once"]);
+
+    assert.deepEqual(decision, { type: "minor", version: "0.5.0" });
+  });
+});
+
+describe("compareVersions", () => {
+  it("orders by each part in turn", () => {
+    assert.equal(compareVersions("0.4.0", "0.3.9"), 1);
+    assert.equal(compareVersions("0.3.9", "0.4.0"), -1);
+    assert.equal(compareVersions("1.0.0", "0.99.99"), 1);
+    assert.equal(compareVersions("0.4.1", "0.4.0"), 1);
+    assert.equal(compareVersions("0.4.0", "0.4.0"), 0);
+  });
+
+  it("refuses a version it cannot read rather than guessing an order", () => {
+    assert.throws(() => compareVersions("0.4", "not-a-version"), /not semver/);
   });
 });
