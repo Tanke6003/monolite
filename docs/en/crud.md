@@ -131,6 +131,89 @@ protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
 }
 ```
 
+`buildWhere` is synchronous on purpose. It is the hook every module overrides, and
+one that could `await` would put a query in front of every listing in the project —
+paid for by all of them, needed by few.
+
+Some filters do have to read somewhere else first, though. "Books whose author is
+called Le Guin" is two steps: the keys of the authors whose name matches, then the
+books holding those keys. That step goes in **`resolveQuery`**, which runs before
+`buildWhere` and hands it a completed query:
+
+```ts
+protected override async resolveQuery(query: unknown): Promise<unknown> {
+  const { author } = (query ?? {}) as { author?: string };
+  if (!author) return query;
+
+  const matches = await this.authors.find({ where: { name: { contains: author } } });
+  // A name nobody is called must not become an empty filter: `{ in: [] }` filters
+  // nothing away on some drivers, and a failed search would answer with the lot.
+  return { ...query, authorIds: matches.length ? matches.map((a) => a.pkAuthor) : [-1] };
+}
+```
+
+The point of the seam is what you keep: paging, the default ordering and
+`withDeleted` all still come from the base class. Overriding `list` to make room
+for the lookup means copying all three, and each copy is a place to drop one.
+
+---
+
+## Relations
+
+A book carries its author's *name*, not just the key — the key is what a client
+sends back when it edits, the name is what it has to print, and a listing that
+carries only the key costs a request per row.
+
+Declare the relation once, where the service is built:
+
+```ts
+export class BooksService extends CrudService<IBook, BookDTO> {
+  constructor(books: IGenericRepository<IBook>, authors: IGenericRepository<IAuthor>) {
+    super(books, bookMapper, {
+      orderBy: { field: "name", direction: "asc" },
+      includes: [
+        include<BookDTO, IAuthor>({
+          key: "authorId",       // the DTO property holding the foreign key
+          relatedKey: "pkAuthor",
+          repository: authors,
+          into: "author",        // the DTO property the name goes into
+          pick: (author) => author.name,
+        }),
+      ],
+    });
+  }
+}
+```
+
+and mark the field it fills in the mapper, so that nothing writes it back and
+everybody can see where it comes from:
+
+```ts
+const bookMapper = createMapper<IBook, BookDTO>({
+  id: { field: "pkBook", readOnly: true },
+  name: "name",
+  authorId: "authorId",
+  author: hydrated(),
+});
+```
+
+That is the whole of it. `list`, `getOne`, `create` and `update` all resolve it,
+because they all go through one place inside `CrudService` — and **a field
+declared with `hydrated()` that no include fills stops the service from being
+constructed**, naming the field. The mistake this replaces is not hypothetical:
+calling `loadRelated` by hand in each of the four verbs and remembering only two
+produces a resource that carries its author when it was read and not when it was
+written, with a DTO that says the field is there either way.
+
+One batched query per relation per page — `WHERE key IN (…)`, the same thing
+EF Core's `Include()` does — and none at all when every key is null. Soft-deleted
+parents are included on purpose: a book has to keep showing its author after that
+author is withdrawn, or a historical row becomes unreadable.
+
+`loadRelated` is still exported for the cases this does not cover: a relation
+that is not one-to-one with a DTO field, or one resolved inside a verb the module
+wrote itself.
+
 ---
 
 ## Transactions
@@ -215,6 +298,8 @@ Generated projects ship that index in every engine's schema.
 | `update(id, input)` | |
 | `softDelete(id)` | |
 | `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>` |
+| `resolveQuery(query)` | Protected hook, async: completes the query before `buildWhere` reads it |
+| `includes` | Relations resolved on every verb, declared at construction with `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |
 
 The service knows nothing about HTTP: it returns `null`, not a 404, and throws

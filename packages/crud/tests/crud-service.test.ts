@@ -1,6 +1,12 @@
 import type { IGenericRepository, QueryOptions } from "monolite-data";
 import { AppError } from "monolite-core";
-import { CrudService, type EntityMapper } from "monolite-crud";
+import {
+  createMapper,
+  CrudService,
+  hydrated,
+  include,
+  type EntityMapper,
+} from "monolite-crud";
 
 interface Item {
   pkItem: number;
@@ -116,6 +122,77 @@ describe("CrudService", () => {
         orderBy: undefined,
       });
     });
+
+    /**
+     * The two-step filter, and the reason `resolveQuery` exists: a module that
+     * has to read somewhere else before it can build its `where` keeps every
+     * other behaviour of the listing instead of reimplementing `list`.
+     */
+    it("lets a module complete the query asynchronously before buildWhere sees it", async () => {
+      const lookup = jest.fn().mockResolvedValue([7, 9]);
+
+      class TwoStepService extends CrudService<Item, ItemDTO> {
+        constructor(repo: IGenericRepository<Item>) {
+          super(repo, mapper, { field: "pkItem", direction: "asc" });
+        }
+
+        protected override async resolveQuery(query: unknown): Promise<unknown> {
+          const { owner } = (query ?? {}) as { owner?: string };
+          return owner ? { ...(query as object), keys: await lookup(owner) } : query;
+        }
+
+        protected override buildWhere(query: unknown): QueryOptions<Item>["where"] {
+          const { keys } = (query ?? {}) as { keys?: number[] };
+          return keys ? { pkItem: { in: keys } } : undefined;
+        }
+      }
+
+      repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
+
+      await new TwoStepService(repository as unknown as IGenericRepository<Item>).list(2, 25, {
+        query: { owner: "ana" },
+        withDeleted: true,
+      });
+
+      expect(lookup).toHaveBeenCalledWith("ana");
+      // Paging, ordering and `withDeleted` all survive: that is what a module
+      // used to lose the moment it overrode `list` to make room for a lookup.
+      expect(repository.getPaged).toHaveBeenCalledWith(2, 25, {
+        where: { pkItem: { in: [7, 9] } },
+        withDeleted: true,
+        orderBy: { field: "pkItem", direction: "asc" },
+      });
+    });
+
+    /**
+     * The cost of the hook for everybody who does not use it, which has to be
+     * nothing: no extra query, and the query object arriving at `buildWhere`
+     * exactly as the route left it.
+     */
+    it("hands buildWhere the untouched query when nobody overrides resolveQuery", async () => {
+      const seen: unknown[] = [];
+
+      class PlainService extends CrudService<Item, ItemDTO> {
+        constructor(repo: IGenericRepository<Item>) {
+          super(repo, mapper);
+        }
+
+        protected override buildWhere(query: unknown): QueryOptions<Item>["where"] {
+          seen.push(query);
+          return undefined;
+        }
+      }
+
+      repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
+
+      const query = { page: 1, limit: 10 };
+      await new PlainService(repository as unknown as IGenericRepository<Item>).list(1, 10, {
+        query,
+      });
+
+      expect(seen).toEqual([query]);
+      expect(seen[0]).toBe(query);
+    });
   });
 
   describe("get", () => {
@@ -175,5 +252,196 @@ describe("CrudService", () => {
 
     await expect(service.softDelete(1)).resolves.toBe(false);
     expect(repository.softDelete).toHaveBeenCalledWith(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+interface Author {
+  pkAuthor: number;
+  name: string;
+}
+
+interface BookRow {
+  pkBook: number;
+  title: string;
+  authorId: number | null;
+}
+
+interface BookDTO {
+  id: number;
+  title: string;
+  authorId: number | null;
+  author: string | null;
+}
+
+const bookMapper = createMapper<BookRow, BookDTO>({
+  id: { field: "pkBook", readOnly: true },
+  title: "title",
+  authorId: "authorId",
+  // Filled by the include below, never by the mapper and never written back.
+  author: hydrated(),
+});
+
+/**
+ * The relation, declared once.
+ *
+ * Before this it was four calls to `loadRelated` — one in each verb that hands a
+ * DTO out — and the mistake it replaces is forgetting two of them, which
+ * produces a resource that carries its author when it was read and not when it
+ * was written.
+ */
+describe("CrudService with a declared include", () => {
+  let books: jest.Mocked<Pick<IGenericRepository<BookRow>, "getPaged" | "getById" | "insert" | "update">>;
+  let authors: jest.Mocked<Pick<IGenericRepository<Author>, "find">>;
+  let service: CrudService<BookRow, BookDTO>;
+
+  const ROW: BookRow = { pkBook: 1, title: "A Wizard of Earthsea", authorId: 7 };
+
+  class BooksService extends CrudService<BookRow, BookDTO> {
+    constructor(store: IGenericRepository<BookRow>, related: IGenericRepository<Author>) {
+      super(store, bookMapper, {
+        orderBy: { field: "title", direction: "asc" },
+        includes: [
+          include<BookDTO, Author>({
+            key: "authorId",
+            relatedKey: "pkAuthor",
+            repository: related,
+            into: "author",
+            pick: (author) => author.name,
+          }),
+        ],
+      });
+    }
+  }
+
+  beforeEach(() => {
+    books = {
+      getPaged: jest.fn(),
+      getById: jest.fn(),
+      insert: jest.fn(),
+      update: jest.fn(),
+    } as unknown as typeof books;
+
+    authors = { find: jest.fn().mockResolvedValue([{ pkAuthor: 7, name: "Ursula K. Le Guin" }]) } as unknown as typeof authors;
+
+    service = new BooksService(
+      books as unknown as IGenericRepository<BookRow>,
+      authors as unknown as IGenericRepository<Author>
+    );
+  });
+
+  /**
+   * The regression, and the reason the whole thing exists. One assertion per
+   * verb, because the bug it replaces was two verbs out of four.
+   */
+  it("resolves the relation on all four verbs", async () => {
+    books.getPaged.mockResolvedValue({ items: [ROW], total: 1, page: 1, limit: 10, pages: 1 });
+    books.getById.mockResolvedValue(ROW);
+    books.insert.mockResolvedValue(ROW);
+    books.update.mockResolvedValue(ROW);
+
+    const listed = await service.list(1, 10);
+    expect(listed.data[0].author).toBe("Ursula K. Le Guin");
+
+    expect((await service.get(1))?.author).toBe("Ursula K. Le Guin");
+    expect((await service.create({ title: "x" })).author).toBe("Ursula K. Le Guin");
+    expect((await service.update(1, { title: "x" }))?.author).toBe("Ursula K. Le Guin");
+  });
+
+  it("asks the related repository once for a whole page, not once per row", async () => {
+    books.getPaged.mockResolvedValue({
+      items: [
+        { pkBook: 1, title: "one", authorId: 7 },
+        { pkBook: 2, title: "two", authorId: 7 },
+        { pkBook: 3, title: "three", authorId: 9 },
+      ],
+      total: 3,
+      page: 1,
+      limit: 10,
+      pages: 1,
+    });
+    authors.find.mockResolvedValue([
+      { pkAuthor: 7, name: "Ursula K. Le Guin" },
+      { pkAuthor: 9, name: "Italo Calvino" },
+    ]);
+
+    const page = await service.list(1, 10);
+
+    expect(authors.find).toHaveBeenCalledTimes(1);
+    // The distinct keys, in one `IN (...)` — three rows, two authors.
+    expect(authors.find).toHaveBeenCalledWith({
+      where: { pkAuthor: { in: [7, 9] } },
+      // A book has to keep showing its author after that author is withdrawn:
+      // hiding the name would turn a historical row into an unreadable one.
+      withDeleted: true,
+    });
+    expect(page.data.map((book) => book.author)).toEqual([
+      "Ursula K. Le Guin",
+      "Ursula K. Le Guin",
+      "Italo Calvino",
+    ]);
+  });
+
+  it("answers null for a row that points nowhere, and asks nothing", async () => {
+    books.getById.mockResolvedValue({ pkBook: 4, title: "Beowulf", authorId: null });
+
+    const book = await service.get(4);
+
+    expect(book).toMatchObject({ authorId: null, author: null });
+    // Present and null, not absent: unknown and empty have to look different.
+    expect(Object.keys(book as object)).toContain("author");
+    expect(authors.find).not.toHaveBeenCalled();
+  });
+
+  it("answers null when the key points at a row that is not there", async () => {
+    books.getById.mockResolvedValue({ pkBook: 5, title: "Orphan", authorId: 404 });
+    authors.find.mockResolvedValue([]);
+
+    expect((await service.get(5))?.author).toBeNull();
+  });
+
+  /**
+   * The other half of the design: declaring the field and forgetting the include
+   * has to be impossible to ship, not merely discouraged.
+   */
+  it("refuses to be constructed when a hydrated field has nothing to fill it", () => {
+    class Forgetful extends CrudService<BookRow, BookDTO> {
+      constructor(store: IGenericRepository<BookRow>) {
+        super(store, bookMapper, { orderBy: { field: "title", direction: "asc" } });
+      }
+    }
+
+    expect(() => new Forgetful(books as unknown as IGenericRepository<BookRow>)).toThrow(
+      /Forgetful.*author.*hydrated/s
+    );
+  });
+
+  /**
+   * The third argument was the ordering for a long time and a great deal of
+   * code passes it that way, so both shapes have to work. A module with no
+   * relation is unaffected by any of this.
+   */
+  it("still takes a bare order-by as its third argument", async () => {
+    const plainMapper = createMapper<BookRow, Omit<BookDTO, "author">>({
+      id: { field: "pkBook", readOnly: true },
+      title: "title",
+      authorId: "authorId",
+    });
+
+    class Plain extends CrudService<BookRow, Omit<BookDTO, "author">> {
+      constructor(store: IGenericRepository<BookRow>) {
+        super(store, plainMapper, { field: "title", direction: "desc" });
+      }
+    }
+
+    books.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
+    await new Plain(books as unknown as IGenericRepository<BookRow>).list(1, 10);
+
+    expect(books.getPaged).toHaveBeenCalledWith(1, 10, {
+      where: undefined,
+      withDeleted: undefined,
+      orderBy: { field: "title", direction: "desc" },
+    });
   });
 });

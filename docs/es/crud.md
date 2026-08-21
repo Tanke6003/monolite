@@ -131,6 +131,91 @@ protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
 }
 ```
 
+`buildWhere` es síncrono a propósito. Es el hook que sobreescriben todos los
+módulos, y uno que pudiera hacer `await` pondría una consulta por delante de todos
+los listados del proyecto: la pagarían todos y la necesitan pocos.
+
+Aun así, hay filtros que sí tienen que mirar en otro sitio antes. «Libros cuyo autor
+se llama Le Guin» son dos pasos: las claves de los autores cuyo nombre encaja, y
+luego los libros con esas claves. Ese paso va en **`resolveQuery`**, que corre antes
+de `buildWhere` y le entrega una consulta ya completa:
+
+```ts
+protected override async resolveQuery(query: unknown): Promise<unknown> {
+  const { author } = (query ?? {}) as { author?: string };
+  if (!author) return query;
+
+  const matches = await this.authors.find({ where: { name: { contains: author } } });
+  // Un nombre que no lleva nadie no puede convertirse en un filtro vacío: `{ in: [] }`
+  // no filtra nada en algunos drivers, y una búsqueda fallida contestaría con todo.
+  return { ...query, authorIds: matches.length ? matches.map((a) => a.pkAuthor) : [-1] };
+}
+```
+
+Lo que importa de la costura es lo que conservas: la paginación, el orden por
+defecto y `withDeleted` siguen viniendo de la clase base. Sobreescribir `list` para
+hacerle sitio a la búsqueda obliga a copiar los tres, y cada copia es un sitio donde
+perder uno.
+
+---
+
+## Relaciones
+
+Un libro lleva el *nombre* de su autor, no sólo la clave: la clave es lo que un
+cliente devuelve al editar, el nombre es lo que tiene que pintar, y un listado que
+sólo lleva la clave cuesta una petición por fila.
+
+Declara la relación una vez, donde se construye el servicio:
+
+```ts
+export class BooksService extends CrudService<IBook, BookDTO> {
+  constructor(books: IGenericRepository<IBook>, authors: IGenericRepository<IAuthor>) {
+    super(books, bookMapper, {
+      orderBy: { field: "name", direction: "asc" },
+      includes: [
+        include<BookDTO, IAuthor>({
+          key: "authorId",       // la propiedad del DTO con la clave ajena
+          relatedKey: "pkAuthor",
+          repository: authors,
+          into: "author",        // la propiedad del DTO donde va el nombre
+          pick: (author) => author.name,
+        }),
+      ],
+    });
+  }
+}
+```
+
+y marca en el mapper el campo que rellena, para que nada lo escriba de vuelta y
+para que se vea de dónde sale:
+
+```ts
+const bookMapper = createMapper<IBook, BookDTO>({
+  id: { field: "pkBook", readOnly: true },
+  name: "name",
+  authorId: "authorId",
+  author: hydrated(),
+});
+```
+
+Eso es todo. `list`, `getOne`, `create` y `update` la resuelven, porque los cuatro
+pasan por un único sitio dentro de `CrudService` — y **un campo declarado con
+`hydrated()` que ningún include rellena impide construir el servicio**, diciendo
+qué campo es. El error que esto sustituye no es hipotético: llamar a `loadRelated`
+a mano en cada uno de los cuatro verbos y acordarse sólo de dos produce un recurso
+que lleva su autor cuando se lee y no cuando se escribe, con un DTO que dice que el
+campo está en ambos casos.
+
+Una consulta en lote por relación y por página —`WHERE clave IN (…)`, lo mismo que
+hace `Include()` de EF Core— y ninguna cuando todas las claves son nulas. Los
+padres borrados lógicamente se incluyen a propósito: un libro tiene que seguir
+mostrando su autor después de que ese autor se retire, o una fila histórica se
+vuelve ilegible.
+
+`loadRelated` se sigue exportando para lo que esto no cubre: una relación que no es
+uno a uno con un campo del DTO, o una que se resuelve dentro de un verbo que el
+módulo escribió él mismo.
+
 ---
 
 ## Transacciones
@@ -218,6 +303,8 @@ los motores.
 | `update(id, input)` | |
 | `softDelete(id)` | |
 | `buildWhere(query)` | Hook protegido: parámetros de consulta → `WhereFilter<T>` |
+| `resolveQuery(query)` | Hook protegido, asíncrono: completa la consulta antes de que `buildWhere` la lea |
+| `includes` | Relaciones resueltas en todos los verbos, declaradas al construir con `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entidad ↔ DTO en un solo sitio |
 
 El servicio no sabe nada de HTTP: devuelve `null`, no un 404, y lanza `AppError`,
