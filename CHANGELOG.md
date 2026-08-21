@@ -9,19 +9,6 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
-### Added
-
-- **`CrudService.resolveQuery`**, an asynchronous hook that runs before
-  `buildWhere` and hands it a completed query. `buildWhere` stays synchronous on
-  purpose — it is the hook every module overrides, and one that could await would
-  put a query in front of every listing in the project. Some filters do have to
-  read somewhere else first, though ("books whose author is called Le Guin" is
-  two steps, not one), and without a seam for that step a module had to override
-  `list` itself and copy the paging, the ordering and `withDeleted` along with
-  it. Overriding nothing costs nothing.
-
-## [0.3.0] — 2026-08-21
-
 ### Fixed
 
 - **The generated API documentation.** Three separate faults, each of which
@@ -94,6 +81,14 @@ a minor release. Pin exact versions.
   `Server.configure()` is `run()` without the listening, so supertest drives the
   Express instance directly and the suite binds no port — it runs beside a `dev`
   server instead of fighting it for 3000.
+- **`CrudService.resolveQuery`**, an asynchronous hook that runs before
+  `buildWhere` and hands it a completed query. `buildWhere` stays synchronous on
+  purpose — it is the hook every module overrides, and one that could await would
+  put a query in front of every listing in the project. Some filters do have to
+  read somewhere else first, though ("books whose author is called Le Guin" is
+  two steps, not one), and without a seam for that step a module had to override
+  `list` itself and copy the paging, the ordering and `withDeleted` along with
+  it. Overriding nothing costs nothing.
 
 ## [0.1.0] — 2026-08-15
 
