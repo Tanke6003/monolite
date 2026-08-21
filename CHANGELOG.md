@@ -11,6 +11,28 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **The release could publish and then fail to record what it published.** It
+  pushed the version commit *after* the seven `npm publish` calls, on the
+  reasoning that the irreversible step should go last. The reasoning had the
+  trade backwards: a push is not a formality that either works or is worth
+  retrying — it can be **rejected**, permanently, because somebody merged while
+  the run was building. That is what happened to v0.4.0: seven packages on the
+  registry, a tag pointing at a commit no branch contained, and a manifest still
+  saying 0.3.0. The push now comes first and is `--atomic`, so the branch and
+  the tag succeed or fail together; a rejection ends the run with nothing
+  published and leaves the release to the newer push, which has a run of its
+  own.
+- **A half-finished release used to be unrecoverable without hand surgery.** The
+  next version was computed from the manifest alone, so a manifest left behind
+  by an interrupted run made every subsequent run decide on a version that was
+  already tagged, and die on it — for ever. The base is now the higher of the
+  manifest and the newest tag, which turns exactly that state into the next
+  release instead of a loop.
+- **`monolite-data/testing` resolves.** The manifest declared only `"."`, so the
+  subpath the testing guide had always told readers to import from was
+  resolvable by nobody. The kit keeps its root export as well, so nothing that
+  already imports it has to move.
+
 - **Thirty-two documented examples that did not compile.** The two worth naming:
   `docs/{en,es}/testing.md` told readers to
   `import { runRepositoryContract } from "monolite-data/testing"`, and neither
@@ -120,6 +142,21 @@ a minor release. Pin exact versions.
   parsed rather than padded out. A second, cheaper check keeps the English and
   Spanish pages structurally in step, since a correction applied to one and not
   the other is the second way these pages have drifted.
+- **A documented response that names a component no longer has to describe
+  itself.** `{ 201: { ref: "Appointment" } }` is enough; OpenAPI still requires a
+  description on a response object and the builder emits one from the status
+  code's reason phrase. `description` remains available and wins when given, and
+  a code the table does not know says `Status 418` rather than a confidently
+  wrong phrase. Four documented examples had been written in the short form and
+  none of them compiled, which was the argument.
+- **`monolite-data/testing`**, the repository contract kit on a subpath of its
+  own. It is a test kit rather than part of the runtime surface, and the guide
+  had been pointing at that path since before it existed.
+- **`CrudHandler`**, the type of the five CRUD handlers. Overriding a verb is the
+  documented way to give a module a rule `@Crud` cannot know, and it used to mean
+  repeating a signature down to the Express generics — both documented examples
+  got it wrong. `public override create: CrudHandler = async (req, res, next) =>`
+  infers all three parameters.
 
 ## [0.1.0] — 2026-08-15
 
