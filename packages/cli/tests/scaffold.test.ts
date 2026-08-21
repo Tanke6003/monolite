@@ -192,7 +192,16 @@ function emitJavaScript(target: string): void {
   // `rootDir`, so a blanket emit writes a `.js` next to every `.ts` in this
   // repository. Naming each file keeps the output inside the generated project.
   for (const source of sources) {
-    const emitted = program.emit(program.getSourceFile(source));
+    const file = program.getSourceFile(source);
+
+    // `emit(undefined)` *is* the blanket emit, so a file the program does not
+    // recognise has to stop this rather than fall through to it. It has
+    // happened: the run leaves a `.js` beside every source in the repository
+    // and, because the project's own output never lands where it is expected,
+    // fails several tests later as a module that cannot be found.
+    if (!file) throw new Error(`[tests] ${source} is not part of the program`);
+
+    const emitted = program.emit(file);
     expect(emitted.emitSkipped).toBe(false);
   }
 }
