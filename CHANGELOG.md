@@ -53,6 +53,34 @@ a minor release. Pin exact versions.
   `POST /auth/login`, which is what `AuthController`'s second argument was for.
 - `RATE_LIMIT_*`, `AUTH_RATE_LIMIT_*` and `CSP_ENABLED` are documented in the
   generated `.env.example` and README.
+- **`monolite-di`** — `missingDataSourceEnv` names the variables the engine
+  `DATA_SOURCE` picks cannot connect without, and `validateDataSourceEnv` throws
+  with the list. Only the configured engine is checked, and only passwords are
+  required: host, port, user and database all default to what the compose files
+  in this repository serve. MongoDB asks for nothing, since its development
+  container runs with authentication off — what it does reject is the halfway
+  state, a `MONGO_USER` with no `MONGO_PASSWORD`.
+- The generated composition root now always validates its environment, and asks
+  `monolite-di` about the engine as well. A `POSTGRES_PASSWORD` left out of
+  `.env` is a line in the boot log naming it, rather than a driver error on the
+  first request that reaches for the database. Previously the hook checked
+  `JWT_SECRET` alone, and only in a project scaffolded with authentication.
+- `--docs=both` serves Swagger UI at `/docs` and Scalar at `/reference`. Both
+  fetch `/openapi.json` rather than carrying a copy, so there is still one
+  description of the API, and the CSP takes the wider of the mounted readers'
+  policies — a project serving Scalar needs the CDN allowed whether or not
+  Swagger UI is beside it.
+- **An end-to-end suite in every generated project.** It drives the application
+  rather than its helpers: health and the shape of a failure, the OpenAPI
+  document and that every `$ref` in it resolves, the example module through
+  create, read, update and soft delete, and — with `--auth` — the login route
+  plus the guard in front of everything else, authenticating the way a client
+  does instead of signing a token of its own. `tests/setup/test-env.ts` forces
+  `DATA_SOURCE=memory` before a module loads, so the suite needs nothing
+  installed; point the variable at an engine and the same tests run against it.
+  `Server.configure()` is `run()` without the listening, so supertest drives the
+  Express instance directly and the suite binds no port — it runs beside a `dev`
+  server instead of fighting it for 3000.
 
 ## [0.1.0] — 2026-08-15
 
