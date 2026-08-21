@@ -125,7 +125,8 @@ my-api/
 │   ├── infrastructure/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   the engine-specific wiring
-│   └── presentation/routes.ts           the imports that run the decorators
+│   ├── composition/modules.ts        the one list a module is added to
+│   └── presentation/routes.ts           mounts every decorated controller
 └── tests/smoke.test.ts       passes on the first run
 ```
 
@@ -150,6 +151,38 @@ monolite g entity payment-method
 | `entity` | The domain interface and its table mapping |
 | `service` | A `CrudService` subclass for an existing entity |
 | `controller` | A `CrudController` subclass for an existing service |
+
+### Wiring
+
+A generated module is added to one list, and the generator adds it:
+
+```
+i Wired into src/composition/modules.ts:
+    import { INVOICE_MODULE } from "./modules/invoice.module";
+    INVOICE_MODULE,
+```
+
+That list is `composition/modules.ts`, and it is the only one. A module used to
+be added in three places — its registration to `entities.ts`, its bindings to
+`container.ts`, an import to `routes.ts` — none of which was a decision, and
+any of which could be forgotten into a module that compiles perfectly and is
+never served.
+
+What made the three-file version impossible to automate safely was not the
+editing; it was that the edits were spread out. A `MonoliteModule` carries the
+registration, the bindings and the controller together, so wiring is one line in
+one file, and one line in one file is small enough for a generator to insert and
+for a reviewer to check.
+
+The licence to write comes from a marker. `composition/modules.ts` ships with
+`// monolite:modules` in it and the entry goes immediately above it. Move that
+marker, rename it or delete it and nothing is touched — the command prints the
+line for you instead, which is what it always used to do. `--no-wire` says the
+same thing on purpose.
+
+No AST is involved, and that is deliberate: the CLI has **no runtime
+dependencies**, and pulling in the TypeScript compiler to add a line to an array
+would spend that promise on the cheapest edit in the project.
 
 The project is found by walking up from the working directory looking for a
 `monolite` key in `package.json`, so the command works from any subdirectory — and

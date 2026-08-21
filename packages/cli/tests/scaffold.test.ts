@@ -3,6 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { missingSchemaRefs } from "monolite-http";
 
+import { generateCommand } from "../src/commands/generate";
 import { newCommand } from "../src/commands/new";
 
 /**
@@ -206,6 +207,32 @@ function emitJavaScript(target: string): void {
   }
 }
 
+/**
+ * Runs `monolite generate module` against a project that has just been
+ * scaffolded, from inside it.
+ *
+ * The command finds its project by walking up from the working directory —
+ * which is the check that stops a mistyped `cd` scattering files over an
+ * unrelated repository — so a test that wants to exercise it has to be standing
+ * in the right place, exactly as a person would be.
+ *
+ * Nothing is hand-edited afterwards. That is the point of the assertion this
+ * feeds: the module reaches HTTP because the generator wired it, or it does not
+ * reach HTTP at all.
+ */
+function generateInto(target: string, name: string): void {
+  const previous = process.cwd();
+  const write = jest.spyOn(process.stdout, "write").mockReturnValue(true);
+
+  try {
+    process.chdir(target);
+    expect(generateCommand(["module", name])).toBe(0);
+  } finally {
+    process.chdir(previous);
+    write.mockRestore();
+  }
+}
+
 beforeAll(() => {
   fs.mkdirSync(SCRATCH, { recursive: true });
 });
@@ -310,6 +337,7 @@ describe("the projects `monolite new` writes", () => {
       let quiet: jest.SpyInstance[];
 
       beforeAll(async () => {
+        generateInto(target, "invoice");
         emitJavaScript(target);
 
         // The generated logger writes a JSON line per request, to stdout and to
@@ -397,13 +425,21 @@ describe("the projects `monolite new` writes", () => {
         expect(missingSchemaRefs(document)).toEqual([]);
       });
 
-      it("declares the example module's DTOs as components", async () => {
+      /**
+       * Exact, not "contains": a component nobody declared is the fault this
+       * assertion exists for, and so is one that appeared from nowhere. The
+       * generated module's two are in the list because the generator wired it —
+       * which makes this a second check on that, from the document's side.
+       */
+      it("declares every module's DTOs as components, and nothing else", async () => {
         const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
           components: { schemas: Record<string, unknown> };
         };
 
         expect(Object.keys(document.components.schemas).sort()).toEqual([
           "ErrorResponse",
+          "Invoice",
+          "PaginatedInvoice",
           "PaginatedProduct",
           "Product",
         ]);
@@ -450,6 +486,20 @@ describe("the projects `monolite new` writes", () => {
         expect(health.headers.get("ratelimit")).toBeNull();
       });
 
+      /**
+       * The generator's real contract, and the only assertion that can hold it:
+       * a module it wrote is *served*, with nothing hand-edited in between.
+       *
+       * That the files appeared proves nothing — they always appeared. What used
+       * to be missing was the wiring, and a module registered nowhere compiles
+       * perfectly and answers 404 for ever.
+       */
+      it("serves a module the generator wired by itself", async () => {
+        const response = await fetch(`${base}/api/v1/invoices`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ total: 2, page: 1 });
+      });
       it("serves the example module, seeded", async () => {
         const response = await fetch(`${base}/api/v1/products`);
 

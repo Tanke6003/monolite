@@ -9,11 +9,20 @@ import { color } from "../util/colors.js";
 import { FileWriter } from "../util/files.js";
 import { created, fail, hint, info, line, title, warn } from "../util/log.js";
 import type { RenderContext } from "../util/render.js";
+import { wireModule } from "../util/wiring.js";
 
 const OPTIONS = {
   force: { type: "boolean" },
   help: { type: "boolean", short: "h" },
   "no-color": { type: "boolean" },
+  /**
+   * Leaves `composition/modules.ts` alone.
+   *
+   * For anyone whose list is not where the scaffold put it, and for the person
+   * who would simply rather a generator did not touch their files. The line to
+   * add is printed either way.
+   */
+  "no-wire": { type: "boolean" },
 } as const;
 
 export function generateCommand(argv: string[]): number {
@@ -58,16 +67,25 @@ export function generateCommand(argv: string[]): number {
     return 1;
   }
 
-  return emit(project, schematicName, entityName, Boolean(parsed.values.force));
+  return emit(project, schematicName, entityName, {
+    force: Boolean(parsed.values.force),
+    wire: !parsed.values["no-wire"],
+  });
+}
+
+interface EmitOptions {
+  force: boolean;
+  /** Whether the module may be inserted into the list; see `wireModule`. */
+  wire: boolean;
 }
 
 function emit(
   project: MonoliteProject,
   schematic: Schematic,
   name: string,
-  force: boolean
+  options: EmitOptions
 ): number {
-  const writer = new FileWriter(project.root, force);
+  const writer = new FileWriter(project.root, options.force);
   const sourceRoot = path.relative(project.root, project.sourceRoot) || ".";
 
   try {
@@ -88,55 +106,36 @@ function emit(
   for (const relative of [...writer.written].sort()) created(relative);
   line();
 
-  if (schematic === "module") wiringReminder(name, sourceRoot);
+  if (schematic === "module") reportWiring(project.root, project.sourceRoot, name, options.wire);
   return 0;
 }
 
 /**
- * A generated module still needs three lines nobody can write for it: its
- * entity in the list the persistence layer is built from, the call in the
- * composition root, and the import that makes the controller's decorators run.
- * Editing the user's own files to add them is how a generator starts mangling
- * code it did not write, so the CLI prints them instead.
+ * Puts the module in the one list it belongs in, and says what it did.
+ *
+ * It used to print three lines for the developer to type, because editing
+ * somebody's own files is how a generator starts mangling code it did not
+ * write. What changed is not the caution — it is that the target is now a
+ * single line above a marker the scaffold put there, which is small enough to
+ * insert and to check. When the marker is gone, so is the licence: the command
+ * falls back to printing, which is exactly what it always did.
  */
-function wiringReminder(name: string, sourceRoot: string): void {
-  const registerName = `register${capitalizePlural(name)}`;
-  const moduleImport = `./modules/${kebab(name)}.module`;
-  const registration = `${upperSnakePlural(name)}_ENTITY_REGISTRATION`;
+function reportWiring(root: string, sourceRoot: string, name: string, wire: boolean): void {
+  const wiring = wire ? wireModule(root, sourceRoot, name) : null;
 
-  info("Three lines left, in your own files:");
-  line(`  ${color.dim(path.join(sourceRoot, "composition", "entities.ts"))}`);
-  line(`    import { ${registration} } from "${moduleImport}";`);
-  line(`    ${color.dim("// ...and the same name inside the ENTITIES array")}`);
-  line(`  ${color.dim(path.join(sourceRoot, "composition", "container.ts"))}`);
-  line(`    import { ${registerName} } from "${moduleImport}";`);
-  line(`    ${registerName}(root.container);`);
-  line(`  ${color.dim(path.join(sourceRoot, "presentation", "routes.ts"))}`);
-  line(`    import "./controllers/${kebab(name)}.controller";`);
+  if (wiring?.wired) {
+    info(`Wired into ${color.bold(wiring.file)}:`);
+    for (const inserted of wiring.lines) line(`    ${inserted}`);
+  } else {
+    const reason = wiring?.reason ? ` (${wiring.reason})` : "";
+    const file = wiring?.file ?? path.join(sourceRoot, "composition", "modules.ts");
+
+    info(`One line left, in ${color.bold(file)}${reason}:`);
+    for (const inserted of wiring?.lines ?? []) line(`    ${inserted}`);
+  }
+
   line();
   warn("the table has to exist in the database too; the generic repository does not create it");
-}
-
-/** Local, tiny copies so the reminder text does not import the whole naming module twice. */
-function kebab(raw: string): string {
-  return raw
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/[^A-Za-z0-9]+/g, "-")
-    .toLowerCase();
-}
-
-function capitalizePlural(raw: string): string {
-  const pascal = kebab(raw)
-    .split("-")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join("");
-  return /[^aeiou]y$/i.test(pascal) ? `${pascal.slice(0, -1)}ies` : `${pascal}s`;
-}
-
-/** `invoice` -> `INVOICES`, the spelling the entity registration is named with. */
-function upperSnakePlural(raw: string): string {
-  return kebab(capitalizePlural(raw)).replace(/-/g, "_").toUpperCase();
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { DependencyContainer, EntityRegistration } from "monolite-di";
+import type { DependencyContainer, EntityRegistration, MonoliteModule } from "monolite-di";
 import { __entityName__Service } from "../../application/services/__entityKebab__.service";
 import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import { __entityConst__ } from "../../infrastructure/persistence/entities/__entityKebab__.entity";
@@ -53,3 +53,18 @@ export function __registerFn__(container: DependencyContainer): void {
   container.register(__entityUpper___TOKENS.service, { useClass: __entityName__Service });
   container.register(__entityUpper___TOKENS.controller, { useClass: __entityName__Controller });
 }
+
+/**
+ * The module, as the one value `composition/modules.ts` lists.
+ *
+ * Its registration, its bindings and its controller travel together, which is
+ * what turns wiring a new module into a single line in a single file — and what
+ * makes that line something `monolite generate module` can insert for you.
+ */
+export const __entityUpper___MODULE: MonoliteModule<I__entityName__> = {
+  registration: __entityPluralUpper___ENTITY_REGISTRATION,
+  register: __registerFn__,
+  // Referenced, not imported for effect: `@ApiController` only runs when the
+  // class is loaded, and a field cannot be dropped the way an unused import can.
+  controller: __entityName__Controller,
+};

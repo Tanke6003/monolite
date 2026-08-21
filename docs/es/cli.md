@@ -126,7 +126,8 @@ mi-api/
 │   ├── infrastructure/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   el cableado propio del motor
-│   └── presentation/routes.ts           los imports que ejecutan los decoradores
+│   ├── composition/modules.ts        la única lista a la que se añade un módulo
+│   └── presentation/routes.ts           monta todos los controladores decorados
 └── tests/smoke.test.ts       pasa a la primera
 ```
 
@@ -151,6 +152,36 @@ monolite g entity payment-method
 | `entity` | La interfaz de dominio y su mapeo a tabla |
 | `service` | Una subclase de `CrudService` para una entidad existente |
 | `controller` | Una subclase de `CrudController` para un servicio existente |
+
+### Cableado
+
+Un módulo generado se añade a una lista, y el generador lo añade:
+
+```
+i Wired into src/composition/modules.ts:
+    import { INVOICE_MODULE } from "./modules/invoice.module";
+    INVOICE_MODULE,
+```
+
+Esa lista es `composition/modules.ts`, y es la única. Antes un módulo se añadía
+en tres sitios —su registro a `entities.ts`, sus bindings a `container.ts`, un
+import a `routes.ts`—, ninguno de ellos una decisión, y olvidar cualquiera dejaba
+un módulo que compila perfectamente y no se sirve nunca.
+
+Lo que hacía imposible automatizar con seguridad la versión de tres ficheros no
+era la edición: era que las ediciones estaban repartidas. Un `MonoliteModule`
+lleva juntos el registro, los bindings y el controlador, así que cablear es una
+línea en un fichero — y una línea en un fichero es lo bastante pequeño como para
+que un generador la inserte y alguien la revise.
+
+El permiso para escribir viene de un marcador. `composition/modules.ts` se
+genera con `// monolite:modules` dentro y la entrada va justo encima. Mueve ese
+marcador, renómbralo o bórralo y no se toca nada: el comando te imprime la línea,
+que es lo que siempre hizo. `--no-wire` dice lo mismo a propósito.
+
+No hay AST de por medio, y es deliberado: la CLI **no tiene dependencias en
+runtime**, y meter el compilador de TypeScript para añadir una línea a un arreglo
+gastaría esa promesa en la edición más barata del proyecto.
 
 El proyecto se localiza subiendo desde el directorio actual en busca de una clave
 `monolite` en el `package.json`, así que el comando funciona desde cualquier

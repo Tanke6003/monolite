@@ -62,6 +62,9 @@ export type {
 } from "./repository.factory.js";
 
 // --------------------------------------------------------------  modules  ---
+export { entitiesOf, registerModules } from "./module.js";
+export type { AnyMonoliteModule, MonoliteModule } from "./module.js";
+
 export { registerPlugins } from "./modules/plugins.module.js";
 export type { Plugins, PluginsOptions } from "./modules/plugins.module.js";
 

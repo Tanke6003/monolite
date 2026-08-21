@@ -2,6 +2,8 @@
 // assume that importing this file is enough to have a working container.
 import {
   createCompositionRoot,
+  entitiesOf,
+  registerModules,
   registerPersistence,
   registerPlugins,
   validateDataSourceEnv,
@@ -11,10 +13,7 @@ import { registerAuth } from "./auth.module";
 // #endif
 import { envs } from "../config/env";
 import { ConsoleLogger } from "../infrastructure/logger";
-import { ENTITIES } from "./entities";
-// #if example
-import { registerProducts } from "./modules/product.module";
-// #endif
+import { MODULES } from "./modules";
 
 /**
  * Composition root.
@@ -65,7 +64,7 @@ export const root = createCompositionRoot((root) => {
   // configuration instead of a change of code.
   const persistence = registerPersistence({
     container: root.container,
-    entities: ENTITIES,
+    entities: entitiesOf(MODULES),
     logger: plugins.logger,
     envs,
     context: plugins.requestContext,
@@ -80,10 +79,9 @@ export const root = createCompositionRoot((root) => {
 
   registerAuth(root.container);
   // #endif
-  // #if example
 
-  registerProducts(root.container);
-  // #endif
+  // Every feature module's own bindings, from the one list in `modules.ts`.
+  registerModules(root.container, MODULES);
 });
 
 export const container = root.container;

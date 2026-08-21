@@ -168,6 +168,26 @@ a minor release. Pin exact versions.
   would otherwise find by reading two files. A relation pointing at an entity
   nobody registered fails while the persistence layer is being assembled, naming
   both sides — not later, when something follows it, because nothing does.
+- **`monolite generate module` wires the module it wrote.** A generated module
+  used to need three lines in three files — its registration in `entities.ts`,
+  its bindings in `container.ts`, an import in `routes.ts` — none of them a
+  decision, and any of them forgettable into a module that compiles perfectly
+  and is never served. A `MonoliteModule` carries all three together, so
+  `composition/modules.ts` is now the only list and wiring is one line in it,
+  which is small enough for a generator to insert and a reviewer to check. What
+  made the old version unsafe to automate was never the editing; it was that the
+  edits were spread out. The licence comes from a `// monolite:modules` marker
+  the scaffold writes: move it, rename it or delete it and nothing is touched,
+  and the command prints the line as it always did. `--no-wire` says the same on
+  purpose. No AST is involved, deliberately — the CLI has no runtime
+  dependencies and adding one to insert a line would spend that promise on the
+  cheapest edit in the project. `src/composition/entities.ts` is gone.
+
+### Removed
+
+- **`composition/entities.ts`** in generated projects. Its one list is derived
+  from `MODULES` now. Projects generated before this keep working exactly as
+  they are; nothing in the packages reads the file.
 
 ## [0.1.0] — 2026-08-15
 
