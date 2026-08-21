@@ -19,6 +19,11 @@ module.exports = {
   moduleNameMapper: {
     "^monolite-([^/]+)$": "<rootDir>/packages/$1/src/index.ts",
 
+    // A package may publish subpaths of its own — `monolite-data/testing` is
+    // the contract kit. Mapping them too is what lets a test here import what a
+    // consumer imports, rather than a path only this repository knows about.
+    "^monolite-([^/]+)/(.+)$": "<rootDir>/packages/$1/src/$2/index.ts",
+
     // Relative imports carry a `.js` extension because `moduleResolution:
     // nodenext` demands it in the emitted output. ts-jest resolves as CommonJS,
     // where that extension points at a file that does not exist on disk, so it
