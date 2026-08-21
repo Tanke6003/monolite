@@ -10,7 +10,7 @@ import express, { type Express } from "express";
 import { z } from "zod";
 import type { IRequestContext } from "monolite-core";
 import { ApiController, errorHandler, registerController } from "monolite-http";
-import { Crud, CrudController, type ICrudService } from "monolite-crud";
+import { Crud, CrudController, type CrudHandler, type ICrudService } from "monolite-crud";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 interface ItemDTO {
@@ -191,5 +191,71 @@ describe("CrudController", () => {
         await partials.close();
       }
     });
+  });
+});
+
+/**
+ * Overriding a verb is the documented way to give a module a rule `@Crud` cannot
+ * know, so it should not be the hardest thing in the package to type.
+ *
+ * The handlers are property arrow functions —that is what keeps `this` bound
+ * without a `.bind()` in the router— which means an override has to match the
+ * property's exact type. Both documented examples of overriding tripped over
+ * it. `CrudHandler` is the name for that type, and with it the parameters
+ * infer.
+ */
+describe("overriding a verb with CrudHandler", () => {
+  @ApiController("/overridden", { tag: "Overridden" })
+  @Crud({ resource: "overridden", dto: "Item", schemas: { create: bodySchema } })
+  class OverriddenController extends CrudController {
+    constructor() {
+      super(service, anonymous, "overridden");
+    }
+
+    // No Request, no Response, no NextFunction, no `Promise<void>`: the type
+    // carries all four and the handler says only what it does.
+    public override create: CrudHandler = async (req, res) => {
+      res.status(201).json({ id: 99, name: (req.body as { name: string }).name, overridden: true });
+    };
+  }
+
+  let served: ServedApp;
+
+  beforeEach(async () => {
+    service = {
+      list: jest.fn(),
+      get: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      softDelete: jest.fn(),
+    } as unknown as jest.Mocked<ICrudService<ItemDTO>>;
+
+    served = await serve(buildApp(OverriddenController, new OverriddenController()));
+  });
+
+  afterEach(async () => {
+    await served.close();
+  });
+
+  /**
+   * Compiling and actually being reached are two different claims, and only the
+   * second one matters: a route that still resolved to the generated handler
+   * would type-check perfectly and quietly ignore the rule the override exists
+   * to enforce.
+   */
+  it("is the handler the route reaches, not the generated one", async () => {
+    const response = await served.client.post("/overridden", { body: { name: "written by hand" } });
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ id: 99, overridden: true });
+    // The generated `create` would have gone through the service.
+    expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it("still validates with the schema the decorator was given", async () => {
+    const response = await served.client.post("/overridden", { body: { name: "" } });
+
+    expect(response.status).toBe(400);
+    expect(service.create).not.toHaveBeenCalled();
   });
 });

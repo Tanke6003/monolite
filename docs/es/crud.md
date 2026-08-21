@@ -99,9 +99,9 @@ export class AppointmentsController extends CrudController {
   // Reemplaza el create genérico: reservar tiene una regla que el genérico no puede saber.
   @Post("/", {
     body: bookSchema,
-    responses: { 201: { description: "Reservada", ref: "Appointment" }, 409: "Horario ocupado" },
+    responses: { 201: { ref: "Appointment" }, 409: "Horario ocupado" },
   })
-  public override create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public override create: CrudHandler = async (req, res, next) => {
     try {
       res.status(201).json(await this.appointments.book(req.body));
     } catch (error) {
