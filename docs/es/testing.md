@@ -75,12 +75,12 @@ contra él.
 cualquier implementación de `IGenericRepository` tiene que pasar.
 
 ```ts
-import { runRepositoryContract } from "monolite-data/testing";
+import { runGenericRepositoryContract } from "monolite-data";
 
-describe("MiRepositorioPropio", () => {
-  runRepositoryContract({
-    create: () => new MiRepositorioPropio(/* ... */),
-  });
+// El nombre del driver es el primer argumento: entra en el nombre de cada test
+// que genera el kit, así que un fallo dice qué implementación se rompió.
+runGenericRepositoryContract("MiRepositorioPropio", {
+  create: () => new MiRepositorioPropio(/* ... */),
 });
 ```
 

@@ -11,7 +11,7 @@ OpenAPI. No se escriben por separado y no pueden discrepar entre sí.
 ## Cómo se ve
 
 ```ts
-@ApiController("/users", { tag: "Users", token: TOKENS.IUsersController })
+@ApiController("/users", { tag: "Users", token: USER_TOKENS.controller })
 export class UsersController extends BaseController {
   constructor(private readonly users: IUsersService, context: IRequestContext) {
     super(context);
@@ -20,7 +20,7 @@ export class UsersController extends BaseController {
   @Get("/", {
     summary: "Listado paginado de usuarios",
     query: paginationSchema,
-    responses: { 200: { ref: "PaginatedUsers" } },
+    responses: { 200: { description: "Una página de usuarios", ref: "PaginatedUsers" } },
   })
   public getAll = async (req: Request, res: Response, next: NextFunction) => {
     // ...
@@ -29,7 +29,7 @@ export class UsersController extends BaseController {
   @Post("/", {
     summary: "Crea un usuario",
     body: createUserSchema,
-    responses: { 201: { ref: "User" }, 400: "Error de validación" },
+    responses: { 201: { description: "Creado", ref: "User" }, 400: "Error de validación" },
   })
   public create = async (req: Request, res: Response, next: NextFunction) => {
     // ...
@@ -41,6 +41,10 @@ El montaje es genérico, nada por módulo:
 
 ```ts
 for (const [type, metadata] of registeredControllers()) {
+  // A controller with no token is discovered and then cannot be served, so it
+  // is refused at startup rather than at the first request that needs it.
+  if (!metadata.token) throw new Error(`${type.name} declares no token`);
+
   registerController(router, type, container.resolve(metadata.token), authGuard);
 }
 ```

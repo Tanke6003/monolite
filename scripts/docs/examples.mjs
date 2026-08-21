@@ -228,13 +228,27 @@ function exportsByPackage() {
 const WORD = /[A-Za-z_$][A-Za-z0-9_$]*/g;
 
 /**
- * The handful of third-party names the examples use bare.
+ * The third-party names the examples use bare, and where they really come from.
  *
- * `z` is worth resolving properly rather than stubbing: half the schemas in
- * these pages are written with it, and a stubbed `z` makes `z.infer<...>` an
- * error about namespaces that says nothing about the documentation.
+ * `z` is worth resolving rather than stubbing: half the schemas in these pages
+ * are written with it, and a stubbed `z` makes `z.infer<...>` an error about
+ * namespaces that says nothing about the documentation.
+ *
+ * Express matters more, and for a reason worth writing down: `Request` and
+ * `Response` are *global* under `@types/node`, where they mean the fetch API.
+ * Left to resolve on their own, `res.status(201)` reads as a call to a number —
+ * because a fetch `Response.status` is one — and every handler in the
+ * documentation fails for a reason that has nothing to do with the page.
  */
-const EXTERNALS = new Map([["z", "zod"]]);
+const EXTERNALS = new Map([
+  ["z", "zod"],
+  ["Request", "express"],
+  ["Response", "express"],
+  ["NextFunction", "express"],
+  ["RequestHandler", "express"],
+  ["Router", "express"],
+  ["Application", "express"],
+]);
 
 /**
  * The imports a snippet needs, inferred from the words in it.

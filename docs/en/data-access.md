@@ -368,7 +368,7 @@ decision, so it happens in the service layer — the equivalent of EF Core's
 const branches = await loadRelated<IAppointment, IBranch>(appointments, {
   foreignKey: "fkBranch",
   relatedKey: "pkBranch",
-  repository: this.branchesRepository,
+  repository: branchesRepository,
 });
 ```
 

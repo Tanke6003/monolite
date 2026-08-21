@@ -204,8 +204,12 @@ un bloqueo real de fila en SQL, y degrada con honestidad en el resto.
 Un controlador declara sus rutas sobre sí mismo:
 
 ```ts
-@ApiController("/branches", { tag: "Branches", token: TOKENS.IBranchesController })
+@ApiController("/branches", { tag: "Branches", token: BRANCH_TOKENS.controller })
 export class BranchesController extends BaseController {
+  constructor(context: IRequestContext) {
+    super(context);
+  }
+
   @Get("/", { query: listQuerySchema })
   list = async (req: Request, res: Response) => { /* ... */ };
 

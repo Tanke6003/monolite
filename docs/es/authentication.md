@@ -47,15 +47,13 @@ import {
 const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
 
-const auth = new AuthService({
-  users: new MyUserProvider(usersRepository),   // tuyo
-  hasher,
-  tokens,
-});
+const auth = new AuthService(new MyUserProvider(usersRepository), hasher, tokens);
 
 const app = createApp({
   controllers: [...controllers, new AuthController(auth)],
   guard: requireAuth(tokens),
+  logger,
+  context,
 });
 ```
 
@@ -110,10 +108,16 @@ Una fila corrupta tiene que hacer fallar el login, no la petición.
 
 ```ts
 // Todo lo que monte la app, salvo lo que se declare público.
-createApp({ guard: requireAuth(tokens) });
+createApp({ controllers, guard: requireAuth(tokens), logger, context });
+```
 
-// O por ruta.
-@Get("/admin/reports", { use: [requireRoles("admin")] })
+O ruta a ruta, con el guardia como middleware extra:
+
+```ts
+class ReportsController {
+  @Get("/admin/reports", { use: [requireRoles("admin")] })
+  public reports = async (req: Request, res: Response) => { /* ... */ };
+}
 ```
 
 `requireAuth` lee `Authorization: Bearer …`, verifica el token y publica la

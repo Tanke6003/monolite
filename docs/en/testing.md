@@ -69,12 +69,12 @@ Point `DATA_SOURCE` at a real engine to run the same suite against it.
 `IGenericRepository` implementation must pass.
 
 ```ts
-import { runRepositoryContract } from "monolite-data/testing";
+import { runGenericRepositoryContract } from "monolite-data";
 
-describe("MyCustomRepository", () => {
-  runRepositoryContract({
-    create: () => new MyCustomRepository(/* ... */),
-  });
+// The driver's name is the first argument: it goes into the name of every test
+// the kit generates, so a failure says which implementation broke.
+runGenericRepositoryContract("MyCustomRepository", {
+  create: () => new MyCustomRepository(/* ... */),
 });
 ```
 

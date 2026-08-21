@@ -376,7 +376,7 @@ consulta por lotes** (`WHERE key IN (…)`), no una por fila:
 const branches = await loadRelated<IAppointment, IBranch>(appointments, {
   foreignKey: "fkBranch",
   relatedKey: "pkBranch",
-  repository: this.branchesRepository,
+  repository: branchesRepository,
 });
 ```
 

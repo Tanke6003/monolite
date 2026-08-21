@@ -79,22 +79,28 @@ npm install monolite-core monolite-data pg
 ```
 
 ```ts
-import { EntitySchema, SqlGenericRepository, postgresDialect } from "monolite-data";
+import { defineEntity, SqlGenericRepository, postgresDialect } from "monolite-data";
 
-const USERS = {
+const USERS = defineEntity<User>({
   table: "USERS",
-  key: { property: "pkUser", column: "PK_USER" },
-  columns: { name: "NAME", email: "EMAIL", isActive: "IS_ACTIVE" },
-  softDelete: { column: "IS_DELETED" },
-  audit: { createdBy: "CREATED_BY", updatedBy: "UPDATED_BY" },
-} as const;
+  primaryKey: "pkUser",
+  columns: {
+    pkUser: { name: "PK_USER", kind: "number", insertable: false, updatable: false },
+    name: { name: "NAME", kind: "string" },
+    email: { name: "EMAIL", kind: "string" },
+    isActive: { name: "IS_ACTIVE", kind: "boolean" },
+  },
+  softDelete: { property: "isActive", activeValue: 1, deletedValue: 0 },
+  audit: { createdBy: "createdBy", updatedBy: "updatedBy" },
+});
 
 const users = new SqlGenericRepository<User>(executor, USERS, logger, postgresDialect);
 
-await users.getAll({
+// Una página, no un trozo: `getPaged` responde con las filas y los totales, que
+// es lo que necesita un listado. `getAll` toma `skip` y `take` y no cuenta nada.
+await users.getPaged(1, 20, {
   where: { isActive: true, name: { contains: search } },
   orderBy: { field: "name" },
-  page: { number: 1, size: 20 },
 });
 ```
 

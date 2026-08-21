@@ -96,6 +96,13 @@ Drop it from `verbs` and declare it with its own route decorator:
 ```ts
 @Crud({ resource: "user", dto: "User", verbs: ["list", "getOne", "update"] })
 export class UsersController extends CrudController {
+  constructor(
+    private readonly users: UsersService,
+    context: IRequestContext
+  ) {
+    super(users, context, "user");
+  }
+
   @Post("/", { summary: "Register a user", body: registerSchema })
   public override create = async (req: Request, res: Response, next: NextFunction) => {
     /* ... */
