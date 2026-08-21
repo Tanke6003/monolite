@@ -9,14 +9,11 @@ import type { ITokenService } from "monolite-auth";
 import { registerController, registeredControllers } from "monolite-http";
 import { container } from "../composition/container";
 
-// Importing a controller is what runs its decorators and puts it in the
-// registry. This is the only list left —one line per module— and it cannot be
-// avoided without scanning the disk at runtime, which would cost more than it
-// saves. Everything else (paths, verbs, validation, documentation) comes from
+// There is no list of controllers here any more. A controller is registered by
+// its decorator, and its decorator runs when the class is loaded — which the
+// module descriptor in `composition/modules.ts` takes care of by holding the
+// class. Everything else (paths, verbs, validation, documentation) comes from
 // the controller itself.
-// #if example
-import "./controllers/product.controller";
-// #endif
 
 // #if !auth
 /**

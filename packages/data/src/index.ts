@@ -57,6 +57,7 @@ export type {
   ColumnKind,
   ColumnMetadata,
   EntityMetadata,
+  RelationMetadata,
   SoftDeleteMetadata,
   TimestampMetadata,
 } from "./metadata/entity-metadata.js";

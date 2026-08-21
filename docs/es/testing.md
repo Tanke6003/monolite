@@ -75,7 +75,7 @@ contra él.
 cualquier implementación de `IGenericRepository` tiene que pasar.
 
 ```ts
-import { runGenericRepositoryContract } from "monolite-data";
+import { runGenericRepositoryContract } from "monolite-data/testing";
 
 // El nombre del driver es el primer argumento: entra en el nombre de cada test
 // que genera el kit, así que un fallo dice qué implementación se rompió.

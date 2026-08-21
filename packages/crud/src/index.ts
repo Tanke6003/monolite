@@ -25,7 +25,7 @@ export type {
 
 // ----------------------------------------------------------  controller  ---
 export { CrudController } from "./crud.controller.js";
-export type { ICrudController } from "./crud.controller.js";
+export type { CrudHandler, ICrudController } from "./crud.controller.js";
 
 // -----------------------------------------------------------  decorator  ---
 export { Crud } from "./crud.decorator.js";

@@ -20,7 +20,7 @@ export class UsersController extends BaseController {
   @Get("/", {
     summary: "Listado paginado de usuarios",
     query: paginationSchema,
-    responses: { 200: { description: "Una página de usuarios", ref: "PaginatedUsers" } },
+    responses: { 200: { ref: "PaginatedUsers" } },
   })
   public getAll = async (req: Request, res: Response, next: NextFunction) => {
     // ...
@@ -29,7 +29,7 @@ export class UsersController extends BaseController {
   @Post("/", {
     summary: "Crea un usuario",
     body: createUserSchema,
-    responses: { 201: { description: "Creado", ref: "User" }, 400: "Error de validación" },
+    responses: { 201: { ref: "User" }, 400: "Error de validación" },
   })
   public create = async (req: Request, res: Response, next: NextFunction) => {
     // ...

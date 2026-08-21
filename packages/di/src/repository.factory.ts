@@ -401,6 +401,38 @@ function registryOf<R>(stores: ReadonlyMap<string, AnyGenericRepository>): Map<s
  * assembly for all six: build the log, build every store over it, index them
  * and hand the unit of work the index.
  */
+/**
+ * A relation pointing at a table nobody registered.
+ *
+ * Checked while the layer is being assembled, and not when something first
+ * follows the relation — because nothing in the repository ever follows one.
+ * Relations are read by the layer above and by the DDL generator, so a typo in
+ * `to` would otherwise surface as an include that silently resolves nothing, or
+ * as a `FOREIGN KEY` against a table that is not there. Both are a long way from
+ * the line that caused them.
+ *
+ * The same trade the composition root makes for `JWT_SECRET`: an arrangement
+ * that cannot work should not start.
+ */
+function assertRelationsResolve(entities: readonly AnyEntityRegistration[]): void {
+  const registered = new Set(entities.map((entity) => entity.metadata.table));
+  const broken: string[] = [];
+
+  for (const entity of entities) {
+    for (const [name, relation] of Object.entries(entity.metadata.relations ?? {})) {
+      if (registered.has(relation.to)) continue;
+      broken.push(`${entity.metadata.table}.${name} -> ${relation.to}`);
+    }
+  }
+
+  if (broken.length === 0) return;
+
+  throw new Error(
+    `[persistence] relation(s) pointing at an entity that is not registered: ${broken.join(", ")}. ` +
+      `Registered: ${[...registered].sort().join(", ") || "none"}.`
+  );
+}
+
 function assemble(assembly: Assembly): PersistenceLayer {
   // The change log is built first and with no log of its own: recording itself
   // would be recursive.
@@ -408,6 +440,8 @@ function assemble(assembly: Assembly): PersistenceLayer {
     ? assembly.create<IAuditLog>(assembly.auditLog, undefined, undefined)
     : undefined;
   const auditTrail = auditLogStore ? assembly.trail(auditLogStore) : undefined;
+
+  assertRelationsResolve(assembly.entities);
 
   const stores = new Map<string, AnyGenericRepository>();
   for (const entity of assembly.entities) {

@@ -47,6 +47,47 @@ export interface AuditMetadata<T> {
   updatedBy?: Extract<keyof T, string>;
 }
 
+/**
+ * What a foreign key points at.
+ *
+ * Declarative and inert: **the repository does not read this**. It still knows
+ * exactly one table, still fires no join, and a relation declared here changes
+ * nothing about how a row is selected, inserted or filtered. Composing across
+ * aggregates stays a decision of the layer above, which is where the rules are.
+ *
+ * What it adds is the ability to answer *what does this column point at*, and
+ * three separate things need that answer and were each restating it:
+ *
+ *  - the include a service declares, which had to repeat both keys by hand;
+ *  - generated DDL, which has no other source for a `FOREIGN KEY` constraint;
+ *  - `monolite generate module`, which cannot scaffold a related module without
+ *    knowing there is a relation.
+ *
+ * One statement of a fact that was being made three times is worth the type.
+ */
+export interface RelationMetadata<T> {
+  /** The related entity's registered name — its `table`. */
+  to: string;
+  /** The property on *this* entity that holds the key. */
+  localKey: Extract<keyof T, string>;
+  /** The property on the related entity that it matches. */
+  foreignKey: string;
+  /**
+   * What the generated DDL should say, and **only** that.
+   *
+   * The repository enforces none of it: there is no cascade to run and no
+   * restriction to check, because nothing here reads relations at query time.
+   * Saying so in the type is what stops somebody expecting a delete to cascade
+   * through a layer that never looks.
+   *
+   * Defaults to `restrict`, which is the choice that fails loudly rather than
+   * quietly removing rows nobody named.
+   */
+  onDelete?: "restrict" | "cascade" | "set null" | "no action";
+  /** `false` for a key that may be empty. Defaults to `true`. */
+  optional?: boolean;
+}
+
 export interface EntityMetadata<T> {
   table: string;
   primaryKey: Extract<keyof T, string>;
@@ -64,6 +105,12 @@ export interface EntityMetadata<T> {
    * worth the cost of an extra row per operation.
    */
   auditTrail?: boolean;
+  /**
+   * What this entity's foreign keys point at, by the name the reader will use
+   * for them. Read by the layers above and by the DDL generator; never by the
+   * repository. See `RelationMetadata`.
+   */
+  relations?: Record<string, RelationMetadata<T>>;
 }
 
 /**

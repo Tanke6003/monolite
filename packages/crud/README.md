@@ -104,7 +104,7 @@ export class UsersController extends CrudController {
   }
 
   @Post("/", { summary: "Register a user", body: registerSchema })
-  public override create = async (req: Request, res: Response, next: NextFunction) => {
+  public override create: CrudHandler = async (req, res, next) => {
     /* ... */
   };
 }

@@ -103,3 +103,39 @@ export function plan(currentVersion, messages) {
 
   return { type, version: nextVersion(currentVersion, type) };
 }
+
+/**
+ * The version a bump should be applied to.
+ *
+ * Normally the manifest and the newest tag agree, and either would do. When
+ * they disagree the tag is right and the manifest is stale, and the difference
+ * is not hypothetical: a run that published and tagged v0.4.0 but failed to
+ * push its version commit left the registry at 0.4.0 and the manifest at 0.3.0.
+ * Every run after that read the manifest, decided on 0.4.0 again, and died on a
+ * tag that already existed — a loop that no amount of retrying escapes.
+ *
+ * Taking the higher of the two turns that into a release of 0.5.0, which is
+ * both correct and the only direction the registry allows anyone to move in.
+ */
+export function baseVersion(manifestVersion, lastTag) {
+  const tagged = lastTag?.replace(/^v/, "");
+  if (!tagged) return manifestVersion;
+
+  return compareVersions(tagged, manifestVersion) > 0 ? tagged : manifestVersion;
+}
+
+/** `-1`, `0` or `1`. Prereleases are ignored: this repository does not cut them. */
+export function compareVersions(left, right) {
+  const parts = (version) => version.split("-")[0].split("+")[0].split(".").map(Number);
+
+  const [a, b] = [parts(left), parts(right)];
+
+  for (let index = 0; index < 3; index++) {
+    if (!Number.isInteger(a[index]) || !Number.isInteger(b[index])) {
+      throw new Error(`cannot compare "${left}" with "${right}": not semver versions`);
+    }
+    if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1;
+  }
+
+  return 0;
+}

@@ -4,6 +4,26 @@ import { AppError } from "monolite-core";
 import { BaseController, parseId } from "monolite-http";
 import type { ICrudService, ListOptions } from "./crud.service.js";
 
+/**
+ * One of the five handlers, and the type an override should carry.
+ *
+ * `CrudController` declares its handlers as property arrow functions — that is
+ * what keeps `this` bound without a `.bind()` in the router, and it is why the
+ * route decorators are written for properties rather than for prototype
+ * methods. The cost is that an override has to match the property's type
+ * exactly, down to `Promise<void>` and the full Express generics, and both
+ * documented examples of overriding a verb tripped over it.
+ *
+ * Naming the type is what removes that: `public override create: CrudHandler =
+ * async (req, res, next) => ...` infers all three parameters, so the override
+ * says what it does and nothing about the shape of Express.
+ */
+export type CrudHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<void>;
+
 /** The HTTP contract `@Crud()` mounts. A module may replace any of them. */
 export interface ICrudController {
   list(req: Request, res: Response, next: NextFunction): Promise<void>;
@@ -90,7 +110,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
     });
   }
 
-  public list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public list: CrudHandler = async (req, res, next) => {
     try {
       const { page, limit, options } = this.paging(req);
       res.json(await this.service.list(page, limit, options));
@@ -99,7 +119,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
     }
   };
 
-  public getOne = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public getOne: CrudHandler = async (req, res, next) => {
     try {
       const found = await this.service.get(parseId(idParam(req.params.id), this.resource));
       if (!found) throw this.notFound();
@@ -110,7 +130,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
     }
   };
 
-  public create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public create: CrudHandler = async (req, res, next) => {
     try {
       // It returns the created resource, not an acknowledgement: the client
       // needs the primary key the database has just generated, and making it
@@ -121,7 +141,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
     }
   };
 
-  public update = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public update: CrudHandler = async (req, res, next) => {
     try {
       const id = parseId(idParam(req.params.id), this.resource);
       const updated = await this.service.update(id, req.body);
@@ -133,7 +153,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
     }
   };
 
-  public softDelete = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public softDelete: CrudHandler = async (req, res, next) => {
     try {
       const deleted = await this.service.softDelete(parseId(idParam(req.params.id), this.resource));
       if (!deleted) throw this.notFound();

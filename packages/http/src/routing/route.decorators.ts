@@ -26,6 +26,14 @@ export type PathParamType = "integer" | "string";
  *   there is no outbound Zod schema to derive it from.
  * - `schema`: a Zod type, if there is one. It is generated the same way as the
  *   request body.
+ *
+ * **`description` is optional once one of those is present.** OpenAPI requires a
+ * description on a response object and the builder still emits one — from the
+ * status code's reason phrase — but a route that has already named the component
+ * does not have to restate it as "Created". Four documented examples were
+ * written as `{ ref: "Appointment" }` and nobody noticed they did not compile
+ * until the documentation started going through the compiler, which is a fairly
+ * direct statement about what the short form ought to be.
  */
 export type ResponseSpec =
   | string
@@ -34,6 +42,17 @@ export type ResponseSpec =
       /** Component of `components.schemas`, without the `#/...`. */
       ref?: string;
       schema?: ZodType;
+    }
+  | {
+      description?: string;
+      /** Component of `components.schemas`, without the `#/...`. */
+      ref: string;
+      schema?: ZodType;
+    }
+  | {
+      description?: string;
+      ref?: string;
+      schema: ZodType;
     };
 
 export interface RouteOptions {
