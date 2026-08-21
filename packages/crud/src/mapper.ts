@@ -141,3 +141,42 @@ export function createMapper<TEntity extends object, TDto extends object>(
     toPartialEntity: (dto) => writeEntity(dto, true),
   };
 }
+
+// ------------------------------------------------------------  hydration  ---
+
+/**
+ * A DTO field that an include fills, not the mapper.
+ *
+ * It is a computed field —so it never travels back to the entity, whatever a
+ * client sends— that also says *why* it is computed. Before this, the same
+ * field was written `{ computed: () => null }`, which is indistinguishable from
+ * a field that is genuinely always null, and nothing anywhere knew that
+ * something else was supposed to fill it in.
+ *
+ * `CrudService` reads the marker and refuses to be constructed if a field
+ * carrying it has no include behind it. That is the whole point: the mistake it
+ * replaces was a resource that quietly answered `author: null` on two verbs out
+ * of four.
+ */
+export interface HydratedField<TValue> {
+  readonly hydrated: true;
+  computed: (entity: unknown) => TValue;
+}
+
+/** Marks a DTO field as filled by an include. See `include()` in `monolite-crud`. */
+export function hydrated<TValue = null>(): HydratedField<TValue> {
+  return { hydrated: true, computed: () => null as TValue };
+}
+
+export function isHydratedField(mapping: unknown): mapping is HydratedField<unknown> {
+  return typeof mapping === "object" && mapping !== null && "hydrated" in mapping;
+}
+
+/** The DTO fields a profile declares with `hydrated()`, by name. */
+export function hydratedFields<TEntity, TDto>(
+  profile: MappingProfile<TEntity, TDto>
+): string[] {
+  return Object.entries(profile)
+    .filter(([, mapping]) => isHydratedField(mapping))
+    .map(([name]) => name);
+}

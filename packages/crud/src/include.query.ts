@@ -54,3 +54,91 @@ export async function loadRelated<TParent, TRelated, TKey = number>(
     related.map((entity) => [(entity as Record<string, unknown>)[spec.relatedKey], entity])
   );
 }
+
+/**
+ * A relation the CRUD resolves on every DTO it hands back.
+ *
+ * `loadRelated` is the primitive and it was never the problem. Where it had to
+ * be *called* was: `list`, `get`, `create` and `update`, in every service with a
+ * relation, and nothing enforced any of the four. Forgetting two of them is not
+ * hypothetical — it produces a resource with two shapes, carrying its relation
+ * when it was read and not when it was written, and the compiler is happy
+ * because the DTO declares the field either way.
+ *
+ * Declared here instead, and applied by `CrudService` in one place. There is no
+ * longer anywhere to forget.
+ */
+export interface Include<TDto> {
+  /** The DTO property this fills; `CrudService` checks the mapper declared it. */
+  readonly into: Extract<keyof TDto, string>;
+  /** Fills that property on a whole page, in one batched query. */
+  hydrate(dtos: TDto[]): Promise<void>;
+}
+
+export interface IncludeDefinition<
+  TDto,
+  TRelated,
+  TInto extends Extract<keyof TDto, string>,
+> {
+  /** The DTO property holding the foreign key. */
+  key: Extract<keyof TDto, string>;
+  /** The related entity's own key. */
+  relatedKey: Extract<keyof TRelated, string>;
+  repository: IGenericRepository<TRelated>;
+  /** The DTO property the resolved value goes into. */
+  into: TInto;
+  /** What to take from the related row. */
+  pick: (related: TRelated) => TDto[TInto];
+  /**
+   * `true` by default, and it matters: a row has to keep showing the name of
+   * what it points at even after that parent has been withdrawn. Hiding it turns
+   * a historical record into an unreadable one.
+   */
+  withDeleted?: boolean;
+}
+
+/**
+ * Declares one relation, ready to hand to `CrudService`.
+ *
+ * @example
+ * super(books, bookMapper, {
+ *   orderBy: { field: "name", direction: "asc" },
+ *   includes: [
+ *     include<BookDTO, IAuthor>({
+ *       key: "authorId",
+ *       relatedKey: "pkAuthor",
+ *       repository: authors,
+ *       into: "author",
+ *       pick: (author) => author.name,
+ *     }),
+ *   ],
+ * });
+ */
+export function include<
+  TDto extends object,
+  TRelated extends object,
+  TInto extends Extract<keyof TDto, string> = Extract<keyof TDto, string>,
+>(definition: IncludeDefinition<TDto, TRelated, TInto>): Include<TDto> {
+  return {
+    into: definition.into,
+
+    async hydrate(dtos: TDto[]): Promise<void> {
+      const index = await loadRelated<TDto, TRelated>(dtos, {
+        foreignKey: definition.key,
+        relatedKey: definition.relatedKey,
+        repository: definition.repository,
+        withDeleted: definition.withDeleted,
+      });
+
+      for (const dto of dtos) {
+        const row = dto as Record<string, unknown>;
+        const key = row[definition.key];
+        const related = key === null || key === undefined ? undefined : index.get(key);
+
+        // `null` and not left absent: a key that points nowhere is known to be
+        // empty, and an absent property reads as unknown.
+        row[definition.into] = related === undefined ? null : definition.pick(related);
+      }
+    },
+  };
+}

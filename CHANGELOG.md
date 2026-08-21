@@ -89,6 +89,19 @@ a minor release. Pin exact versions.
   two steps, not one), and without a seam for that step a module had to override
   `list` itself and copy the paging, the ordering and `withDeleted` along with
   it. Overriding nothing costs nothing.
+- **Relations declared once instead of hydrated by hand.** `include()` describes
+  a relation where a service is constructed, and `CrudService` resolves it in the
+  one place `list`, `getOne`, `create` and `update` all go through.
+  `loadRelated` was always the right primitive; where it had to be *called* was
+  the problem — four sites, none of them enforced, and forgetting two produces a
+  resource that carries its relation when it was read and not when it was
+  written, with a DTO that says the field is there either way. The mapper marks
+  such a field with `hydrated()`, and a field carrying that marker with no
+  include behind it **stops the service being constructed**, naming the field,
+  while the container is still being assembled. Still one batched
+  `WHERE key IN (…)` per relation per page, and none at all when every key is
+  null. The third constructor argument keeps accepting a bare `OrderByClause`,
+  so nothing already written has to change.
 
 ## [0.1.0] — 2026-08-15
 
