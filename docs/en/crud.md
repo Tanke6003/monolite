@@ -121,6 +121,31 @@ protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
 }
 ```
 
+`buildWhere` is synchronous on purpose. It is the hook every module overrides, and
+one that could `await` would put a query in front of every listing in the project —
+paid for by all of them, needed by few.
+
+Some filters do have to read somewhere else first, though. "Books whose author is
+called Le Guin" is two steps: the keys of the authors whose name matches, then the
+books holding those keys. That step goes in **`resolveQuery`**, which runs before
+`buildWhere` and hands it a completed query:
+
+```ts
+protected override async resolveQuery(query: unknown): Promise<unknown> {
+  const { author } = (query ?? {}) as { author?: string };
+  if (!author) return query;
+
+  const matches = await this.authors.find({ where: { name: { contains: author } } });
+  // A name nobody is called must not become an empty filter: `{ in: [] }` filters
+  // nothing away on some drivers, and a failed search would answer with the lot.
+  return { ...query, authorIds: matches.length ? matches.map((a) => a.pkAuthor) : [-1] };
+}
+```
+
+The point of the seam is what you keep: paging, the default ordering and
+`withDeleted` all still come from the base class. Overriding `list` to make room
+for the lookup means copying all three, and each copy is a place to drop one.
+
 ---
 
 ## Transactions
@@ -193,6 +218,7 @@ Generated projects ship that index in every engine's schema.
 | `update(id, input)` | |
 | `softDelete(id)` | |
 | `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>` |
+| `resolveQuery(query)` | Protected hook, async: completes the query before `buildWhere` reads it |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |
 
 The service knows nothing about HTTP: it returns `null`, not a 404, and throws
