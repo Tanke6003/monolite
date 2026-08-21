@@ -116,6 +116,77 @@ describe("CrudService", () => {
         orderBy: undefined,
       });
     });
+
+    /**
+     * The two-step filter, and the reason `resolveQuery` exists: a module that
+     * has to read somewhere else before it can build its `where` keeps every
+     * other behaviour of the listing instead of reimplementing `list`.
+     */
+    it("lets a module complete the query asynchronously before buildWhere sees it", async () => {
+      const lookup = jest.fn().mockResolvedValue([7, 9]);
+
+      class TwoStepService extends CrudService<Item, ItemDTO> {
+        constructor(repo: IGenericRepository<Item>) {
+          super(repo, mapper, { field: "pkItem", direction: "asc" });
+        }
+
+        protected override async resolveQuery(query: unknown): Promise<unknown> {
+          const { owner } = (query ?? {}) as { owner?: string };
+          return owner ? { ...(query as object), keys: await lookup(owner) } : query;
+        }
+
+        protected override buildWhere(query: unknown): QueryOptions<Item>["where"] {
+          const { keys } = (query ?? {}) as { keys?: number[] };
+          return keys ? { pkItem: { in: keys } } : undefined;
+        }
+      }
+
+      repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
+
+      await new TwoStepService(repository as unknown as IGenericRepository<Item>).list(2, 25, {
+        query: { owner: "ana" },
+        withDeleted: true,
+      });
+
+      expect(lookup).toHaveBeenCalledWith("ana");
+      // Paging, ordering and `withDeleted` all survive: that is what a module
+      // used to lose the moment it overrode `list` to make room for a lookup.
+      expect(repository.getPaged).toHaveBeenCalledWith(2, 25, {
+        where: { pkItem: { in: [7, 9] } },
+        withDeleted: true,
+        orderBy: { field: "pkItem", direction: "asc" },
+      });
+    });
+
+    /**
+     * The cost of the hook for everybody who does not use it, which has to be
+     * nothing: no extra query, and the query object arriving at `buildWhere`
+     * exactly as the route left it.
+     */
+    it("hands buildWhere the untouched query when nobody overrides resolveQuery", async () => {
+      const seen: unknown[] = [];
+
+      class PlainService extends CrudService<Item, ItemDTO> {
+        constructor(repo: IGenericRepository<Item>) {
+          super(repo, mapper);
+        }
+
+        protected override buildWhere(query: unknown): QueryOptions<Item>["where"] {
+          seen.push(query);
+          return undefined;
+        }
+      }
+
+      repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
+
+      const query = { page: 1, limit: 10 };
+      await new PlainService(repository as unknown as IGenericRepository<Item>).list(1, 10, {
+        query,
+      });
+
+      expect(seen).toEqual([query]);
+      expect(seen[0]).toBe(query);
+    });
   });
 
   describe("get", () => {

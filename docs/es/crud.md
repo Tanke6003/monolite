@@ -121,6 +121,32 @@ protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
 }
 ```
 
+`buildWhere` es síncrono a propósito. Es el hook que sobreescriben todos los
+módulos, y uno que pudiera hacer `await` pondría una consulta por delante de todos
+los listados del proyecto: la pagarían todos y la necesitan pocos.
+
+Aun así, hay filtros que sí tienen que mirar en otro sitio antes. «Libros cuyo autor
+se llama Le Guin» son dos pasos: las claves de los autores cuyo nombre encaja, y
+luego los libros con esas claves. Ese paso va en **`resolveQuery`**, que corre antes
+de `buildWhere` y le entrega una consulta ya completa:
+
+```ts
+protected override async resolveQuery(query: unknown): Promise<unknown> {
+  const { author } = (query ?? {}) as { author?: string };
+  if (!author) return query;
+
+  const matches = await this.authors.find({ where: { name: { contains: author } } });
+  // Un nombre que no lleva nadie no puede convertirse en un filtro vacío: `{ in: [] }`
+  // no filtra nada en algunos drivers, y una búsqueda fallida contestaría con todo.
+  return { ...query, authorIds: matches.length ? matches.map((a) => a.pkAuthor) : [-1] };
+}
+```
+
+Lo que importa de la costura es lo que conservas: la paginación, el orden por
+defecto y `withDeleted` siguen viniendo de la clase base. Sobreescribir `list` para
+hacerle sitio a la búsqueda obliga a copiar los tres, y cada copia es un sitio donde
+perder uno.
+
 ---
 
 ## Transacciones
@@ -196,6 +222,7 @@ los motores.
 | `update(id, input)` | |
 | `softDelete(id)` | |
 | `buildWhere(query)` | Hook protegido: parámetros de consulta → `WhereFilter<T>` |
+| `resolveQuery(query)` | Hook protegido, asíncrono: completa la consulta antes de que `buildWhere` la lea |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entidad ↔ DTO en un solo sitio |
 
 El servicio no sabe nada de HTTP: devuelve `null`, no un 404, y lanza `AppError`,

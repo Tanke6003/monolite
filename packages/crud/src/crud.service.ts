@@ -73,9 +73,31 @@ export abstract class CrudService<T extends object, TDto> implements ICrudServic
     return undefined;
   }
 
+  /**
+   * A last chance to complete the query before it becomes a filter.
+   *
+   * `buildWhere` is synchronous, and that is not an oversight: it is the hook
+   * every module overrides, and one that could await would put a query in front
+   * of every listing in the project — paid by all of them, needed by few.
+   *
+   * But some filters genuinely have to read somewhere else first. "Books whose
+   * author is called Le Guin" is two steps: the keys of the authors whose name
+   * matches, then the books holding those keys. Without a seam for that step, a
+   * module has to override `list` itself and copy the paging, the ordering and
+   * everything else the base class was doing for it — and each copy is a place
+   * to drop one of them.
+   *
+   * So: override this to turn the route's query into a richer one, and let
+   * `buildWhere` stay a pure function of what it is handed. A module that does
+   * not override it fires nothing extra.
+   */
+  protected async resolveQuery(query: unknown): Promise<unknown> {
+    return query;
+  }
+
   async list(page: number, limit: number, options: ListOptions = {}): Promise<PaginatedDTO<TDto>> {
     const query: Omit<QueryOptions<T>, "skip" | "take"> = {
-      where: this.buildWhere(options.query),
+      where: this.buildWhere(await this.resolveQuery(options.query)),
       withDeleted: options.withDeleted,
       orderBy: this.defaultOrderBy,
     };
