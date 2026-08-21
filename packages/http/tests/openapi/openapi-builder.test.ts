@@ -415,3 +415,55 @@ describe("buildOpenApiDocument", () => {
     });
   });
 });
+
+/**
+ * A response that names a component does not have to restate it in prose.
+ *
+ * OpenAPI still requires a description, so one is always emitted — but writing
+ * it stops being the caller's job. Four documented examples had been written
+ * this way and never compiled, which is about as clear a statement as there is
+ * about what the short form ought to be.
+ */
+describe("a response that names a component and nothing else", () => {
+  @ApiController("/things", { tag: "Things" })
+  class ShorthandController {
+    @Post("/", {
+      responses: {
+        201: { ref: "Thing" },
+        204: { ref: "Nothing" },
+        418: { ref: "Teapot" },
+        409: { description: "Already there", ref: "Thing" },
+      },
+    })
+    public create = async (_req: Request, res: Response): Promise<void> => {
+      res.status(201).json({});
+    };
+  }
+
+  const built = buildOpenApiPaths([getControllerMetadata(ShorthandController)!], {
+    secured: false,
+  }) as Record<string, Record<string, { responses: Record<string, Record<string, unknown>> }>>;
+
+  const responses = built["/things"].post.responses;
+
+  it("still emits a description, taken from the status code", () => {
+    expect(responses["201"].description).toBe("Created");
+    expect(responses["204"].description).toBe("No Content");
+  });
+
+  it("keeps the component it was given", () => {
+    expect(JSON.stringify(responses["201"].content)).toContain("Thing");
+  });
+
+  /**
+   * A table that tried to cover every code in RFC 9110 would eventually label
+   * one wrongly, and a confidently wrong phrase is worse than the number.
+   */
+  it("says the code rather than guessing a phrase it does not know", () => {
+    expect(responses["418"].description).toBe("Status 418");
+  });
+
+  it("leaves an explicit description alone", () => {
+    expect(responses["409"].description).toBe("Already there");
+  });
+});

@@ -132,12 +132,49 @@ function contentOf(spec: Exclude<ResponseSpec, string>): Record<string, unknown>
  *  - the 401 on any route that goes through the guard;
  *  - the error body on every 4xx and 5xx that does not describe another one.
  */
+/**
+ * The standard reason phrase for a status code, used when a response names a
+ * component instead of describing itself.
+ *
+ * Only the codes this toolkit's own routes emit. Anything else falls back to
+ * the code as prose rather than to a wrong phrase from a table that tried to
+ * cover all of RFC 9110: a reader is better served by "418" than by a
+ * confidently mislabelled one.
+ */
+const REASON_PHRASES: Record<string, string> = {
+  "200": "OK",
+  "201": "Created",
+  "202": "Accepted",
+  "204": "No Content",
+  "400": "Bad Request",
+  "401": "Unauthorized",
+  "403": "Forbidden",
+  "404": "Not Found",
+  "409": "Conflict",
+  "422": "Unprocessable Content",
+  "429": "Too Many Requests",
+  "500": "Internal Server Error",
+};
+
+function reasonPhrase(code: string): string {
+  return REASON_PHRASES[code] ?? `Status ${code}`;
+}
+
 function responsesOf(route: RouteMetadata, options: BuildPathsOptions): Record<string, unknown> {
   const declared: Record<string, unknown> = {};
 
   for (const [code, spec] of Object.entries(route.responses ?? { 200: "OK" })) {
     const normalized = typeof spec === "string" ? { description: spec } : spec;
-    declared[code] = { description: normalized.description, ...contentOf(normalized) };
+
+    declared[code] = {
+      // OpenAPI 3.1 requires a description on a response object, so one is
+      // always emitted — but a route that already named a component does not
+      // have to restate it. `{ ref: "Appointment" }` under a 201 was written
+      // four separate times in the documentation before anything compiled it,
+      // which says plainly enough what people expect the short form to be.
+      description: normalized.description ?? reasonPhrase(code),
+      ...contentOf(normalized),
+    };
   }
 
   if (options.secured !== false && !route.public && !declared["401"]) {
