@@ -1,0 +1,5 @@
+# Blank issues stay available on purpose. A form is a good default and a bad
+# floor: a question, a half-formed observation or a report that fits no field
+# is still worth having, and a repository that only accepts what its template
+# anticipated stops hearing about anything it did not anticipate.
+blank_issues_enabled: true

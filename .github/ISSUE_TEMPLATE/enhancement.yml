@@ -1,0 +1,91 @@
+name: Enhancement
+description: A change to what the toolkit does, or to how it feels to use
+title: "[enhancement] "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for a change to the toolkit's behaviour or its ergonomics.
+        For something that is already broken, open a bug report instead.
+
+        Two of the fields below ask for the *reasoning* rather than the request.
+        That is deliberate: the packages in this repository are full of comments
+        explaining why a decision went the way it did, and an enhancement that
+        arrives without that argument is one nobody can weigh later.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Where the change lands. Pick "several" if it spans more than one.
+      options:
+        - monolite-core
+        - monolite-data
+        - monolite-http
+        - monolite-crud
+        - monolite-di
+        - monolite-auth
+        - monolite-cli
+        - documentation
+        - several
+    validations:
+      required: true
+
+  - type: textarea
+    id: today
+    attributes:
+      label: What is hard today
+      description: >-
+        The friction, as a concrete case rather than in the abstract. What did
+        you have to write, remember or repeat that the toolkit could have taken
+        care of? If it caused a real bug, say which one.
+      placeholder: |
+        Resolving a relation means calling `loadRelated` in `list`, `get`,
+        `create` and `update`. I forgot two of them, so `POST /books` answered
+        `author: null` for a book with a perfectly valid author.
+    validations:
+      required: true
+
+  - type: textarea
+    id: instead
+    attributes:
+      label: What it would look like instead
+      description: >-
+        A sketch of the API or the behaviour you have in mind. Pseudocode is
+        fine — the shape matters more than the details.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this shape
+      description: >-
+        What else was considered, and why it lost. A design with no rejected
+        alternative behind it usually has not met its hard case yet.
+
+  - type: textarea
+    id: proof
+    attributes:
+      label: How it would be checked
+      description: >-
+        The test that fails today and passes afterwards. "It compiles" is not
+        one — the mistakes this toolkit keeps making are the ones that compile.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking change
+      description: >-
+        A template change only affects projects generated from that point on;
+        an exported signature affects everyone who already installed the package.
+      options:
+        - "No"
+        - "Yes — for projects generated from now on"
+        - "Yes — for the published API of a package"
+    validations:
+      required: true
