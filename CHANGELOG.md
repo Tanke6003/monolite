@@ -11,6 +11,17 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **Thirty-two documented examples that did not compile.** The two worth naming:
+  `docs/{en,es}/testing.md` told readers to
+  `import { runRepositoryContract } from "monolite-data/testing"`, and neither
+  half of that works — the package declares only `"."` in its `exports`, and the
+  function is `runGenericRepositoryContract`, which takes the driver's name
+  first; and `getting-started.md` described entity metadata that had been
+  superseded entirely, then paged with a `page: { number, size }` that
+  `QueryOptions` has never had. The rest were a `toDto` for `toDTO`, four
+  `responses` refs missing the required `description`, module tokens looked for
+  on the framework's `TOKENS`, controllers with no constructor to decorate, and
+  `AuthService` called with an object where it takes positional arguments.
 - **The generated API documentation.** Three separate faults, each of which
   served a 200 while showing nothing useful:
   - The DTO the scaffold writes was a plain TypeScript interface, so `Product`
@@ -81,6 +92,13 @@ a minor release. Pin exact versions.
   `Server.configure()` is `run()` without the listening, so supertest drives the
   Express instance directly and the suite binds no port — it runs beside a `dev`
   server instead of fighting it for 3000.
+- **The documentation's TypeScript is compiled in CI.** `scripts/docs` extracts
+  every block from the guides, both root READMEs and each package's, and puts
+  the self-contained ones through the compiler with `monolite-*` pointed at the
+  sources in this tree — 82 of 88 blocks. The other six are fragments and are
+  parsed rather than padded out. A second, cheaper check keeps the English and
+  Spanish pages structurally in step, since a correction applied to one and not
+  the other is the second way these pages have drifted.
 
 ## [0.1.0] — 2026-08-15
 
