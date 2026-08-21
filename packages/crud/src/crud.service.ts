@@ -1,5 +1,8 @@
 import type { IGenericRepository, OrderByClause, QueryOptions } from "monolite-data";
 import { AppError } from "monolite-core";
+import type { Include } from "./include.query.js";
+import type { MappingProfile } from "./mapper.js";
+import { hydratedFields } from "./mapper.js";
 
 /**
  * A page of results as it leaves over HTTP.
@@ -41,6 +44,32 @@ export interface ListOptions {
   query?: unknown;
 }
 
+/** What a module tells `CrudService` about itself, beyond the two it must. */
+export interface CrudServiceOptions<T, TDto> {
+  /** Default ordering of the listing; without it, the primary key's. */
+  orderBy?: OrderByClause<T>;
+  /**
+   * The relations every DTO this service hands back carries.
+   *
+   * Declared here rather than resolved per verb, which is the whole point: see
+   * `include()`. A field the mapper marks with `hydrated()` and no include fills
+   * is refused at construction time.
+   */
+  includes?: Include<TDto>[];
+}
+
+/**
+ * The third constructor argument used to be the ordering and nothing else, and
+ * a great deal of code passes it that way. Both shapes are accepted, told apart
+ * by the one key an `OrderByClause` always has.
+ */
+function settingsOf<T, TDto>(
+  options?: OrderByClause<T> | CrudServiceOptions<T, TDto>
+): CrudServiceOptions<T, TDto> {
+  if (!options) return {};
+  return "field" in options ? { orderBy: options } : options;
+}
+
 /**
  * A module's CRUD, written once.
  *
@@ -55,12 +84,68 @@ export interface ListOptions {
  * right answer is not to extend this class.
  */
 export abstract class CrudService<T extends object, TDto> implements ICrudService<TDto> {
+  /** Default ordering of the listing; without it, the primary key's. */
+  protected readonly defaultOrderBy?: OrderByClause<T>;
+
+  private readonly includes: Include<TDto>[];
+
   protected constructor(
     protected readonly repository: IGenericRepository<T>,
     protected readonly mapper: EntityMapper<T, TDto>,
-    /** Default ordering of the listing; without it, the primary key's. */
-    protected readonly defaultOrderBy?: OrderByClause<T>
-  ) {}
+    options?: OrderByClause<T> | CrudServiceOptions<T, TDto>
+  ) {
+    const settings = settingsOf<T, TDto>(options);
+
+    this.defaultOrderBy = settings.orderBy;
+    this.includes = settings.includes ?? [];
+
+    this.assertEveryHydratedFieldIsFilled();
+  }
+
+  /**
+   * Refuses to be built when the mapper declares a hydrated field nothing fills.
+   *
+   * At construction time, so it fails while the container is being assembled and
+   * names the field — rather than answering `null` on that property for the life
+   * of the process. It is the same trade the composition root already makes for
+   * `JWT_SECRET`: an arrangement that cannot work should not start.
+   *
+   * Only a mapper built by `createMapper` carries a profile to read, so a
+   * hand-written one is taken on trust. It is a check, not a proof.
+   */
+  private assertEveryHydratedFieldIsFilled(): void {
+    const profile = (this.mapper as { profile?: MappingProfile<T, TDto> }).profile;
+    if (!profile) return;
+
+    const filled = new Set<string>(this.includes.map((one) => one.into as string));
+    const missing = hydratedFields(profile).filter((name) => !filled.has(name));
+    if (missing.length === 0) return;
+
+    const one = missing.length === 1;
+    throw new Error(
+      `[crud] ${this.constructor.name}: ${missing.join(", ")} ${one ? "is" : "are"} ` +
+        `declared with hydrated() and no include fills ${one ? "it" : "them"}.`
+    );
+  }
+
+  /**
+   * Fills in the relations, once per set of DTOs.
+   *
+   * Every verb that hands a DTO out goes through here, and that is the point:
+   * calling `loadRelated` from `list`, `get`, `create` and `update` separately
+   * is four places to forget, and forgetting two of them produces a resource
+   * that carries its relation when read and not when written.
+   *
+   * The includes run concurrently — they are independent queries against
+   * different repositories — and they write into the DTOs the mapper has just
+   * produced, which nothing else holds a reference to yet.
+   */
+  private async hydrate(dtos: TDto[]): Promise<TDto[]> {
+    if (this.includes.length === 0 || dtos.length === 0) return dtos;
+
+    await Promise.all(this.includes.map((one) => one.hydrate(dtos)));
+    return dtos;
+  }
 
   /**
    * The listing filter, built from the route's query.
@@ -105,7 +190,7 @@ export abstract class CrudService<T extends object, TDto> implements ICrudServic
     const paged = await this.repository.getPaged(page, limit, query);
 
     return {
-      data: this.mapper.toDTOList(paged.items),
+      data: await this.hydrate(this.mapper.toDTOList(paged.items)),
       total: paged.total,
       page: paged.page,
       limit: paged.limit,
@@ -115,7 +200,10 @@ export abstract class CrudService<T extends object, TDto> implements ICrudServic
 
   async get(id: number): Promise<TDto | null> {
     const entity = await this.repository.getById(id as never);
-    return entity ? this.mapper.toDTO(entity) : null;
+    if (!entity) return null;
+
+    const [dto] = await this.hydrate([this.mapper.toDTO(entity)]);
+    return dto;
   }
 
   async create(dto: Partial<TDto>): Promise<TDto> {
@@ -127,14 +215,22 @@ export abstract class CrudService<T extends object, TDto> implements ICrudServic
     // or as a 201 with an empty body. Failing here names the real problem.
     if (!created) throw new AppError("The record could not be created", 500);
 
-    return this.mapper.toDTO(created);
+    // Hydrated on the way out of a write as well as a read. A resource that
+    // carries its relation when it was fetched and not when it was just created
+    // is two shapes under one name, and the client that forgot which verb it
+    // used renders a blank.
+    const [hydrated] = await this.hydrate([this.mapper.toDTO(created)]);
+    return hydrated;
   }
 
   async update(id: number, dto: Partial<TDto>): Promise<TDto | null> {
     // Partial on purpose: the mapper skips the keys that did not arrive, so an
     // incomplete PUT does not wipe what nobody asked to change.
     const updated = await this.repository.update(id as never, this.mapper.toPartialEntity(dto));
-    return updated ? this.mapper.toDTO(updated) : null;
+    if (!updated) return null;
+
+    const [hydrated] = await this.hydrate([this.mapper.toDTO(updated)]);
+    return hydrated;
   }
 
   softDelete(id: number): Promise<boolean> {

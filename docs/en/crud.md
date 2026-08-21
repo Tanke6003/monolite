@@ -148,6 +148,64 @@ for the lookup means copying all three, and each copy is a place to drop one.
 
 ---
 
+## Relations
+
+A book carries its author's *name*, not just the key — the key is what a client
+sends back when it edits, the name is what it has to print, and a listing that
+carries only the key costs a request per row.
+
+Declare the relation once, where the service is built:
+
+```ts
+export class BooksService extends CrudService<IBook, BookDTO> {
+  constructor(books: IGenericRepository<IBook>, authors: IGenericRepository<IAuthor>) {
+    super(books, bookMapper, {
+      orderBy: { field: "name", direction: "asc" },
+      includes: [
+        include<BookDTO, IAuthor>({
+          key: "authorId",       // the DTO property holding the foreign key
+          relatedKey: "pkAuthor",
+          repository: authors,
+          into: "author",        // the DTO property the name goes into
+          pick: (author) => author.name,
+        }),
+      ],
+    });
+  }
+}
+```
+
+and mark the field it fills in the mapper, so that nothing writes it back and
+everybody can see where it comes from:
+
+```ts
+const bookMapper = createMapper<IBook, BookDTO>({
+  id: { field: "pkBook", readOnly: true },
+  name: "name",
+  authorId: "authorId",
+  author: hydrated(),
+});
+```
+
+That is the whole of it. `list`, `getOne`, `create` and `update` all resolve it,
+because they all go through one place inside `CrudService` — and **a field
+declared with `hydrated()` that no include fills stops the service from being
+constructed**, naming the field. The mistake this replaces is not hypothetical:
+calling `loadRelated` by hand in each of the four verbs and remembering only two
+produces a resource that carries its author when it was read and not when it was
+written, with a DTO that says the field is there either way.
+
+One batched query per relation per page — `WHERE key IN (…)`, the same thing
+EF Core's `Include()` does — and none at all when every key is null. Soft-deleted
+parents are included on purpose: a book has to keep showing its author after that
+author is withdrawn, or a historical row becomes unreadable.
+
+`loadRelated` is still exported for the cases this does not cover: a relation
+that is not one-to-one with a DTO field, or one resolved inside a verb the module
+wrote itself.
+
+---
+
 ## Transactions
 
 A use case that writes in more than one place needs a transaction. Threading one
@@ -219,6 +277,7 @@ Generated projects ship that index in every engine's schema.
 | `softDelete(id)` | |
 | `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>` |
 | `resolveQuery(query)` | Protected hook, async: completes the query before `buildWhere` reads it |
+| `includes` | Relations resolved on every verb, declared at construction with `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |
 
 The service knows nothing about HTTP: it returns `null`, not a 404, and throws

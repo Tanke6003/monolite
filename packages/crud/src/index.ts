@@ -16,6 +16,7 @@
 // -------------------------------------------------------------  service  ---
 export { CrudService } from "./crud.service.js";
 export type {
+  CrudServiceOptions,
   EntityMapper,
   ICrudService,
   ListOptions,
@@ -34,15 +35,16 @@ export type { CrudOptions, CrudVerb } from "./crud.decorator.js";
 export { lockRow, Transactional, TransactionalService } from "./transactional.js";
 
 // --------------------------------------------------------------  mapping  ---
-export { createMapper } from "./mapper.js";
+export { createMapper, hydrated, hydratedFields, isHydratedField } from "./mapper.js";
 export type {
   ComputedField,
   FieldMapping,
+  HydratedField,
   Mapper,
   MappedField,
   MappingProfile,
 } from "./mapper.js";
 
 // --------------------------------------------------------------  queries  ---
-export { loadRelated } from "./include.query.js";
-export type { IncludeSpec } from "./include.query.js";
+export { include, loadRelated } from "./include.query.js";
+export type { Include, IncludeDefinition, IncludeSpec } from "./include.query.js";
