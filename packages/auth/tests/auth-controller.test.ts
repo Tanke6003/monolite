@@ -1,5 +1,5 @@
 /**
- * The HTTP face of `AuthService`: one route, mounted the way the router mounts
+ * The HTTP face of `AuthBLL`: one route, mounted the way the router mounts
  * it, with the schemas that both validate it and describe it.
  *
  * There is no `POST /auth/refresh` to test. Refreshing honestly means a second,
@@ -12,7 +12,7 @@
 import express, { type Express, type RequestHandler } from "express";
 import { AppError } from "monolite-core";
 import { errorHandler, getControllerMetadata, registerController } from "monolite-http";
-import { AuthController, authResultSchema, loginSchema, type IAuthService } from "monolite-auth";
+import { AuthController, authResultSchema, loginSchema, type IAuthBLL } from "monolite-auth";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 const result = {
@@ -38,11 +38,11 @@ const buildApp = (controller: AuthController): Express => {
 };
 
 describe("AuthController", () => {
-  let auth: jest.Mocked<IAuthService>;
+  let auth: jest.Mocked<IAuthBLL>;
   let served: ServedApp;
 
   beforeEach(async () => {
-    auth = { login: jest.fn().mockResolvedValue(result) } as unknown as jest.Mocked<IAuthService>;
+    auth = { login: jest.fn().mockResolvedValue(result) } as unknown as jest.Mocked<IAuthBLL>;
     served = await serve(buildApp(new AuthController(auth)));
   });
 

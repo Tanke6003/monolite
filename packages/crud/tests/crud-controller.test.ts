@@ -10,7 +10,7 @@ import express, { type Express } from "express";
 import { z } from "zod";
 import type { IRequestContext } from "monolite-core";
 import { ApiController, errorHandler, registerController } from "monolite-http";
-import { Crud, CrudController, type CrudHandler, type ICrudService } from "monolite-crud";
+import { Crud, CrudController, type CrudHandler, type ICrudBLL } from "monolite-crud";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 interface ItemDTO {
@@ -25,7 +25,7 @@ const querySchema = z.object({
 });
 
 /** Reassigned per test; the controllers read it when they are constructed. */
-let service: jest.Mocked<ICrudService<ItemDTO>>;
+let service: jest.Mocked<ICrudBLL<ItemDTO>>;
 
 /** A context that never has anybody in it: these tests are not about identity. */
 const anonymous = { getCurrentUser: () => null } as unknown as IRequestContext;
@@ -73,7 +73,7 @@ describe("CrudController", () => {
       create: jest.fn(),
       update: jest.fn(),
       softDelete: jest.fn(),
-    } as unknown as jest.Mocked<ICrudService<ItemDTO>>;
+    } as unknown as jest.Mocked<ICrudBLL<ItemDTO>>;
 
     served = await serve(buildApp(ItemsController as never, new ItemsController()));
   });
@@ -87,7 +87,7 @@ describe("CrudController", () => {
 
     expect(res.status).toBe(200);
     // The whole query goes down: pagination is what the controller understands,
-    // and anything else is for `CrudService.buildWhere` to interpret.
+    // and anything else is for `CrudBLL.buildWhere` to interpret.
     expect(service.list).toHaveBeenCalledWith(2, 5, {
       withDeleted: undefined,
       query: { page: 2, limit: 5 },
@@ -228,7 +228,7 @@ describe("overriding a verb with CrudHandler", () => {
       create: jest.fn(),
       update: jest.fn(),
       softDelete: jest.fn(),
-    } as unknown as jest.Mocked<ICrudService<ItemDTO>>;
+    } as unknown as jest.Mocked<ICrudBLL<ItemDTO>>;
 
     served = await serve(buildApp(OverriddenController, new OverriddenController()));
   });

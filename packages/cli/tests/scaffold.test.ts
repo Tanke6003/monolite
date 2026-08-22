@@ -383,6 +383,10 @@ describe("the projects `monolite new` writes", () => {
         // Over `product`, the example module's entity: the schematic exists for
         // the case where the generic API has run out on a table you already have.
         generateInto(target, "query", "revenue", "--over", "product");
+        // And a repository for the module generated above, which is the other
+        // half of the escape hatch: a query the generic API does not express,
+        // on an entity this project owns.
+        generateInto(target, "repository", "invoice");
         emitJavaScript(target);
 
         // The generated logger writes a JSON line per request, to stdout and to
@@ -565,7 +569,7 @@ describe("the projects `monolite new` writes", () => {
        * The shape, which is the other half of why this schematic exists.
        *
        * Every `@Crud` module keeps the layering right without anyone thinking
-       * about it, because `CrudController` takes an `ICrudService` and will not
+       * about it, because `CrudController` takes an `ICrudBLL` and will not
        * take anything else. A query is four files written from a blank page, so
        * it is the one place in a monolite project where nothing enforces the
        * rule — and the first time one was written by hand, the rule was broken:
@@ -578,7 +582,7 @@ describe("the projects `monolite new` writes", () => {
 
         const controller = inside("presentation", "controllers", "revenue.controller.ts");
 
-        expect(controller).toContain("REVENUE_TOKENS.service");
+        expect(controller).toContain("REVENUE_TOKENS.bll");
         expect(controller).not.toContain("REVENUE_TOKENS.repository");
 
         // And from the other end: the repository answers rows, and the DTO is
@@ -621,6 +625,44 @@ describe("the projects `monolite new` writes", () => {
         // The query module carries no registration, so it contributes no table —
         // which is the other half of a module being allowed not to own one.
         expect(script).not.toContain("REVENUE");
+      });
+
+      /**
+       * The repository schematic, and the binding it had to insert.
+       *
+       * Unlike a module, this one is written into a file the developer already
+       * owns and has probably edited — the module's `register` function. That
+       * is the situation a generator has to be careful in, so it goes through
+       * a marker of its own and prints the two lines when the marker is gone.
+       */
+      it("registers a generated repository in the module it belongs to", () => {
+        const module = fs.readFileSync(
+          path.join(target, "src", "composition", "modules", "invoice.module.ts"),
+          "utf8"
+        );
+
+        expect(module).toContain("INVOICE_TOKENS.repository, { useClass: InvoicesRepository }");
+        expect(module).toContain('from "../../infrastructure/persistence/invoice.repository"');
+
+        // Inserted above the marker, which stays where the next one goes.
+        expect(module).toContain("// monolite:bindings");
+      });
+
+      /**
+       * And it resolves: a binding the container cannot build is a binding that
+       * compiles and fails on the first request that needs it.
+       */
+      it("builds the generated repository out of the container", async () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { container } = require(path.join(target, "dist", "composition", "container.js")) as {
+          container: { resolve(token: string): { countAll(): Promise<number> } };
+        };
+
+        const repository = container.resolve("IInvoicesRepository");
+
+        // Two rows are seeded in memory, and the fallback path is the one this
+        // driver takes — which is the branch a generated suite actually runs.
+        await expect(repository.countAll()).resolves.toBe(2);
       });
 
       it("serves the example module, seeded", async () => {

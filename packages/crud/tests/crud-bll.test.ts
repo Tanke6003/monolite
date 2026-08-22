@@ -2,7 +2,7 @@ import type { IGenericRepository, QueryOptions } from "monolite-data";
 import { AppError } from "monolite-core";
 import {
   createMapper,
-  CrudService,
+  CrudBLL,
   hydrated,
   include,
   type EntityMapper,
@@ -25,7 +25,7 @@ const mapper: EntityMapper<Item, ItemDTO> = {
   toPartialEntity: (dto) => (dto.name === undefined ? {} : { name: dto.name }),
 };
 
-class ItemsService extends CrudService<Item, ItemDTO> {
+class ItemsBLL extends CrudBLL<Item, ItemDTO> {
   constructor(repository: IGenericRepository<Item>) {
     super(repository, mapper, { field: "pkItem", direction: "asc" });
   }
@@ -35,9 +35,9 @@ type Repository = jest.Mocked<
   Pick<IGenericRepository<Item>, "getPaged" | "getById" | "insert" | "update" | "softDelete">
 >;
 
-describe("CrudService", () => {
+describe("CrudBLL", () => {
   let repository: Repository;
-  let service: ItemsService;
+  let service: ItemsBLL;
 
   beforeEach(() => {
     repository = {
@@ -48,7 +48,7 @@ describe("CrudService", () => {
       softDelete: jest.fn(),
     } as unknown as Repository;
 
-    service = new ItemsService(repository as unknown as IGenericRepository<Item>);
+    service = new ItemsBLL(repository as unknown as IGenericRepository<Item>);
   });
 
   describe("list", () => {
@@ -99,7 +99,7 @@ describe("CrudService", () => {
      * keeps the pagination, the mapping and the ordering for free.
      */
     it("lets a module supply its own filter through buildWhere", async () => {
-      class SearchableService extends CrudService<Item, ItemDTO> {
+      class SearchableBLL extends CrudBLL<Item, ItemDTO> {
         constructor(repo: IGenericRepository<Item>) {
           super(repo, mapper);
         }
@@ -112,7 +112,7 @@ describe("CrudService", () => {
 
       repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
 
-      await new SearchableService(repository as unknown as IGenericRepository<Item>).list(1, 10, {
+      await new SearchableBLL(repository as unknown as IGenericRepository<Item>).list(1, 10, {
         query: { search: "an" },
       });
 
@@ -131,7 +131,7 @@ describe("CrudService", () => {
     it("lets a module complete the query asynchronously before buildWhere sees it", async () => {
       const lookup = jest.fn().mockResolvedValue([7, 9]);
 
-      class TwoStepService extends CrudService<Item, ItemDTO> {
+      class TwoStepBLL extends CrudBLL<Item, ItemDTO> {
         constructor(repo: IGenericRepository<Item>) {
           super(repo, mapper, { field: "pkItem", direction: "asc" });
         }
@@ -149,7 +149,7 @@ describe("CrudService", () => {
 
       repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
 
-      await new TwoStepService(repository as unknown as IGenericRepository<Item>).list(2, 25, {
+      await new TwoStepBLL(repository as unknown as IGenericRepository<Item>).list(2, 25, {
         query: { owner: "ana" },
         withDeleted: true,
       });
@@ -172,7 +172,7 @@ describe("CrudService", () => {
     it("hands buildWhere the untouched query when nobody overrides resolveQuery", async () => {
       const seen: unknown[] = [];
 
-      class PlainService extends CrudService<Item, ItemDTO> {
+      class PlainBLL extends CrudBLL<Item, ItemDTO> {
         constructor(repo: IGenericRepository<Item>) {
           super(repo, mapper);
         }
@@ -186,7 +186,7 @@ describe("CrudService", () => {
       repository.getPaged.mockResolvedValue({ items: [], total: 0, page: 1, limit: 10, pages: 0 });
 
       const query = { page: 1, limit: 10 };
-      await new PlainService(repository as unknown as IGenericRepository<Item>).list(1, 10, {
+      await new PlainBLL(repository as unknown as IGenericRepository<Item>).list(1, 10, {
         query,
       });
 
@@ -291,14 +291,14 @@ const bookMapper = createMapper<BookRow, BookDTO>({
  * produces a resource that carries its author when it was read and not when it
  * was written.
  */
-describe("CrudService with a declared include", () => {
+describe("CrudBLL with a declared include", () => {
   let books: jest.Mocked<Pick<IGenericRepository<BookRow>, "getPaged" | "getById" | "insert" | "update">>;
   let authors: jest.Mocked<Pick<IGenericRepository<Author>, "find">>;
-  let service: CrudService<BookRow, BookDTO>;
+  let service: CrudBLL<BookRow, BookDTO>;
 
   const ROW: BookRow = { pkBook: 1, title: "A Wizard of Earthsea", authorId: 7 };
 
-  class BooksService extends CrudService<BookRow, BookDTO> {
+  class BooksBLL extends CrudBLL<BookRow, BookDTO> {
     constructor(store: IGenericRepository<BookRow>, related: IGenericRepository<Author>) {
       super(store, bookMapper, {
         orderBy: { field: "title", direction: "asc" },
@@ -325,7 +325,7 @@ describe("CrudService with a declared include", () => {
 
     authors = { find: jest.fn().mockResolvedValue([{ pkAuthor: 7, name: "Ursula K. Le Guin" }]) } as unknown as typeof authors;
 
-    service = new BooksService(
+    service = new BooksBLL(
       books as unknown as IGenericRepository<BookRow>,
       authors as unknown as IGenericRepository<Author>
     );
@@ -406,7 +406,7 @@ describe("CrudService with a declared include", () => {
    * has to be impossible to ship, not merely discouraged.
    */
   it("refuses to be constructed when a hydrated field has nothing to fill it", () => {
-    class Forgetful extends CrudService<BookRow, BookDTO> {
+    class Forgetful extends CrudBLL<BookRow, BookDTO> {
       constructor(store: IGenericRepository<BookRow>) {
         super(store, bookMapper, { orderBy: { field: "title", direction: "asc" } });
       }
@@ -429,7 +429,7 @@ describe("CrudService with a declared include", () => {
       authorId: "authorId",
     });
 
-    class Plain extends CrudService<BookRow, Omit<BookDTO, "author">> {
+    class Plain extends CrudBLL<BookRow, Omit<BookDTO, "author">> {
       constructor(store: IGenericRepository<BookRow>) {
         super(store, plainMapper, { field: "title", direction: "desc" });
       }

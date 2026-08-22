@@ -4,7 +4,7 @@
  * Every rejection here is an `AppError`, never a raw `jsonwebtoken` error. The
  * kernel's mapper does know how to read those, but letting them travel raw
  * would tie the shape of a 401 to whichever library happens to sit behind
- * `ITokenService` — an application with opaque tokens would answer differently
+ * `ITokenBLL` — an application with opaque tokens would answer differently
  * for the same reason. The expired/invalid distinction survives the
  * translation, because clients branch on it: expired means "renew", invalid
  * means "sign in again".
@@ -13,7 +13,7 @@ import type { NextFunction, Request, Response } from "express";
 import { AppError, AsyncRequestContext, type CurrentUser } from "monolite-core";
 import { errorHandler } from "monolite-http";
 import {
-  JwtTokenService,
+  JwtTokenBLL,
   authenticatedUser,
   requireAuth,
   requireRoles,
@@ -21,7 +21,7 @@ import {
 } from "monolite-auth";
 
 const SECRET = "unit-test-secret";
-const tokens = new JwtTokenService({ secret: SECRET });
+const tokens = new JwtTokenBLL({ secret: SECRET });
 
 const tokenFor = (claims: object, expiresIn?: string | number): string =>
   tokens.sign(claims, expiresIn).token;
@@ -144,7 +144,7 @@ describe("requireAuth", () => {
     });
 
     it("answers 401 for a token signed with another secret", () => {
-      const foreign = new JwtTokenService({ secret: "someone-else" }).sign({ sub: "7" }).token;
+      const foreign = new JwtTokenBLL({ secret: "someone-else" }).sign({ sub: "7" }).token;
 
       expect(guard({ authorization: `Bearer ${foreign}` }).error).toMatchObject({
         code: "INVALID_TOKEN",

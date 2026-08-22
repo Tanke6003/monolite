@@ -12,7 +12,7 @@ configuration, not code.
 ## The shape of it
 
 ```
-IGenericRepository<T>              ← what services see. Identical on every engine.
+IGenericRepository<T>              ← what BLLs see. Identical on every engine.
         │
         ├── SqlGenericRepository     ── SqlDialect ── oracle · mssql · postgres · mysql
         ├── MongoGenericRepository
@@ -22,7 +22,7 @@ IGenericRepository<T>              ← what services see. Identical on every eng
             └── ISqlDbPlugin         ← + execute statements and open transactions
 ```
 
-**The uniformity lives at the top.** Services see `IGenericRepository<T>`, and there
+**The uniformity lives at the top.** BLLs see `IGenericRepository<T>`, and there
 every engine behaves the same. The connector contract underneath is deliberately
 thinner: `IDbPlugin` covers only `engine`, `authenticate` and `close`, because that
 is all a relational store and a document store genuinely share. Pretending to unify
@@ -288,7 +288,7 @@ metadata. Silently doing nothing would be worse.
 **Not everything is wrapped in a transaction.** A single statement is already
 atomic and travels with auto-commit; wrapping it would only add a round trip.
 
-A transaction is opened in two cases, and the boundary is the service, not the
+A transaction is opened in two cases, and the boundary is the BLL, not the
 repository:
 
 1. **The use case writes in more than one place** and a half-finished result would
@@ -357,10 +357,10 @@ columns that must not collide.
 
 ## Where the generic API stops
 
-### Relations are composed in the service
+### Relations are composed in the BLL
 
 A repository knows exactly one table. Composing across aggregates is a business
-decision, so it happens in the service layer — the equivalent of EF Core's
+decision, so it happens in the business layer — the equivalent of EF Core's
 `Include()`. `loadRelated` resolves an N:1 relation in **one batched query**
 (`WHERE key IN (…)`), not one per row:
 
@@ -407,7 +407,7 @@ find by reading two files. A relation pointing at an entity nobody registered
 fails while the persistence layer is being assembled, naming both sides — not
 later, when something follows it, because nothing ever does.
 
-The include a service declares still names its own keys. The metadata knows the
+The include a BLL declares still names its own keys. The metadata knows the
 *entity* property; an include needs the *DTO* property, and only the mapper knows
 how those two correspond.
 

@@ -9,21 +9,21 @@
  * environment, so the class no longer decides where configuration comes from.
  */
 import jwt from "jsonwebtoken";
-import { JwtTokenService } from "monolite-auth";
+import { JwtTokenBLL } from "monolite-auth";
 
 const SECRET = "unit-test-secret";
 
-describe("JwtTokenService", () => {
-  let tokens: JwtTokenService;
+describe("JwtTokenBLL", () => {
+  let tokens: JwtTokenBLL;
 
   beforeEach(() => {
-    tokens = new JwtTokenService({ secret: SECRET });
+    tokens = new JwtTokenBLL({ secret: SECRET });
   });
 
   it("refuses to be built without a secret", () => {
     // A default secret is a secret everybody knows, and the day it reaches
     // production every token in the world is forgeable. Failing here is louder.
-    expect(() => new JwtTokenService({ secret: "" })).toThrow(/No secret was provided/);
+    expect(() => new JwtTokenBLL({ secret: "" })).toThrow(/No secret was provided/);
   });
 
   it("signs a token", () => {
@@ -57,11 +57,11 @@ describe("JwtTokenService", () => {
     });
 
     it("defaults to an hour", () => {
-      expect(new JwtTokenService({ secret: SECRET }).sign({ a: 1 }).expiresIn).toBe(3600);
+      expect(new JwtTokenBLL({ secret: SECRET }).sign({ a: 1 }).expiresIn).toBe(3600);
     });
 
     it("honours the service's configured default", () => {
-      expect(new JwtTokenService({ secret: SECRET, expiresIn: "15m" }).sign({ a: 1 }).expiresIn).toBe(
+      expect(new JwtTokenBLL({ secret: SECRET, expiresIn: "15m" }).sign({ a: 1 }).expiresIn).toBe(
         900
       );
     });
@@ -84,7 +84,7 @@ describe("JwtTokenService", () => {
     });
 
     it("throws for a token signed with another secret", () => {
-      const foreign = new JwtTokenService({ secret: "someone-elses-secret" }).sign({ a: 1 }).token;
+      const foreign = new JwtTokenBLL({ secret: "someone-elses-secret" }).sign({ a: 1 }).token;
 
       expect(() => tokens.verify(foreign)).toThrow(/invalid signature/);
     });
@@ -111,7 +111,7 @@ describe("JwtTokenService", () => {
 
   describe("issuer and audience", () => {
     const issued = () =>
-      new JwtTokenService({
+      new JwtTokenBLL({
         secret: SECRET,
         issuer: "monolite",
         audience: ["web"],
@@ -129,7 +129,7 @@ describe("JwtTokenService", () => {
      * would carry the wrong value.
      */
     it("demands them when verifying", () => {
-      const fromElsewhere = new JwtTokenService({
+      const fromElsewhere = new JwtTokenBLL({
         secret: SECRET,
         issuer: "another-service",
         audience: ["web"],
@@ -141,7 +141,7 @@ describe("JwtTokenService", () => {
     it("refuses a token that carries neither", () => {
       // Signed with the right secret and still refused: the claims are part of
       // what makes the token this service's, not decoration.
-      const plain = new JwtTokenService({ secret: SECRET }).sign({ a: 1 }).token;
+      const plain = new JwtTokenBLL({ secret: SECRET }).sign({ a: 1 }).token;
 
       expect(() => issued().verify(plain)).toThrow(/jwt (issuer|audience) invalid/);
     });

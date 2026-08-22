@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { IRequestContext } from "monolite-core";
 import { AppError } from "monolite-core";
 import { BaseController, parseId } from "monolite-http";
-import type { ICrudService, ListOptions } from "./crud.service.js";
+import type { ICrudBLL, ListOptions } from "./crud.bll.js";
 
 /**
  * One of the five handlers, and the type an override should carry.
@@ -78,7 +78,7 @@ function idParam(value: string | string[] | undefined): string | undefined {
  */
 export abstract class CrudController extends BaseController implements ICrudController {
   protected constructor(
-    private readonly service: ICrudService<unknown>,
+    private readonly service: ICrudBLL<unknown>,
     context: IRequestContext,
     /** The resource's name in the messages: "no user found with that id". */
     protected readonly resource: string
@@ -91,7 +91,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
    *
    * The whole query goes down to the service: pagination is what this
    * controller understands, and the rest — a search, a filter of its own — is
-   * interpreted by `CrudService.buildWhere`, which is where that decision
+   * interpreted by `CrudBLL.buildWhere`, which is where that decision
    * belongs.
    */
   private paging(req: Request): { page: number; limit: number; options: ListOptions } {

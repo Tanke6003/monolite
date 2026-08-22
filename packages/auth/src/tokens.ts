@@ -8,22 +8,22 @@
  * its decorator, so the router can only find whoever serves it if both sides
  * spell it the same way.
  *
- * Key and value are identical on purpose, and `ITokenService` deliberately
+ * Key and value are identical on purpose, and `ITokenBLL` deliberately
  * matches the entry in `monolite-di`'s table. The two packages do not import
  * each other; they agree on a name, which is all a token is. An application
- * running both registers the token service once and both tables find it.
+ * running both registers the token BLL once and both tables find it.
  */
 export const AUTH_TOKENS = {
   /**
    * Issues and verifies access tokens. Same string as `monolite-di`'s
-   * `TOKENS.ITokenService`, so the two never end up with two registrations of
+   * `TOKENS.ITokenBLL`, so the two never end up with two registrations of
    * the same thing.
    */
-  ITokenService: "ITokenService",
+  ITokenBLL: "ITokenBLL",
   IPasswordHasher: "IPasswordHasher",
   /** Where the login looks users up. Always the application's own class. */
   IUserProvider: "IUserProvider",
-  IAuthService: "IAuthService",
+  IAuthBLL: "IAuthBLL",
   /** Token `AuthController` declares, and the one the router resolves it by. */
   IAuthController: "IAuthController",
 } as const;

@@ -1,5 +1,5 @@
 import { inject, injectable } from "tsyringe";
-import { createMapper, CrudService } from "monolite-crud";
+import { createMapper, CrudBLL } from "monolite-crud";
 import type { IGenericRepository } from "monolite-data";
 import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import type { __dtoName__ } from "../dtos/__entityKebab__.dto";
@@ -31,7 +31,7 @@ const __mapperName__ = createMapper<I__entityName__, __dtoName__>({
  * __entityName__: a CRUD with no rules of its own, so it writes none.
  *
  * Paging, mapping, inserting, updating by parts and soft deleting are identical
- * in every flat module and live in `CrudService`. All this class contributes is
+ * in every flat module and live in `CrudBLL`. All this class contributes is
  * which repository and which mapper it works with, and how the listing is
  * ordered.
  *
@@ -42,7 +42,7 @@ const __mapperName__ = createMapper<I__entityName__, __dtoName__>({
  * stop extending this class.
  */
 @injectable()
-export class __entityName__Service extends CrudService<I__entityName__, __dtoName__> {
+export class __entityName__BLL extends CrudBLL<I__entityName__, __dtoName__> {
   constructor(
     @inject(__entityUpper___TOKENS.store) store: IGenericRepository<I__entityName__>
   ) {

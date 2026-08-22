@@ -1,7 +1,7 @@
 import jwt, { JsonWebTokenError, type JwtPayload, type SignOptions } from "jsonwebtoken";
-import type { ITokenService, SignedToken, TokenClaims } from "./contracts.js";
+import type { ITokenBLL, SignedToken, TokenClaims } from "./contracts.js";
 
-export interface JwtTokenServiceOptions {
+export interface JwtTokenBLLOptions {
   /**
    * The signing secret. There is no default on purpose: a default secret is a
    * secret everybody knows, and the day it reaches production every token in
@@ -47,25 +47,25 @@ function lifetimeOf(token: string): number {
 }
 
 /**
- * JWT-backed token service.
+ * JWT-backed token BLL.
  *
  * This is the port of the old `JwtPlugin`, minus its two extra jobs. The plugin
  * also owned an Express middleware and reached into the request context, which
  * meant the one class that knows how to sign a token could not be constructed
  * without a web framework around it. Here signing and verifying are all that is
- * left; guarding a route is `requireAuth`'s business, and it takes this service
+ * left; guarding a route is `requireAuth`'s business, and it takes this BLL
  * as a parameter.
  */
-export class JwtTokenService implements ITokenService {
+export class JwtTokenBLL implements ITokenBLL {
   private readonly secret: string;
   private readonly defaultExpiresIn: SignOptions["expiresIn"];
   private readonly issuer?: string;
   private readonly audience?: string | [string, ...string[]];
 
-  constructor(options: JwtTokenServiceOptions) {
+  constructor(options: JwtTokenBLLOptions) {
     if (!options.secret) {
       throw new Error(
-        "[JwtTokenService] No secret was provided. Refusing to sign tokens with an insecure " +
+        "[JwtTokenBLL] No secret was provided. Refusing to sign tokens with an insecure " +
           "default."
       );
     }

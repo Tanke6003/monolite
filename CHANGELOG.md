@@ -9,7 +9,61 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Changed
+
+- **The application layer is called the BLL now, everywhere.** `CrudService` is
+  `CrudBLL`, `ICrudService` is `ICrudBLL`, `CrudServiceOptions` is
+  `CrudBLLOptions`, `TransactionalService` is `TransactionalBLL`, and in
+  `monolite-auth` `AuthService`, `IAuthService`, `AuthServiceOptions`,
+  `ITokenService`, `JwtTokenService` and `JwtTokenServiceOptions` follow the
+  same rule. Generated projects get `application/bll/<name>.bll.ts`, a
+  `<ENTITY>_TOKENS.bll` key, and `monolite generate bll`.
+
+  **This is a breaking change** and it is a rename, nothing else: no signature,
+  no behaviour and no wiring moved. Upgrading is a find-and-replace of the names
+  above plus the directory. `monolite generate service` still resolves, to
+  `bll`, and says what it resolved to — an unrecognised subcommand is the worse
+  answer when the thing it asks for still exists.
+
+  Three uses of the word survive untouched because they are not the layer:
+  `SERVICE_NAME` and the logger field built from it, docker-compose's
+  `services:`, and Oracle's own term for a database.
+
+### Added
+
+- **`monolite generate repository <entity>`.** An existing entity's store plus
+  its own queries, on `executeRaw` — the escape hatch for the entity you *own*,
+  where `generate query` is the one for an answer computed across several. It
+  extends `BaseModuleRepository`, so the whole contract is forwarded and every
+  call is wrapped in a guard that logs the driver's error and re-throws a
+  neutral one.
+
+  It is deliberately not part of `generate module`: `defineEntity` already
+  produces a working repository, and a class that forwards seventeen methods and
+  adds nothing is a layer for the sake of having one.
+
+  The binding it needs goes into a file you already own, so it goes through a
+  marker of its own — `// monolite:bindings`, which `generate module` now
+  writes into every module's `register` function. No marker, no edit: the two
+  lines are printed instead. The token was already declared by `generate
+  module` and simply goes unbound until there is something to bind to it, which
+  saves the generator from reopening the token table.
+
 ### Fixed
+
+- **The generated project's README described a layout it had not had since
+  0.5.0.** It told the reader the CLI prints three lines to add by hand in
+  `composition/entities.ts`, `composition/container.ts` and
+  `presentation/routes.ts` — a file that no longer exists and a workflow the
+  module descriptor replaced with one line the generator inserts itself. Its
+  directory tree listed `entities.ts` too, and the module the generator writes
+  still told you to add its registration there.
+- **The package documentation was missing everything shipped in 0.6.0 and
+  0.7.0.** `transactionAware`, `IRawQueryable` / `asRawQueryable`,
+  `RelationMetadata` / `IndexMetadata`, the whole schema-generation surface,
+  `MonoliteModule` / `entitiesOf` / `registerModules` and the fact that
+  `registerPersistence` wraps the stores it binds are all in the READMEs now,
+  with the guides they belong to linked from them.
 
 - **The scaffold suite could fail on a mistake the previous run made.** It
   generated into one fixed directory and removed it on the way out, and on

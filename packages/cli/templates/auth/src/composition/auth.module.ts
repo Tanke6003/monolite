@@ -1,11 +1,11 @@
 import {
   AUTH_TOKENS,
   AuthController,
-  AuthService,
-  JwtTokenService,
+  AuthBLL,
+  JwtTokenBLL,
   ScryptPasswordHasher,
 } from "monolite-auth";
-import type { IAuthService, IPasswordHasher, ITokenService, IUserProvider } from "monolite-auth";
+import type { IAuthBLL, IPasswordHasher, ITokenBLL, IUserProvider } from "monolite-auth";
 import { registerInstance, registerSingleton } from "monolite-di";
 import type { DependencyContainer } from "monolite-di";
 import { buildAuthRateLimiter } from "monolite-http";
@@ -36,7 +36,7 @@ export function registerAuth(container: DependencyContainer): void {
   // The constructor refuses an empty secret rather than signing with a default,
   // so this is where a misconfigured deployment stops — at startup, in the boot
   // log, instead of at the first forged token.
-  const tokens: ITokenService = new JwtTokenService({
+  const tokens: ITokenBLL = new JwtTokenBLL({
     secret: requireEnv("JWT_SECRET"),
     // Seconds. `jsonwebtoken` also takes "1h" and "7d", but the variable is
     // read as a number here so a typo is a startup failure rather than a
@@ -44,11 +44,11 @@ export function registerAuth(container: DependencyContainer): void {
     expiresIn: toInt(readEnv("JWT_EXPIRES_IN"), 3600, 1),
   });
   // Registered under the string both `monolite-auth` and `monolite-di` use,
-  // so whatever asks for a token service finds this one.
-  registerInstance<ITokenService>(container, AUTH_TOKENS.ITokenService, tokens);
+  // so whatever asks for a token BLL finds this one.
+  registerInstance<ITokenBLL>(container, AUTH_TOKENS.ITokenBLL, tokens);
 
-  const auth: IAuthService = new AuthService(container.resolve(AUTH_TOKENS.IUserProvider), hasher, tokens);
-  registerInstance<IAuthService>(container, AUTH_TOKENS.IAuthService, auth);
+  const auth: IAuthBLL = new AuthBLL(container.resolve(AUTH_TOKENS.IUserProvider), hasher, tokens);
+  registerInstance<IAuthBLL>(container, AUTH_TOKENS.IAuthBLL, auth);
 
   // The controller declares this token in its own decorator, which is how the
   // router —which mounts every decorated controller it finds— knows who serves

@@ -9,7 +9,7 @@ import type { ITransactionContext, IUnitOfWork } from "monolite-data";
 
 /**
  * What the decorator needs to find on the service. Extending
- * `TransactionalService` satisfies it.
+ * `TransactionalBLL` satisfies it.
  */
 interface TransactionalHost {
   readonly unitOfWork: IUnitOfWork;
@@ -21,7 +21,7 @@ interface TransactionalHost {
  *
  * It stands on its own, and not only as a method of the base class, because
  * TypeScript has no multiple inheritance: a service that already extends
- * `CrudService` cannot extend `TransactionalService` as well, and it still
+ * `CrudBLL` cannot extend `TransactionalBLL` as well, and it still
  * needs to lock.
  *
  * **It must be the first statement of the method.** MySQL fixes the snapshot on
@@ -52,7 +52,7 @@ export function lockRow(
  * `lockRow`: without it the lock would be left without the scope it comes from,
  * which was the substantive objection against the decorator in the first place.
  */
-export abstract class TransactionalService {
+export abstract class TransactionalBLL {
   protected constructor(
     readonly unitOfWork: IUnitOfWork,
     readonly transactions: ITransactionContext
@@ -94,7 +94,7 @@ export function Transactional() {
         return Promise.reject(
           new Error(
             `[Transactional] ${propertyKey} is decorated but its class exposes no unit of ` +
-              "work. Extend TransactionalService."
+              "work. Extend TransactionalBLL."
           )
         );
       }

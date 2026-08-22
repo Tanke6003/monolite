@@ -11,7 +11,7 @@ import { hydratedFields } from "./mapper.js";
  * rows `items` because it knows nothing about HTTP, and the response body has
  * called them `data` since the first endpoint. Keeping the two shapes apart
  * means the wire format cannot drift just because the data layer renames a
- * field, and the translation happens in exactly one place — `CrudService.list`.
+ * field, and the translation happens in exactly one place — `CrudBLL.list`.
  */
 export interface PaginatedDTO<T> {
   data: T[];
@@ -30,7 +30,7 @@ export interface EntityMapper<T, TDto> {
 }
 
 /** The contract `CrudController` consumes. */
-export interface ICrudService<TDto> {
+export interface ICrudBLL<TDto> {
   list(page: number, limit: number, options?: ListOptions): Promise<PaginatedDTO<TDto>>;
   get(id: number): Promise<TDto | null>;
   create(dto: Partial<TDto>): Promise<TDto>;
@@ -44,8 +44,8 @@ export interface ListOptions {
   query?: unknown;
 }
 
-/** What a module tells `CrudService` about itself, beyond the two it must. */
-export interface CrudServiceOptions<T, TDto> {
+/** What a module tells `CrudBLL` about itself, beyond the two it must. */
+export interface CrudBLLOptions<T, TDto> {
   /** Default ordering of the listing; without it, the primary key's. */
   orderBy?: OrderByClause<T>;
   /**
@@ -64,8 +64,8 @@ export interface CrudServiceOptions<T, TDto> {
  * by the one key an `OrderByClause` always has.
  */
 function settingsOf<T, TDto>(
-  options?: OrderByClause<T> | CrudServiceOptions<T, TDto>
-): CrudServiceOptions<T, TDto> {
+  options?: OrderByClause<T> | CrudBLLOptions<T, TDto>
+): CrudBLLOptions<T, TDto> {
   if (!options) return {};
   return "field" in options ? { orderBy: options } : options;
 }
@@ -83,7 +83,7 @@ function settingsOf<T, TDto>(
  * and keeps the rest. If a service had to contort itself to fit in here, the
  * right answer is not to extend this class.
  */
-export abstract class CrudService<T extends object, TDto> implements ICrudService<TDto> {
+export abstract class CrudBLL<T extends object, TDto> implements ICrudBLL<TDto> {
   /** Default ordering of the listing; without it, the primary key's. */
   protected readonly defaultOrderBy?: OrderByClause<T>;
 
@@ -92,7 +92,7 @@ export abstract class CrudService<T extends object, TDto> implements ICrudServic
   protected constructor(
     protected readonly repository: IGenericRepository<T>,
     protected readonly mapper: EntityMapper<T, TDto>,
-    options?: OrderByClause<T> | CrudServiceOptions<T, TDto>
+    options?: OrderByClause<T> | CrudBLLOptions<T, TDto>
   ) {
     const settings = settingsOf<T, TDto>(options);
 

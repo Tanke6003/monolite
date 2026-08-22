@@ -4,7 +4,7 @@ The kernel of the monolite toolkit. Every other package depends on it, which is
 exactly why it depends on nothing: no Express, no database driver, no DI
 container, no runtime dependencies at all. Anything added here becomes
 mandatory for every package downstream, so only the shared vocabulary lives in
-it — the error type services throw, the mapper that turns anything thrown into
+it — the error type BLLs throw, the mapper that turns anything thrown into
 an HTTP-shaped answer, the contracts other packages implement, and the two
 implementations that need nothing beyond Node's standard library.
 
@@ -16,7 +16,7 @@ Requires Node 20 or newer.
 
 | Export | Kind | What it is |
 | --- | --- | --- |
-| `AppError` | class | The error services throw on purpose. Carries an HTTP status, a stable `code` for the client to branch on, optional field-level `errors`, and an ES2022 `cause` so the original failure is never lost. |
+| `AppError` | class | The error BLLs throw on purpose. Carries an HTTP status, a stable `code` for the client to branch on, optional field-level `errors`, and an ES2022 `cause` so the original failure is never lost. |
 | `AppErrorOptions` | type | `code`, `errors` and `cause` for the `AppError` constructor. |
 | `ErrorDetail` | type | A single `{ field, message }` validation detail. |
 | `normalizeError` | function | Turns anything thrown — `AppError`, a Zod failure, a JWT error, a body-parser error, a raw driver error — into a `NormalizedError`. |

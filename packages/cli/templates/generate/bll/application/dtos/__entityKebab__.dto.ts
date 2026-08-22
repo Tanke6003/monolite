@@ -6,7 +6,7 @@ import { z } from "zod";
  *
  * The DTO is not the entity: it omits the primary-key column name, the
  * soft-delete flag and the audit columns, so none of them can be set from a
- * request body. The mapping between the two lives in the service.
+ * request body. The mapping between the two lives in the BLL.
  *
  * The Zod schemas are declared once and used twice — the route validates with
  * them and the OpenAPI document is derived from them — which is the whole point

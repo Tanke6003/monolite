@@ -12,7 +12,7 @@ elegir entre ellos es configuración, no código.
 ## La forma que tiene
 
 ```
-IGenericRepository<T>              ← lo que ven los servicios. Idéntico en todos los motores.
+IGenericRepository<T>              ← lo que ven las BLL. Idéntico en todos los motores.
         │
         ├── SqlGenericRepository     ── SqlDialect ── oracle · mssql · postgres · mysql
         ├── MongoGenericRepository
@@ -22,7 +22,7 @@ IGenericRepository<T>              ← lo que ven los servicios. Idéntico en to
             └── ISqlDbPlugin         ← + ejecutar sentencias y abrir transacciones
 ```
 
-**La uniformidad vive arriba.** Los servicios ven `IGenericRepository<T>`, y ahí
+**La uniformidad vive arriba.** Las BLL ven `IGenericRepository<T>`, y ahí
 todos los motores se comportan igual. El contrato del conector que hay debajo es
 más fino a propósito: `IDbPlugin` cubre sólo `engine`, `authenticate` y `close`,
 porque eso es todo lo que un almacén relacional y uno documental comparten de
@@ -295,7 +295,7 @@ los metadatos. No hacer nada en silencio sería peor.
 **No todo va envuelto en una transacción.** Una sola sentencia ya es atómica y
 viaja con auto-commit; envolverla sólo añadiría un viaje de ida y vuelta.
 
-Se abre una transacción en dos casos, y la frontera es el servicio, no el
+Se abre una transacción en dos casos, y la frontera es la BLL, no el
 repositorio:
 
 1. **El caso de uso escribe en más de un sitio** y un resultado a medias sería
@@ -365,10 +365,10 @@ instancia corriendo, la garantía tiene que estar en la base de datos — un ín
 
 ## Dónde se detiene la API genérica
 
-### Las relaciones se componen en el servicio
+### Las relaciones se componen en la BLL
 
 Un repositorio conoce exactamente una tabla. Componer entre agregados es una
-decisión de negocio, así que ocurre en la capa de servicio — el equivalente del
+decisión de negocio, así que ocurre en la capa de negocio — el equivalente del
 `Include()` de EF Core. `loadRelated` resuelve una relación N:1 en **una sola
 consulta por lotes** (`WHERE key IN (…)`), no una por fila:
 
@@ -416,7 +416,7 @@ que ir a buscar leyendo dos ficheros. Una relación que apunta a una entidad que
 nadie registró falla mientras se ensambla la capa de persistencia, nombrando
 ambos lados — no más tarde, cuando algo la siga, porque nunca la sigue nadie.
 
-El include que declara un servicio sigue nombrando sus propias claves. La
+El include que declara una BLL sigue nombrando sus propias claves. La
 metadata conoce la propiedad de la *entidad*; un include necesita la del *DTO*, y
 sólo el mapper sabe cómo se corresponden esas dos.
 

@@ -13,7 +13,7 @@ document. You do not write them separately, and they cannot disagree.
 ```ts
 @ApiController("/users", { tag: "Users", token: USER_TOKENS.controller })
 export class UsersController extends BaseController {
-  constructor(private readonly users: IUsersService, context: IRequestContext) {
+  constructor(private readonly users: IUsersBLL, context: IRequestContext) {
     super(context);
   }
 
@@ -198,7 +198,7 @@ Nothing else: no route file, no documentation file, no module table.
 ## What this does not solve
 
 The controller still has a `try/catch` and a `Number(req.params.id)` in every
-handler, and in a module without rules the service is still a pass-through to the
+handler, and in a module without rules the BLL is still a pass-through to the
 repository. That is a different kind of repetition, and it is attacked by a generic
 CRUD layer on top of the generic repository — see [crud.md](crud.md) — not by more
 decorators.

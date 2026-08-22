@@ -94,3 +94,68 @@ export function wireModule(root: string, sourceRoot: string, name: string): Wiri
 
   return { wired: true, lines, file: relative };
 }
+
+export const BINDINGS_MARKER = "// monolite:bindings";
+
+/**
+ * Registers a generated repository in its module's `register` function.
+ *
+ * The same trick as `wireModule` and for the same reason: the target is one
+ * line above a marker the scaffold put there, which is small enough to insert
+ * and to check. A repository is generated *after* its module, so the file it
+ * belongs in already exists and is one the developer owns — which is exactly
+ * the situation a generator has to be careful in, and exactly what the marker
+ * makes safe. Take the marker away and it goes back to printing.
+ *
+ * Two lines rather than one, because the class has to be imported before it can
+ * be bound; they are inserted at the two places a person would have put them.
+ */
+export function wireBinding(
+  root: string,
+  sourceRoot: string,
+  moduleKebab: string,
+  binding: { importLine: string; register: string; constant: string }
+): WiringResult {
+  const relative = path.join(
+    path.relative(root, sourceRoot) || ".",
+    "composition",
+    "modules",
+    `${moduleKebab}.module.ts`
+  );
+  const absolute = path.join(sourceRoot, "composition", "modules", `${moduleKebab}.module.ts`);
+  const lines = [binding.importLine, binding.register.trim()];
+
+  if (!fs.existsSync(absolute)) {
+    return { wired: false, lines, file: relative, reason: "there is no module for it yet" };
+  }
+
+  const source = fs.readFileSync(absolute, "utf8");
+
+  if (source.includes(binding.constant)) {
+    return { wired: false, lines, file: relative, reason: "it is already registered" };
+  }
+
+  if (!source.includes(BINDINGS_MARKER)) {
+    return {
+      wired: false,
+      lines,
+      file: relative,
+      reason: `it no longer has its ${BINDINGS_MARKER} marker`,
+    };
+  }
+
+  const rows = source.split("\n");
+
+  const markerAt = rows.findIndex((row) => row.trim() === BINDINGS_MARKER);
+  rows.splice(markerAt, 0, binding.register);
+
+  const lastImport = rows.reduce(
+    (found, row, index) => (row.startsWith("import ") ? index : found),
+    -1
+  );
+  rows.splice(lastImport + 1, 0, binding.importLine);
+
+  fs.writeFileSync(absolute, rows.join("\n"), "utf8");
+
+  return { wired: true, lines, file: relative };
+}

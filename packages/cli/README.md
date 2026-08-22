@@ -68,7 +68,7 @@ rather than hanging on a question nobody is there to answer.
 | 4 | Database family → engine | `--database` | See the table below. This is the single biggest branch in the output |
 | 5 | Host, port, database, user | `--db-host`, `--db-port`, `--db-name`, `--db-user` | Defaults in `.env.example`, defaults in `data-source.ts`, and the published port in `docker-compose.yml`. Only asked for a real engine |
 | 6 | Authentication | `--auth` / `--no-auth` | Adds `monolite-auth` to the dependencies, `src/auth/seed-user.provider.ts`, the `registerAuth` call in the composition root, the guard in `routes.ts`, and `JWT_SECRET` / `JWT_EXPIRES_IN` in `.env.example`. Default: no |
-| 7 | Example CRUD module | `--example` / `--no-example` | Adds a `product` module — entity, table mapping, DTO with validation, service, controller, tokens and registration — plus its import in `routes.ts` and its `registerProducts()` in the container. Default: yes |
+| 7 | Example CRUD module | `--example` / `--no-example` | Adds a `product` module — entity, table mapping, DTO with validation, BLL, controller, tokens and registration — plus its import in `routes.ts` and its `registerProducts()` in the container. Default: yes |
 | 8 | API prefix | `--api-prefix` | `API_PREFIX` in `.env.example`, the fallback baked into `resolveApiPrefix`, and the URLs in the README. Normalised, so `api/v1` and `/api/v1/` both become `/api/v1`. Default `/api/v1` |
 | 9 | Package manager | `--pm` | Every command printed in the README and in the `check` script, and which binary the install step runs. `npm`, `pnpm` or `yarn`. Default `npm` |
 | 10 | Initialise git | `--git` / `--skip-git` | Runs `git init` in the new directory. Default: yes |
@@ -130,20 +130,41 @@ repository.
 ```bash
 monolite generate module invoice
 monolite g entity payment-method
-monolite g service invoice --force
+monolite g bll invoice --force
+monolite g query revenue --over invoice
+monolite g repository invoice
 ```
 
 | Schematic | Files written (under the project's `sourceRoot`) |
 | --- | --- |
 | `entity` | `domain/models/<name>.model.ts`, `infrastructure/persistence/entities/<name>.entity.ts`, `composition/modules/<name>.tokens.ts` |
-| `service` | `application/dtos/<name>.dto.ts`, `application/services/<name>.service.ts` |
+| `bll` | `application/dtos/<name>.dto.ts`, `application/bll/<name>.bll.ts` |
 | `controller` | `presentation/controllers/<name>.controller.ts` |
 | `module` | all of the above, plus `composition/modules/<name>.module.ts` |
+| `query` | the four above under one name, for an answer the generic API cannot express: `infrastructure/persistence/<name>.repository.ts`, `application/dtos/<name>.dto.ts`, `application/bll/<name>.bll.ts`, `presentation/controllers/<name>.controller.ts`, plus its tokens and a module descriptor with **no** entity registration. Needs `--over <entity>` |
+| `repository` | `infrastructure/persistence/<name>.repository.ts` — an existing entity's store plus its own queries, on `executeRaw` |
 
 `module` is a composition of the other three rather than a fourth copy of them, which is
 what guarantees that `generate module invoice` and `generate entity invoice` produce the
 same entity file. The `--example` module of `monolite new` goes through the very same
 path, so the sample code you read on day one is what the generator hands you on day two.
+
+`query` and `repository` are the two escape hatches, and the difference between them is
+what owns the data. A **query** owns no table: it computes an answer across entities that
+already exist, so it comes with its own BLL, DTO and controller, and its module descriptor
+carries no registration. A **repository** belongs to one entity and adds methods to *its*
+store; it is not part of `generate module` because `defineEntity` already produces a
+working repository, and a class that forwards seventeen methods and adds nothing is a
+layer for the sake of having one.
+
+Both are generated with the layering already right, which is the point of having them:
+the controller injects the BLL and never the repository, and that is the one rule nothing
+in the CRUD path can break — because `CrudController` takes an `ICrudBLL` and will not
+take anything else — and the one place all four files are written from a blank page.
+
+`service` still resolves, to `bll`, and says so. It was the schematic's name until the
+layer was renamed; an unrecognised subcommand is the worse answer when the thing it asks
+for still exists.
 
 Names are derived, not asked: `payment-method` becomes the class `PaymentMethod`, the file
 `payment-method.model.ts`, the table `PAYMENT_METHODS`, the key `pkPaymentMethod` /
@@ -169,7 +190,7 @@ templates/
   db/<engine>/       memory | oracle | mssql | postgres | mysql | mongo
   auth/              only with --auth
   generate/
-    entity/  service/  controller/  module/
+    entity/  bll/  controller/  module/
 ```
 
 ### Placeholders

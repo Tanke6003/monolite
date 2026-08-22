@@ -19,7 +19,7 @@ import {
   sortedRoutes,
   type RouteMetadata,
 } from "monolite-http";
-import { Crud, CrudController, type ICrudService } from "monolite-crud";
+import { Crud, CrudController, type ICrudBLL } from "monolite-crud";
 import { serve } from "./support/http-client.js";
 
 interface ItemDTO {
@@ -31,7 +31,7 @@ const createSchema = z.object({ name: z.string().min(1) });
 const updateSchema = z.object({ name: z.string().min(1).optional() });
 const querySchema = z.object({ page: z.coerce.number().int().min(1).optional() });
 
-let service: jest.Mocked<ICrudService<ItemDTO>>;
+let service: jest.Mocked<ICrudBLL<ItemDTO>>;
 
 const anonymous = { getCurrentUser: () => null } as unknown as IRequestContext;
 
@@ -73,7 +73,7 @@ beforeEach(() => {
     create: jest.fn().mockResolvedValue({ id: 1, name: "one" }),
     update: jest.fn().mockResolvedValue({ id: 1, name: "one" }),
     softDelete: jest.fn().mockResolvedValue(true),
-  } as unknown as jest.Mocked<ICrudService<ItemDTO>>;
+  } as unknown as jest.Mocked<ICrudBLL<ItemDTO>>;
 });
 
 /** The registered routes as `VERB path -> handler`, in the order they mount. */

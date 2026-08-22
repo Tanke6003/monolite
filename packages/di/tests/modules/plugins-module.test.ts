@@ -145,11 +145,11 @@ describe("registerPlugins", () => {
   describe("the optional passthroughs", () => {
     it("registers a token service when one was given", () => {
       const container = createContainer();
-      const tokenService = { sign: () => "", verify: () => ({}) };
+      const tokenBLL = { sign: () => "", verify: () => ({}) };
 
-      registerPlugins({ container, logger: silentLogger(), tokenService });
+      registerPlugins({ container, logger: silentLogger(), tokenBLL });
 
-      expect(container.resolve(TOKENS.ITokenService)).toBe(tokenService);
+      expect(container.resolve(TOKENS.ITokenBLL)).toBe(tokenBLL);
     });
 
     it("registers file storage when it was given", () => {
@@ -172,7 +172,7 @@ describe("registerPlugins", () => {
 
       registerPlugins({ container, logger: silentLogger() });
 
-      expect(container.isRegistered(TOKENS.ITokenService)).toBe(false);
+      expect(container.isRegistered(TOKENS.ITokenBLL)).toBe(false);
       expect(container.isRegistered(TOKENS.IFileStorage)).toBe(false);
     });
   });

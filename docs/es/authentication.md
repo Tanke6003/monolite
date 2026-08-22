@@ -3,7 +3,7 @@
 > 🇬🇧 [Read in English](../en/authentication.md) · paquete: `monolite-auth`
 
 Opcional y enchufable. El paquete aporta lo que es igual en todas las aplicaciones
-—el flujo de login, un servicio de tokens, un hasheador de contraseñas, el
+—el flujo de login, una BLL de tokens, un hasheador de contraseñas, el
 middleware que protege una ruta— y se niega a propósito a saber lo que no lo es.
 
 **Ningún otro paquete depende de este.** Una aplicación que ya se autentica por
@@ -17,7 +17,7 @@ otro lado puede llevarse sólo `requireAuth`, o nada en absoluto.
 | --- | --- | --- |
 | `IUserProvider` | **Tú** | Dónde viven los usuarios es decisión tuya: una tabla, un directorio LDAP, un arreglo. El paquete no debe imponer un esquema. |
 | `IPasswordHasher` | Incluido (`ScryptPasswordHasher`), intercambiable | Lo que hoy es suficiente no lo será en cinco años. Cambiar a argon2 no debe tocar nada más. |
-| `ITokenService` | Incluido (`JwtTokenService`), intercambiable | Una aplicación con tokens opacos respaldados por un almacén implementa los mismos dos métodos. |
+| `ITokenBLL` | Incluido (`JwtTokenBLL`), intercambiable | Una aplicación con tokens opacos respaldados por un almacén implementa los mismos dos métodos. |
 
 ```ts
 export interface IUserProvider {
@@ -28,7 +28,7 @@ export interface IUserProvider {
 
 Esa es toda la superficie de integración. `AuthUserWithSecret` es `{ id, name,
 email, roles, passwordHash }`, y `passwordHash` es el único campo que nunca sale
-del servicio.
+de la BLL.
 
 ---
 
@@ -37,17 +37,17 @@ del servicio.
 ```ts
 import {
   AuthController,
-  AuthService,
-  JwtTokenService,
+  AuthBLL,
+  JwtTokenBLL,
   ScryptPasswordHasher,
   requireAuth,
   requireRoles,
 } from "monolite-auth";
 
-const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
+const tokens = new JwtTokenBLL({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
 
-const auth = new AuthService(new MyUserProvider(usersRepository), hasher, tokens);
+const auth = new AuthBLL(new MyUserProvider(usersRepository), hasher, tokens);
 
 const app = createApp({
   controllers: [...controllers, new AuthController(auth)],
@@ -71,7 +71,7 @@ Los dos levantan el mismo 401 con el mismo mensaje. Distinguirlos convierte el
 endpoint de login en un oráculo de existencia de cuentas: quien ataca averigua qué
 direcciones están registradas sin adivinar ni una sola contraseña.
 
-**Y tarda lo mismo en las dos.** Cuando el usuario no existe, el servicio ejecuta
+**Y tarda lo mismo en las dos.** Cuando el usuario no existe, la BLL ejecuta
 igualmente la verificación del hash contra un hash señuelo. Saltársela devolvería
 en microsegundos en vez de en los ~100 ms que cuesta una comparación real de
 scrypt, y esa diferencia se mide por red: el mensaje idéntico se filtraría por el
@@ -171,7 +171,7 @@ Explícitamente, porque los huecos importan más que las funcionalidades:
   sesión" es que el cliente lo tire. La revocación de verdad necesita una lista de
   bloqueo, que es la misma decisión de almacenamiento de arriba.
 - **Ni OAuth ni OIDC.** Si los necesitas, verifica el token del proveedor con tu
-  propia implementación de `ITokenService` y deja el resto del paquete como está.
+  propia implementación de `ITokenBLL` y deja el resto del paquete como está.
 
 Cada una de esas es una omisión deliberada, no una funcionalidad que falta. Un
 framework que las adivina te entrega algo que luego tienes que deshacer.
@@ -182,7 +182,7 @@ framework que las adivina te entrega algo que luego tienes que deshacer.
 
 | Variable | Notas |
 | --- | --- |
-| `JWT_SECRET` | Obligatoria cuando se usa el servicio de tokens JWT. **No tiene valor por defecto**: un framework que trae una clave de firma de respaldo le entrega una vulnerabilidad de tokens falsificados a todo el que se olvide de sobreescribirla. |
+| `JWT_SECRET` | Obligatoria cuando se usa la BLL de tokens JWT. **No tiene valor por defecto**: un framework que trae una clave de firma de respaldo le entrega una vulnerabilidad de tokens falsificados a todo el que se olvide de sobreescribirla. |
 | `JWT_EXPIRES_IN` | Por defecto `1h`. Acepta la sintaxis de duración de `jsonwebtoken`. |
 
 Comprueba que el secreto está al arrancar y falla a gritos si no lo está. Fallar en

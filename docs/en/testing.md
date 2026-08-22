@@ -42,7 +42,7 @@ whose behaviour is not obvious from reading them.
   isolated between concurrent flows.
 
 What does **not** get a unit test is per-entity ceremony. A test asserting that
-`UsersService.create` calls `usersRepository.insert` restates the implementation in
+`UsersBLL.create` calls `usersRepository.insert` restates the implementation in
 a second language; it passes as long as the two files agree with each other and
 says nothing about whether either is correct. Those flows belong in end-to-end
 tests, where a real request produces a real row.
@@ -142,7 +142,7 @@ else.
 
 They need nothing running. `tests/setup/test-env.ts` forces `DATA_SOURCE=memory`
 before a single module loads, so the tests get the real repository, the real
-services and the real routes on the in-memory driver. Point that variable at an
+BLLs and the real routes on the in-memory driver. Point that variable at an
 engine to run the very same tests against one — the entity metadata does not change.
 
 The application is driven in memory rather than over a socket:

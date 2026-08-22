@@ -7,12 +7,12 @@
  * below under *their* tokens.
  *
  * Like every generated tokens file, this one lives apart from the module that
- * registers them: the service and the controller need them too, and importing
- * them from the module file — which imports the service and the controller —
+ * registers them: the BLL and the controller need them too, and importing
+ * them from the module file — which imports the BLL and the controller —
  * would close a cycle.
  */
 export const __entityUpper___TOKENS = {
   repository: "I__entityName__Repository",
-  service: "I__entityName__Service",
+  bll: "I__entityName__BLL",
   controller: "I__entityName__Controller",
 } as const;

@@ -27,7 +27,7 @@ export interface RequestContextData {
  * passed as a parameter. It is the equivalent of `IHttpContextAccessor` in .NET.
  *
  * The generic repository needs it to fill `CREATED_BY` / `UPDATED_BY` without
- * every service having to drag the user all the way down to the CRUD.
+ * every BLL having to drag the user all the way down to the CRUD.
  */
 export interface IRequestContext {
   /** Runs `fn` with this context active, including everything async it starts. */

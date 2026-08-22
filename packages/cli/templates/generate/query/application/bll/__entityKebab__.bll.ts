@@ -6,7 +6,7 @@ import type {
 } from "../../infrastructure/persistence/__entityKebab__.repository";
 import type { __dtoName__ } from "../dtos/__entityKebab__.dto";
 
-export interface I__entityName__Service {
+export interface I__entityName__BLL {
   read(): Promise<__dtoName__[]>;
 }
 
@@ -14,9 +14,9 @@ export interface I__entityName__Service {
  * The layer the controller talks to, and the reason it exists even for a query
  * with one method.
  *
- * **A controller talks to a service, never to a repository.** Every `@Crud`
+ * **A controller talks to a BLL, never to a repository.** Every `@Crud`
  * module in this project keeps that shape without anyone thinking about it,
- * because `CrudController` takes an `ICrudService` and will not take anything
+ * because `CrudController` takes an `ICrudBLL` and will not take anything
  * else. Written by hand, the shape has to be chosen — and this is the one place
  * in a monolite project where nothing enforces it, which is exactly why the
  * generator writes it for you.
@@ -27,7 +27,7 @@ export interface I__entityName__Service {
  * how many.
  */
 @injectable()
-export class __entityName__Service implements I__entityName__Service {
+export class __entityName__BLL implements I__entityName__BLL {
   constructor(
     @inject(__entityUpper___TOKENS.repository)
     private readonly __entityCamel__: I__entityName__Repository

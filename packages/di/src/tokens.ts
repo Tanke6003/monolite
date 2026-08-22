@@ -28,7 +28,7 @@ export const TOKENS = {
   ITransactionContext: "ITransactionContext",
   IHealthProbe: "IHealthProbe",
   /** Issues and verifies access tokens. Implemented outside this package. */
-  ITokenService: "ITokenService",
+  ITokenBLL: "ITokenBLL",
   IFileStorage: "IFileStorage",
 
   // ------------------------------------------------------------ persistence --
