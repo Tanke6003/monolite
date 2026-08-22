@@ -174,6 +174,12 @@ registration, the bindings and the controller together, so wiring is one line in
 one file, and one line in one file is small enough for a generator to insert and
 for a reviewer to check.
 
+The registration is optional. A module that owns no table — a report reading
+three entities that already exist, a search across several of them, a dashboard,
+an import job, a webhook receiver — leaves it off and joins the same list, which
+is the point: the alternative was a second place to register things, and a
+second place is the problem this list solved.
+
 The licence to write comes from a marker. `composition/modules.ts` ships with
 `// monolite:modules` in it and the entry goes immediately above it. Move that
 marker, rename it or delete it and nothing is touched — the command prints the

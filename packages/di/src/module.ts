@@ -16,9 +16,18 @@ import type { AnyEntityRegistration, EntityRegistration } from "./repository.fac
  * also what makes it something a generator can insert. What could not be
  * automated safely was never the wiring; it was that the wiring was spread out.
  */
-export interface MonoliteModule<T extends object> {
-  /** What the persistence layer builds this module's repository from. */
-  registration: EntityRegistration<T>;
+export interface MonoliteModule<T extends object = never> {
+  /**
+   * What the persistence layer builds this module's repository from.
+   *
+   * Optional, because not every module owns a table. A sales report reads three
+   * that already exist; so do a search endpoint across several tables, a
+   * dashboard, an import job and a webhook receiver. Each is a set of bindings
+   * and a controller, and requiring an entity would send all of them back to
+   * being registered by hand in the composition root — which is the wiring this
+   * descriptor was introduced to remove.
+   */
+  registration?: EntityRegistration<T>;
 
   /** The module's own container bindings: its service, its controller. */
   register(container: DependencyContainer): void;
@@ -39,9 +48,17 @@ export interface MonoliteModule<T extends object> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyMonoliteModule = MonoliteModule<any>;
 
-/** The registrations the persistence layer wants, in the order they were listed. */
+/**
+ * The registrations the persistence layer wants, in the order they were listed.
+ *
+ * Modules without one are skipped rather than rejected: a module with no table
+ * is not an incomplete module, it is a module with nothing for the persistence
+ * layer to build.
+ */
 export function entitiesOf(modules: readonly AnyMonoliteModule[]): AnyEntityRegistration[] {
-  return modules.map((module) => module.registration);
+  return modules
+    .map((module) => module.registration)
+    .filter((registration): registration is AnyEntityRegistration => registration !== undefined);
 }
 
 /**

@@ -174,6 +174,12 @@ lleva juntos el registro, los bindings y el controlador, así que cablear es una
 línea en un fichero — y una línea en un fichero es lo bastante pequeño como para
 que un generador la inserte y alguien la revise.
 
+El registro es opcional. Un módulo que no tiene tabla propia —un informe que lee
+tres entidades que ya existen, una búsqueda sobre varias, un panel, un proceso de
+importación, un receptor de webhooks— lo omite y entra en la misma lista, que es
+justo el objetivo: la alternativa era un segundo sitio donde registrar cosas, y un
+segundo sitio es el problema que esta lista resolvió.
+
 El permiso para escribir viene de un marcador. `composition/modules.ts` se
 genera con `// monolite:modules` dentro y la entrada va justo encima. Mueve ese
 marcador, renómbralo o bórralo y no se toca nada: el comando te imprime la línea,
