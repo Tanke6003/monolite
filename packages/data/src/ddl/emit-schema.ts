@@ -32,14 +32,6 @@ export interface TableDdl {
 
 const DEFAULT_TERMINATOR = ";";
 
-/** `ON DELETE` as SQL writes it; the metadata spells it in prose. */
-const ON_DELETE: Record<string, string> = {
-  restrict: "RESTRICT",
-  cascade: "CASCADE",
-  "set null": "SET NULL",
-  "no action": "NO ACTION",
-};
-
 /**
  * Trims a generated constraint name to what the strictest engine accepts.
  *
@@ -61,8 +53,32 @@ function nullabilityOf(column: ColumnMetadata, isPrimaryKey: boolean): string {
   return column.nullable === false ? " NOT NULL" : "";
 }
 
+/**
+ * The soft-delete flag is never nullable, and always starts alive.
+ *
+ * The mapping filters every read with `WHERE <flag> = <activeValue>`, so a
+ * `NULL` in that column is neither active nor deleted: the row exists and no
+ * query will ever return it. Emitting the column as the mapping actually treats
+ * it — not null, defaulted to the active value — makes that state unreachable
+ * even from a hand-written `INSERT`, which is the one path the repository
+ * cannot cover.
+ *
+ * It overrides what the column said rather than asking, because `softDelete`
+ * saying so is the stronger statement: an entity that declares one has decided
+ * what an unset flag means.
+ */
+function softDeleteColumn<T>(schema: EntitySchema<T>, property: string): ColumnMetadata | null {
+  if (schema.softDelete?.property !== property) return null;
+
+  return {
+    ...schema.columnMetadataOf(property),
+    nullable: false,
+    default: String(schema.softDeleteActiveValue),
+  };
+}
+
 function columnLine<T>(schema: EntitySchema<T>, property: string, dialect: DdlDialect): string {
-  const column = schema.columnMetadataOf(property);
+  const column = softDeleteColumn(schema, property) ?? schema.columnMetadataOf(property);
   const isPrimaryKey = property === schema.primaryKey;
   const name = dialect.quote(column.name);
 
@@ -122,15 +138,15 @@ export function emitTable<T>(
   const foreignKeys = Object.entries(metadata.relations ?? {}).map(([, relation]) => {
     const local = dialect.quote(schema.columnOf(relation.localKey));
     const name = constraintName("FK", schema.table, schema.columnOf(relation.localKey));
-    const rule = ON_DELETE[relation.onDelete ?? "restrict"];
+    const rule = dialect.onDelete(relation.onDelete ?? "restrict");
 
     // The related column is named as the property is, because the emitter has
     // one entity in hand and cannot resolve the other's mapping. `emitSchema`
     // has both and rewrites it; this is the honest answer for a single table.
     return (
       `ALTER TABLE ${table} ADD CONSTRAINT ${name} FOREIGN KEY (${local}) ` +
-      `REFERENCES ${dialect.quote(relation.to)} (${dialect.quote(relation.foreignKey)}) ` +
-      `ON DELETE ${rule}${terminator}`
+      `REFERENCES ${dialect.quote(relation.to)} (${dialect.quote(relation.foreignKey)})` +
+      `${rule}${terminator}`
     );
   });
 
@@ -191,13 +207,13 @@ export function emitSchema(
 
       const local = schema.columnOf(relation.localKey);
       const remote = target.columnOf(relation.foreignKey);
-      const rule = ON_DELETE[relation.onDelete ?? "restrict"];
+      const rule = dialect.onDelete(relation.onDelete ?? "restrict");
 
       foreignKeys.push(
         `ALTER TABLE ${table} ADD CONSTRAINT ${constraintName("FK", entity.table, local)} ` +
           `FOREIGN KEY (${dialect.quote(local)}) ` +
-          `REFERENCES ${dialect.quote(relation.to)} (${dialect.quote(remote)}) ` +
-          `ON DELETE ${rule}${terminator}`
+          `REFERENCES ${dialect.quote(relation.to)} (${dialect.quote(remote)})` +
+          `${rule}${terminator}`
       );
     }
   }

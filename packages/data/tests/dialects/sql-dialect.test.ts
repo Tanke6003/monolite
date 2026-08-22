@@ -31,8 +31,8 @@ describe("SqlGenericRepository on the SQL Server dialect", () => {
       await repository.insert({ name: "alpha", qty: 10 });
 
       expect(db.sqlAt(0)).toBe(
-        "INSERT INTO ITEMS (NAME, QTY, CREATED_AT) OUTPUT INSERTED.PK_ITEM AS insertedId " +
-          "VALUES (:b0, :b1, SYSDATETIME())"
+        "INSERT INTO ITEMS (NAME, QTY, CREATED_AT, ACTIVE) OUTPUT INSERTED.PK_ITEM AS insertedId " +
+          "VALUES (:b0, :b1, SYSDATETIME(), :b3)"
       );
       // The statement gives back rows, so the executor has to read them.
       expect(db.calls[0].expects).toBe("rows");
@@ -154,7 +154,7 @@ describe("SqlGenericRepository on the PostgreSQL dialect", () => {
     await repository.insert({ name: "alpha", qty: 10 });
 
     expect(db.sqlAt(0)).toBe(
-      "INSERT INTO ITEMS (NAME, QTY, CREATED_AT) VALUES (:b0, :b1, NOW()) " +
+      "INSERT INTO ITEMS (NAME, QTY, CREATED_AT, ACTIVE) VALUES (:b0, :b1, NOW(), :b3) " +
         "RETURNING PK_ITEM AS insertedId"
     );
     expect(db.calls[0].expects).toBe("rows");
@@ -194,7 +194,7 @@ describe("SqlGenericRepository on the MySQL dialect", () => {
     await repository.insert({ name: "alpha", qty: 10 });
 
     expect(db.sqlAt(0)).toBe(
-      "INSERT INTO ITEMS (NAME, QTY, CREATED_AT) VALUES (:b0, :b1, CURRENT_TIMESTAMP(3))"
+      "INSERT INTO ITEMS (NAME, QTY, CREATED_AT, ACTIVE) VALUES (:b0, :b1, CURRENT_TIMESTAMP(3), :b3)"
     );
     // `identity` is what tells the connector to go through LAST_INSERT_ID().
     expect(db.calls[0].expects).toBe("identity");

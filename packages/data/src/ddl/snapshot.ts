@@ -1,5 +1,5 @@
 import { EntitySchema } from "../metadata/entity-metadata.js";
-import type { DdlDialect } from "./ddl-dialect.js";
+import type { DdlDialect, OnDeleteRule } from "./ddl-dialect.js";
 import { emitTable, type AnyEntityMetadata, type EmitOptions } from "./emit-schema.js";
 
 /**
@@ -71,9 +71,19 @@ export function snapshotOf(entities: readonly AnyEntityMetadata[]): SchemaSnapsh
         ...(column.length === undefined ? {} : { length: column.length }),
         ...(column.precision === undefined ? {} : { precision: column.precision }),
         ...(column.scale === undefined ? {} : { scale: column.scale }),
-        nullable: property === schema.primaryKey ? false : column.nullable !== false,
+        // The soft-delete flag as the emitter writes it: never nullable, always
+        // defaulted to the active value. If the snapshot disagreed with the DDL,
+        // the very first migration would ask to change a column nothing changed.
+        nullable:
+          property === schema.primaryKey || property === schema.softDelete?.property
+            ? false
+            : column.nullable !== false,
         unique: column.unique === true,
-        ...(column.default === undefined ? {} : { default: column.default }),
+        ...(property === schema.softDelete?.property
+          ? { default: String(schema.softDeleteActiveValue) }
+          : column.default === undefined
+            ? {}
+            : { default: column.default }),
       };
     }
 
@@ -292,8 +302,8 @@ function diffForeignKeys(
     statements.push(
       `ALTER TABLE ${quoted} ADD CONSTRAINT ${constraint} ` +
         `FOREIGN KEY (${dialect.quote(relation.column)}) ` +
-        `REFERENCES ${dialect.quote(relation.references.table)} (${dialect.quote(remote)}) ` +
-        `ON DELETE ${relation.onDelete.toUpperCase()}${terminator}`
+        `REFERENCES ${dialect.quote(relation.references.table)} (${dialect.quote(remote)})` +
+        `${dialect.onDelete(relation.onDelete as OnDeleteRule)}${terminator}`
     );
   }
 

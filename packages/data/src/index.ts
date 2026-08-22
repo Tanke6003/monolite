@@ -168,7 +168,7 @@ export type { IRawQueryable } from "./contracts/raw-queryable.js";
 
 // -------------------------------------------------------------------  ddl  ---
 export { DDL_DIALECTS, ddlDialectFor, mysqlDdl, oracleDdl, postgresDdl, sqlServerDdl } from "./ddl/ddl-dialect.js";
-export type { DdlDialect } from "./ddl/ddl-dialect.js";
+export type { DdlDialect, OnDeleteRule } from "./ddl/ddl-dialect.js";
 export { emitSchema, emitTable } from "./ddl/emit-schema.js";
 export type { AnyEntityMetadata, EmitOptions, TableDdl } from "./ddl/emit-schema.js";
 export { diffSnapshots, emptySnapshot, snapshotOf } from "./ddl/snapshot.js";

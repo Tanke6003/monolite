@@ -106,7 +106,7 @@ describe("SqlGenericRepository on the Oracle dialect", () => {
       const created = await repository.insert({ name: "alpha", qty: 10 });
 
       expect(db.sqlAt(0)).toBe(
-        "INSERT INTO ITEMS (NAME, QTY, CREATED_AT) VALUES (:b0, :b1, SYSTIMESTAMP) " +
+        "INSERT INTO ITEMS (NAME, QTY, CREATED_AT, ACTIVE) VALUES (:b0, :b1, SYSTIMESTAMP, :b3) " +
           "RETURNING PK_ITEM INTO :insertedId"
       );
       expect(db.calls[0].binds).toMatchObject({ b0: "alpha", b1: 10 });
@@ -151,12 +151,14 @@ describe("SqlGenericRepository on the Oracle dialect", () => {
 
       expect(affected).toBe(2);
       expect(db.sqlAt(0)).toBe(
-        "INSERT INTO ITEMS (NAME, QTY, CREATED_AT) VALUES (:b0, :b1, SYSTIMESTAMP)"
+        "INSERT INTO ITEMS (NAME, QTY, ACTIVE, CREATED_AT) VALUES (:b0, :b1, :b2, SYSTIMESTAMP)"
       );
       expect(db.calls[0].binds).toEqual([
-        { b0: "a", b1: 1 },
-        // The row that does not carry the column travels as NULL.
-        { b0: "b", b1: null },
+        // `b2` is the soft-delete flag, active, on every row: a bulk insert that
+        // left it out would write rows no read can see.
+        { b0: "a", b1: 1, b2: 1 },
+        // The row that does not carry an ordinary column travels as NULL.
+        { b0: "b", b1: null, b2: 1 },
       ]);
     });
 
@@ -166,7 +168,39 @@ describe("SqlGenericRepository on the Oracle dialect", () => {
     });
 
     it("insertMany throws when no row contributes a single column", async () => {
+      // Counted before the soft-delete flag is added, or an empty insert would
+      // become a row containing nothing but its own liveness.
       await expect(repository.insertMany([{}])).rejects.toThrow(/with no columns to write/);
+    });
+
+    /**
+     * A row arrives alive unless the caller said otherwise.
+     *
+     * Left to the schema's default, a mapping that declared none lands `NULL` —
+     * which is neither the active value nor the deleted one, so `WHERE ACTIVE =
+     * 1` never matches and the row is invisible from the moment it is written.
+     * The insert reports success and the row is gone.
+     *
+     * The other two drivers already did this; this one, which speaks to four of
+     * the six engines, did not. It survived because the shared contract had only
+     * ever been run against the two that were already right — see the
+     * integration suite, where it now runs against all of them.
+     */
+    it("writes the soft-delete flag as active when the caller left it out", async () => {
+      db.queue({ rows: [{ INSERTED_ID: 1 }], outBinds: { insertedId: [1] } }).queue({ rows: [ROW] });
+      await repository.insert({ name: "alpha", qty: 10 });
+
+      expect(db.sqlAt(0)).toContain("ACTIVE");
+      expect(Object.values(db.bindsAt(0))).toContain(1);
+    });
+
+    it("leaves the flag alone when the caller set it", async () => {
+      db.queue({ rows: [{ INSERTED_ID: 1 }], outBinds: { insertedId: [1] } }).queue({ rows: [ROW] });
+      await repository.insert({ name: "alpha", qty: 10, active: false });
+
+      // Written once, with the caller's value, and not appended a second time.
+      expect(db.sqlAt(0).match(/ACTIVE/g)).toHaveLength(1);
+      expect(Object.values(db.bindsAt(0))).toContain(0);
     });
   });
 

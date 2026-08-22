@@ -166,7 +166,12 @@ export class SqlGenericRepository<T extends object, TKey = number>
   // --------------------------------------------------------------- reads ---
 
   async find(options: QueryOptions<T> = {}): Promise<T[]> {
-    const compiler = new SqlWhereCompiler<T>(this.schema, "w", this.dialect.toBindValue);
+    const compiler = new SqlWhereCompiler<T>(
+      this.schema,
+      "w",
+      this.dialect.toBindValue,
+      this.dialect.buildLike
+    );
     const where = compiler.compile(this.withSoftDeleteFilter(options.where, options.withDeleted));
 
     const paginated = options.skip !== undefined || options.take !== undefined;
@@ -206,7 +211,12 @@ export class SqlGenericRepository<T extends object, TKey = number>
   }
 
   async count(where?: WhereFilter<T>, withDeleted?: boolean): Promise<number> {
-    const compiler = new SqlWhereCompiler<T>(this.schema, "w", this.dialect.toBindValue);
+    const compiler = new SqlWhereCompiler<T>(
+      this.schema,
+      "w",
+      this.dialect.toBindValue,
+      this.dialect.buildLike
+    );
     const compiled = compiler.compile(this.withSoftDeleteFilter(where, withDeleted));
 
     let sql = `SELECT COUNT(*) AS TOTAL FROM ${this.schema.table}`;
@@ -293,6 +303,30 @@ export class SqlGenericRepository<T extends object, TKey = number>
       binds.auditUser = this.auditUser();
     }
 
+    // A row arrives alive unless the caller said otherwise.
+    //
+    // Without this the column is left to the schema's default, and a mapping
+    // that did not declare one lands `NULL` — which is neither the active value
+    // nor the deleted one, so `WHERE ACTIVE = 1` never matches it and the row
+    // is invisible to every read that follows. The insert reports success and
+    // the row is gone.
+    //
+    // Both other drivers already did this: the memory one fills the property
+    // and the MongoDB one writes the state into the document, with a comment
+    // saying the repository is what completes it. This was the driver that
+    // spoke to four of the six engines and did not, which is exactly the kind
+    // of divergence the shared contract exists to forbid — and it survived
+    // because that contract had only ever been run against the two that were
+    // already right.
+    const softDelete = this.schema.softDelete;
+
+    if (softDelete && (entity as Record<string, unknown>)[softDelete.property] === undefined) {
+      const bindName = `b${columns.length}`;
+      columns.push(this.schema.columnOf(softDelete.property));
+      values.push(`:${bindName}`);
+      binds[bindName] = this.dialect.toBindValue(this.schema.softDeleteActiveValue);
+    }
+
     const statement = this.dialect.buildInsert({
       table: this.schema.table,
       columns,
@@ -333,7 +367,7 @@ export class SqlGenericRepository<T extends object, TKey = number>
 
     // `executeMany` requires a single statement, so the union of the present
     // properties is taken and the ones missing from a row travel as NULL.
-    const properties = this.schema
+    const supplied = this.schema
       .insertableProperties()
       .filter(
         (property) => property !== createdAt && property !== createdBy && property !== updatedBy
@@ -342,11 +376,20 @@ export class SqlGenericRepository<T extends object, TKey = number>
         entities.some((entity) => (entity as Record<string, unknown>)[property] !== undefined)
       );
 
-    if (properties.length === 0) {
+    // Counted before the soft-delete flag is added, so that the guard still
+    // means "the caller gave me nothing". Adding it first would turn an empty
+    // insert into a row containing only its own liveness.
+    if (supplied.length === 0) {
       throw new Error(
         `[SqlGenericRepository] insertMany into ${this.schema.table} with no columns to write.`
       );
     }
+
+    // Always written, even when no row supplied it: see `insert`. A row that
+    // lands with it `NULL` is neither active nor deleted, and every read
+    // filters it out.
+    const flag = this.schema.softDelete?.property;
+    const properties = flag && !supplied.includes(flag) ? [...supplied, flag] : supplied;
 
     const columns = properties.map((property) => this.schema.columnOf(property));
     const placeholders = properties.map((_, index) => `:b${index}`);
@@ -367,9 +410,15 @@ export class SqlGenericRepository<T extends object, TKey = number>
     const rows = entities.map((entity) => {
       const row: Record<string, unknown> = {};
       properties.forEach((property, index) => {
-        row[`b${index}`] = this.dialect.toBindValue(
-          this.schema.toColumnValue(property, (entity as Record<string, unknown>)[property])
-        );
+        const supplied = (entity as Record<string, unknown>)[property];
+
+        // Alive unless this row said otherwise, for the reason above.
+        const value =
+          supplied === undefined && property === this.schema.softDelete?.property
+            ? this.schema.softDeleteActiveValue
+            : this.schema.toColumnValue(property, supplied);
+
+        row[`b${index}`] = this.dialect.toBindValue(value);
       });
       if (createdBy) row.auditUser = auditUser;
       return row;
@@ -423,7 +472,12 @@ export class SqlGenericRepository<T extends object, TKey = number>
   ): Promise<number> {
     // A different prefix for the WHERE binds: otherwise they would clash with
     // the SET ones.
-    const compiler = new SqlWhereCompiler<T>(this.schema, "w", this.dialect.toBindValue);
+    const compiler = new SqlWhereCompiler<T>(
+      this.schema,
+      "w",
+      this.dialect.toBindValue,
+      this.dialect.buildLike
+    );
     const compiled = compiler.compile(this.withSoftDeleteFilter(where));
 
     let sql = `UPDATE ${this.schema.table} SET ${setClause.sql}`;
@@ -571,7 +625,12 @@ export class SqlGenericRepository<T extends object, TKey = number>
 
   async hardDeleteWhere(where: WhereFilter<T>): Promise<number> {
     const actor = this.captureActor();
-    const compiler = new SqlWhereCompiler<T>(this.schema, "w", this.dialect.toBindValue);
+    const compiler = new SqlWhereCompiler<T>(
+      this.schema,
+      "w",
+      this.dialect.toBindValue,
+      this.dialect.buildLike
+    );
     // No soft-delete filter: the goal here is to clean up for real.
     const compiled = compiler.compile(where);
 

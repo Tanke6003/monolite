@@ -34,7 +34,19 @@ export class SqlWhereCompiler<T> {
      * Final adjustment of the value before binding it, specific to the engine.
      * The dialect supplies it; without it, values travel as they are.
      */
-    private readonly toBindValue: (value: unknown) => unknown = (value) => value
+    private readonly toBindValue: (value: unknown) => unknown = (value) => value,
+    /**
+     * How a case-sensitive `LIKE` is written here; see `SqlDialect.buildLike`.
+     *
+     * Only `like` and `notLike` use it. `ilike` and `contains` compare through
+     * `UPPER(...)` on both sides, which is case-insensitive on every engine
+     * whatever its collation says.
+     */
+    private readonly buildLike: (column: string, bind: string, negated: boolean) => string = (
+      column,
+      bind,
+      negated
+    ) => `${column} ${negated ? "NOT " : ""}LIKE ${bind}`
   ) {}
 
   compile(filter?: WhereFilter<T>): CompiledWhere {
@@ -112,10 +124,10 @@ export class SqlWhereCompiler<T> {
     if (operators.lte !== undefined) parts.push(`${column} <= ${this.bind(property, operators.lte)}`);
 
     if (operators.like !== undefined) {
-      parts.push(`${column} LIKE ${this.bind(property, operators.like)}`);
+      parts.push(this.buildLike(column, this.bind(property, operators.like), false));
     }
     if (operators.notLike !== undefined) {
-      parts.push(`${column} NOT LIKE ${this.bind(property, operators.notLike)}`);
+      parts.push(this.buildLike(column, this.bind(property, operators.notLike), true));
     }
     if (operators.ilike !== undefined) {
       parts.push(`UPPER(${column}) LIKE UPPER(${this.bind(property, operators.ilike)})`);
