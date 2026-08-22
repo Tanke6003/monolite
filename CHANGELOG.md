@@ -9,6 +9,69 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Fixed
+
+Everything in this section was found the same way: by running the packages
+against the five engines they claim to support, which had never happened. The
+unit suite verified them against an array and two doubles, and each of these
+passed every one of those tests.
+
+- **The SQL driver never wrote the soft-delete flag.** A row inserted without it
+  landed `NULL` — neither the active value nor the deleted one — so
+  `WHERE ACTIVE = 1` never matched it: the insert reported success and the row
+  was invisible to every read that followed. The memory driver filled the
+  property and the MongoDB one wrote the state into the document, with a comment
+  saying the repository is what completes it. The driver that speaks to four of
+  the six engines was the one that did not, and the shared contract had only
+  ever been run against the two that were already right.
+- **`ON DELETE RESTRICT` is not valid on two of the four SQL engines**, and
+  `restrict` is the default every relation gets — so **no generated schema
+  could be created on SQL Server at all**. T-SQL has no `RESTRICT`; Oracle has
+  neither that nor `NO ACTION` and expresses the same thing by omitting the
+  clause. The rule is now the dialect's to spell, like every other difference
+  between engines.
+- **`executeRaw` could not call a stored procedure on MySQL.** The documented
+  escape hatch, on one of the six engines. `CALL` answers with more than one
+  result set, and one that only writes answers with none at all — which reached
+  `results.map` inside Sequelize and threw. The affected-row count was worse
+  than broken: for an INSERT the driver answers `[insertId, affected]`, so the
+  connector was reading a row's id and reporting it as a count. A bulk insert of
+  two rows reported nine, which was simply where the auto-increment happened to
+  be.
+- **`like` was case-insensitive on MySQL and SQL Server.** The filter language
+  promises `like` distinguishes case and `ilike` does not; both engines default
+  to a case-insensitive collation, so the two operators quietly meant the same
+  thing there. One operator meaning two things depending on the engine is
+  precisely what the shared contract exists to forbid. MySQL now casts the
+  pattern and SQL Server collates the column, each through its own dialect.
+- **A `CREATE PROCEDURE` run through the connector came back corrupted on SQL
+  Server.** `expects: "none"` appends `; SELECT @@ROWCOUNT` to read the count
+  back, and a T-SQL procedure body extends to the end of its batch — so the
+  probe was compiled *into* the procedure, which then returned a spurious row to
+  every caller forever. Statements that own their batch skip the probe.
+- **The MongoDB connector accepted no connection options.** No
+  `directConnection`, no `replicaSet`, no `tls`, no `readPreference` — the URI
+  was built from host, port and credentials and nothing else. That made every
+  replica set behind a port mapping, a tunnel or a load balancer unreachable,
+  which is every one a developer runs locally; and since a MongoDB transaction
+  *requires* a replica set, the engine's transaction support was documented
+  while the standard way of running one could not be connected to.
+  `MongoConnectionConfig.options` and `MONGO_OPTIONS` carry the query string.
+### Added
+
+- **An integration suite over every engine, and a CI job that runs it.**
+  `docker/integration/docker-compose.yml` brings up PostgreSQL, MySQL, SQL
+  Server, MongoDB and Oracle Free; `npm run test:integration` runs 270 checks
+  across all five. It applies the schema `emitSchema` generates — so a green run
+  is a statement about the DDL generator too — then runs the shared repository
+  contract, multi-table transactions committing and rolling back, row locks, and
+  stored procedures that read, that write, and that get rolled back with the
+  transaction that called them.
+
+  An engine that was asked for and is not reachable **fails** the run rather
+  than skipping it. A suite that quietly verifies nothing is worse than one
+  nobody runs, because CI goes on reporting that it passed.
+
 ### Changed
 
 - **The application layer is called the BLL now, everywhere.** `CrudService` is

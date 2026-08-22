@@ -138,6 +138,68 @@ verdad está mejor que uno al 95% rellenado con aserciones sobre getters.
 
 ---
 
+## Ejecutarlo contra todos los motores
+
+La suite de unidad verifica los paquetes contra un array y dos dobles, y los
+dobles son buenos: evalúan el SQL generado en vez de asentir. Lo que no pueden
+detectar es la clase de fallo en la que el motor y el doble no coinciden, y esa
+clase se publicó más de una vez: una transacción a la que los repositorios no se
+sumaban, una marca de borrado lógico que el driver SQL nunca escribía, una
+cláusula `ON DELETE` que un motor no sabe decir, y una llamada a procedimiento
+que el conector no podía hacer. Todas pasaban todas las pruebas de unidad.
+
+```bash
+npm run engines:up          # cinco contenedores, espera a que estén sanos
+npm run test:integration
+npm run engines:down        # y sus volúmenes
+```
+
+`docker/integration/docker-compose.yml` levanta PostgreSQL, MySQL, SQL Server,
+MongoDB y Oracle Free en puertos elegidos para no chocar con lo que ya tengas
+corriendo. CI ejecuta la misma suite en cada push, contra los mismos cinco.
+
+Para acotar mientras trabajas:
+
+```bash
+MONOLITE_IT_ENGINES=postgres,mysql npm run test:integration
+MONOLITE_IT_VERBOSE=true npm run test:integration    # cada sentencia, al log
+```
+
+Cada dato de conexión tiene su `MONOLITE_IT_<MOTOR>_<CAMPO>`, así que la suite
+puede apuntar a un servidor que no hayas levantado tú desde ese fichero.
+
+### Qué comprueba de verdad
+
+- **El esquema es el que genera este repositorio.** `emitSchema` lo escribe a
+  partir de los mismos metadatos que lee el repositorio, y la suite aplica eso.
+  Un esquema escrito a mano escondería justo el desacuerdo que el generador
+  existe para evitar —y escondió uno durante meses: el mapeo escribe un booleano
+  como `1`, que una columna `BOOLEAN` rechaza—.
+- **El contrato común, en los cinco.** `runGenericRepositoryContract` es el
+  conjunto de aserciones que toda implementación debe pasar. Hasta ahora solo se
+  había ejecutado contra los dos que ya estaban bien.
+- **Transacciones sobre tres tablas**, confirmando y revirtiendo, incluido el
+  caso que más importa: un almacén inyectado al arrancar, dentro de una
+  transacción que nadie le pasó.
+- **Bloqueos de fila**, tomados antes de la lectura que depende de ellos.
+- **Procedimientos almacenados** por `executeRaw`: uno que lee, uno que escribe,
+  y uno llamado dentro de una transacción que luego revierte —que es lo que
+  demuestra que la vía de escape corre sobre la conexión de la transacción y no
+  sobre la del pool—.
+
+MongoDB se salta los cuatro casos que solo aplican a SQL y lo dice: no tiene
+procedimientos ni claves foráneas, y fingir lo contrario sería inventarse una
+forma que nadie escribe.
+
+### Falla en vez de saltarse
+
+Un motor nombrado en `MONOLITE_IT_ENGINES` que no responda hace fallar la
+ejecución. Una suite que verifica nada en silencio es peor que una que nadie
+ejecuta, porque CI sigue informando de que las pruebas de integración pasaron.
+
+---
+
+
 ## Probar tu propio proyecto
 
 Un proyecto generado por la CLI llega con dos suites y las dos pasan a la primera:
