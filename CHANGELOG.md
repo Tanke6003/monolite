@@ -11,6 +11,37 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **The seven packages declared MIT and shipped no licence.** npm only picks a
+  `LICENSE` up from the package's own folder, and the repository's was at the
+  root — so every tarball on the registry carried a licence field pointing at a
+  file that was not in it.
+- **428 kB of source maps that resolved nothing.** Both `.js.map` and
+  `.d.ts.map` point at `../src/*.ts`, which `files: ["dist"]` excluded, and
+  `sourcesContent` is off — so an editor asked to go to a definition followed
+  the map, found nothing and fell back to the `.d.ts`, while the tarball
+  carried the weight anyway. The sources ship now, which is the choice that
+  makes both work and the right one for this library in particular: the
+  reasoning here lives in the comments, and landing on them is the point.
+- **`monolite-data` declared `tedious: ^18`** while the integration suite
+  verifies SQL Server against 20. Sequelize 6 declares no peer of its own, so
+  the range is ours to state, and one narrower than what is tested warns people
+  off a combination that is known to work.
+
+### Added
+
+- **Published packages carry provenance.** `--provenance` attaches a signed
+  statement linking each tarball to the commit and the workflow run that built
+  it, which npm shows on the package page and anyone can verify. The release job
+  already had the OIDC token it needs, so it cost a flag — and for a toolkit
+  asking people to install seven packages from one publisher, "built from this
+  commit, by this workflow" is worth more than any wording in a README.
+- **Nine checks over what the tarballs contain**, in `npm run test:scripts`.
+  Nothing else exercised any of this: a package can be published for months
+  missing its licence or shipping the CLI without its templates and every test
+  still passes, because nothing installs the tarball. The way it surfaced was
+  reading an npm page, which is not a way to find out.
+
+
 Everything in this section was found the same way: by running the packages
 against the five engines they claim to support, which had never happened. The
 unit suite verified them against an array and two doubles, and each of these
