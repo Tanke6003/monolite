@@ -29,6 +29,26 @@ a minor release. Pin exact versions.
   `SERVICE_NAME` and the logger field built from it, docker-compose's
   `services:`, and Oracle's own term for a database.
 
+  **Upgrading an existing project**, in the order the compiler will ask for it.
+  Applied to the reference demo, it was these six substitutions, a directory
+  rename, and nothing else — 36 files, no behaviour touched:
+
+  | From | To |
+  | --- | --- |
+  | `CrudService`, `ICrudService`, `CrudServiceOptions` | `CrudBLL`, `ICrudBLL`, `CrudBLLOptions` |
+  | `TransactionalService` | `TransactionalBLL` |
+  | `AuthService`, `IAuthService`, `AuthServiceOptions` | `AuthBLL`, `IAuthBLL`, `AuthBLLOptions` |
+  | `ITokenService`, `JwtTokenService`, `JwtTokenServiceOptions` | `ITokenBLL`, `JwtTokenBLL`, `JwtTokenBLLOptions` |
+  | `AUTH_TOKENS.ITokenService`, `AUTH_TOKENS.IAuthService` | `AUTH_TOKENS.ITokenBLL`, `AUTH_TOKENS.IAuthBLL` |
+  | `src/application/services/*.service.ts` | `src/application/bll/*.bll.ts` |
+
+  The one that is easy to miss is your **own** token tables: the key is
+  `service` and its value is usually `"I<Plural>Service"`, and both are yours
+  rather than the framework's. Rename them to `bll` / `"I<Plural>BLL"` to stay
+  with what the generator now writes — nothing forces you to, since they are
+  only strings, but a project where half the tokens read one way is worse than
+  either.
+
 ### Added
 
 - **`monolite generate repository <entity>`.** An existing entity's store plus
