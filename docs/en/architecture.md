@@ -68,6 +68,26 @@ The dependency rule is unchanged: inner layers know nothing about outer ones. Wh
 the packages add is that the outer layers are now mostly *supplied* rather than
 written. Your domain models and business rules stay yours.
 
+### A controller talks to a service, never to a repository
+
+The dependency rule is about *direction*, and a controller reaching past the
+application layer into infrastructure obeys it as written — which is why this
+needs saying separately.
+
+Two decisions live in the gap it skips: **what a client is allowed to see**, and
+**what the answer means**. A repository knows how to count rows. It does not know
+which of them are worth publishing, in what order, or how many; and a controller
+that answered with rows would be making both calls in the layer furthest from
+either.
+
+Most of the time nothing has to be remembered, because nothing can go wrong:
+`CrudController` takes an `ICrudService` and will not take anything else, so
+every `@Crud` module has the shape whether or not anyone thought about it. The
+rule is only load-bearing in the one case where all four files are written from a
+blank page — a report, a search across several tables, a dashboard. That is what
+`monolite generate query` is for: it writes them with the layering already
+right.
+
 ---
 
 ## Request lifecycle

@@ -4,7 +4,13 @@ import { parseArgs } from "node:util";
 import { ENGINES, type EngineId } from "../config/engines.js";
 import { printGenerateHelp } from "../help.js";
 import { findProject, type MonoliteProject } from "../project.js";
-import { isSchematic, renderSchematic, SCHEMATICS, type Schematic } from "../schematics.js";
+import {
+  isSchematic,
+  NEEDS_OVER,
+  renderSchematic,
+  SCHEMATICS,
+  type Schematic,
+} from "../schematics.js";
 import { color } from "../util/colors.js";
 import { FileWriter } from "../util/files.js";
 import { created, fail, hint, info, line, title, warn } from "../util/log.js";
@@ -23,6 +29,14 @@ const OPTIONS = {
    * add is printed either way.
    */
   "no-wire": { type: "boolean" },
+  /**
+   * The entity a query reads.
+   *
+   * The one thing a generator cannot derive from the name typed: `generate
+   * module invoice` knows its table is `INVOICES`, but `generate query
+   * revenue` could be reading any of them.
+   */
+  over: { type: "string" },
 } as const;
 
 export function generateCommand(argv: string[]): number {
@@ -67,9 +81,19 @@ export function generateCommand(argv: string[]): number {
     return 1;
   }
 
+  const over = parsed.values.over;
+
+  if (NEEDS_OVER.includes(schematicName) && !over) {
+    fail(`the "${schematicName}" schematic needs the entity it reads`);
+    hint(`usage: monolite generate ${schematicName} ${entityName} --over <entity>`);
+    hint("a query owns no table; --over names the one whose store it injects");
+    return 1;
+  }
+
   return emit(project, schematicName, entityName, {
     force: Boolean(parsed.values.force),
     wire: !parsed.values["no-wire"],
+    over,
   });
 }
 
@@ -77,6 +101,8 @@ interface EmitOptions {
   force: boolean;
   /** Whether the module may be inserted into the list; see `wireModule`. */
   wire: boolean;
+  /** The entity a query reads; see the `over` flag. */
+  over?: string;
 }
 
 function emit(
@@ -89,7 +115,14 @@ function emit(
   const sourceRoot = path.relative(project.root, project.sourceRoot) || ".";
 
   try {
-    renderSchematic({ schematic, name, project: contextFor(project), writer, sourceRoot });
+    renderSchematic({
+      schematic,
+      name,
+      over: options.over,
+      project: contextFor(project),
+      writer,
+      sourceRoot,
+    });
   } catch (error) {
     fail((error as Error).message);
     return 1;
@@ -106,7 +139,11 @@ function emit(
   for (const relative of [...writer.written].sort()) created(relative);
   line();
 
-  if (schematic === "module") reportWiring(project.root, project.sourceRoot, name, options.wire);
+  // Both write a module descriptor, so both belong in the one list. What
+  // differs is only that a query's carries no registration.
+  if (schematic === "module" || schematic === "query") {
+    reportWiring(project.root, project.sourceRoot, name, options.wire, schematic);
+  }
   return 0;
 }
 
@@ -120,7 +157,13 @@ function emit(
  * insert and to check. When the marker is gone, so is the licence: the command
  * falls back to printing, which is exactly what it always did.
  */
-function reportWiring(root: string, sourceRoot: string, name: string, wire: boolean): void {
+function reportWiring(
+  root: string,
+  sourceRoot: string,
+  name: string,
+  wire: boolean,
+  schematic: Schematic
+): void {
   const wiring = wire ? wireModule(root, sourceRoot, name) : null;
 
   if (wiring?.wired) {
@@ -135,6 +178,14 @@ function reportWiring(root: string, sourceRoot: string, name: string, wire: bool
   }
 
   line();
+
+  if (schematic === "query") {
+    // Nothing to warn about a table it does not own; what is worth saying is
+    // that the aggregate is a placeholder.
+    hint("the aggregate in the repository is a starting point — replace it with your own");
+    return;
+  }
+
   warn("the table has to exist in the database too; the generic repository does not create it");
 }
 

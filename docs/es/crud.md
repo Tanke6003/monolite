@@ -261,6 +261,14 @@ export class AppointmentsService extends CrudService<IAppointment, AppointmentDt
 están varias capas más abajo y a los que nunca se les dijo nada— resuelve su
 almacén a través de ese contexto y se suma a la misma transacción. No se pasa nada.
 
+Esa resolución es lo que cablea `registerPersistence` cuando recibe un contexto
+`transactions`: cada almacén que registra se suma a la transacción que esté
+abierta y usa el pool cuando no hay ninguna. Los proyectos generados lo pasan, así
+que en el tuyo ya es cierto. Una raíz de composición escrita a mano que lo omita
+obtiene almacenes que escriben por su propia conexión pase lo que pase con el
+decorador, que es la forma silenciosa de estar mal: tres auto-commits se ven
+exactamente igual que una transacción hasta que algo falla en medio.
+
 Tres cosas al respecto que son decisiones y no accidentes:
 
 **Se suma en vez de anidar.** Un método `@Transactional()` llamado desde dentro de

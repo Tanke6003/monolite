@@ -144,6 +144,7 @@ Alias: `monolite g`.
 ```bash
 monolite generate module invoice
 monolite g entity payment-method
+monolite g query revenue --over invoice
 ```
 
 | Schematic | Qué escribe |
@@ -152,6 +153,49 @@ monolite g entity payment-method
 | `entity` | La interfaz de dominio y su mapeo a tabla |
 | `service` | Una subclase de `CrudService` para una entidad existente |
 | `controller` | Una subclase de `CrudController` para un servicio existente |
+| `query` | Repositorio + servicio + DTO + controlador, para lo que la API genérica no expresa |
+
+### `generate query`
+
+Las agregaciones, los `GROUP BY`, las vistas y los procedimientos almacenados
+quedan fuera de la API genérica a propósito: expresarlos la convertiría en un
+ORM. Lo que se escribe en su lugar son cuatro ficheros: una interfaz propia y
+pequeña, una implementación sobre `executeRaw`, un servicio y un controlador.
+
+```bash
+monolite g query revenue --over invoice
+```
+
+```
+src/infrastructure/persistence/revenue.repository.ts   interfaz + implementación
+src/application/dtos/revenue.dto.ts                    la forma publicada
+src/application/services/revenue.service.ts            filas -> DTO
+src/presentation/controllers/revenue.controller.ts     inyecta el servicio
+src/composition/modules/revenue.tokens.ts              sus tres identificadores
+src/composition/modules/revenue.module.ts              sus bindings, sin registro
+```
+
+`--over` es obligatorio y nombra la entidad que la consulta lee: es lo único que
+no se puede derivar del nombre que escribiste. El repositorio generado inyecta
+el almacén de esa entidad, lo estrecha con `asRawQueryable` y trae ya el camino
+alternativo en proceso para los drivers que no tienen SQL —que es justo la rama
+que ejercita la suite generada—.
+
+El módulo que escribe **no lleva registro**, porque una consulta no tiene tabla
+propia. Aun así entra en `composition/modules.ts` como todo lo demás, que es la
+razón de que se pueda generar siquiera.
+
+El agregado que calcula —cuántas filas hay, el id más bajo y el más alto— es un
+marcador de posición, cierto en cualquier tabla, para que el módulo responda
+antes de que escribas una línea. Sustitúyelo. Lo que merece la pena conservar es
+la forma que lo rodea: binds en vez de concatenación, nombres de columna sacados
+del mapeo y un controlador que habla con el servicio.
+
+Eso último es la razón de ser de este schematic. Todo módulo `@Crud` mantiene
+bien las capas sin que nadie piense en ello, porque `CrudController` recibe un
+`ICrudService` y no acepta otra cosa. Una consulta es el único sitio de un
+proyecto monolite donde los cuatro ficheros se escriben desde cero, así que es el
+único donde la regla se puede romper —ver [arquitectura](architecture.md)—.
 
 ### Cableado
 
@@ -173,6 +217,12 @@ era la edición: era que las ediciones estaban repartidas. Un `MonoliteModule`
 lleva juntos el registro, los bindings y el controlador, así que cablear es una
 línea en un fichero — y una línea en un fichero es lo bastante pequeño como para
 que un generador la inserte y alguien la revise.
+
+El registro es opcional. Un módulo que no tiene tabla propia —un informe que lee
+tres entidades que ya existen, una búsqueda sobre varias, un panel, un proceso de
+importación, un receptor de webhooks— lo omite y entra en la misma lista, que es
+justo el objetivo: la alternativa era un segundo sitio donde registrar cosas, y un
+segundo sitio es el problema que esta lista resolvió.
 
 El permiso para escribir viene de un marcador. `composition/modules.ts` se
 genera con `// monolite:modules` dentro y la entrada va justo encima. Mueve ese

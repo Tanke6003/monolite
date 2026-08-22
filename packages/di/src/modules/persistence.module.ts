@@ -1,5 +1,6 @@
 import { HealthProbe } from "monolite-core";
 import type { IHealthProbe } from "monolite-core";
+import { transactionAware } from "monolite-data";
 import type { IAuditTrail, IUnitOfWork } from "monolite-data";
 import { container as rootContainer, registerInstance } from "../container.js";
 import type { DependencyContainer } from "../container.js";
@@ -38,11 +39,20 @@ export function registerPersistence(options: PersistenceModuleOptions): Persiste
   // One token per entity, so a feature's repository injects its own store and
   // nothing else. The name follows the convention in `storeToken` unless the
   // registration spells one out.
+  //
+  // Each one is wrapped so that it joins whatever transaction is open. Without
+  // that, a service decorated with `@Transactional()` opens a transaction and
+  // then writes outside it on the pool's connection — quietly, because three
+  // auto-commits look exactly like one transaction until something throws in
+  // the middle. The wrapper is what makes the ambient behaviour the packages
+  // have always documented true of the stores they actually bind.
   for (const entity of persistence.entities) {
+    const store = persistence.store(entity.name);
+
     registerInstance(
       container,
       entity.token ?? storeToken(entity.name),
-      persistence.store(entity.name)
+      options.transactions ? transactionAware(store, entity.name, options.transactions) : store
     );
   }
 

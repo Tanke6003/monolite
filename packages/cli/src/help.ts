@@ -94,13 +94,17 @@ export function printGenerateHelp(): void {
   line(`  ${flag("entity")}       Domain interface and its table mapping`);
   line(`  ${flag("service")}      CrudService subclass for an existing entity`);
   line(`  ${flag("controller")}   CrudController subclass for an existing service`);
+  line(`  ${flag("query")}        Repository + service + controller for what the generic API cannot express`);
   line();
   line(heading("Options"));
   line(`  ${flag("--force")}      Overwrite files that already exist`);
+  line(`  ${flag("--over <e>")}   The entity a query reads; required by the query schematic`);
+  line(`  ${flag("--no-wire")}    Leave composition/modules.ts alone`);
   line(`  ${flag("-h, --help")}   Show this help`);
   line();
   line(heading("Examples"));
   line(color.dim("  monolite generate module invoice"));
   line(color.dim("  monolite g entity payment-method"));
+  line(color.dim("  monolite g query revenue --over invoice"));
   line();
 }

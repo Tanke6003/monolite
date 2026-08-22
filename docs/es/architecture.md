@@ -70,6 +70,24 @@ fuera. Lo que aportan los paquetes es que ahora las capas de fuera vienen *dadas
 en vez de escritas. Tus modelos de dominio y tus reglas de negocio siguen siendo
 tuyos.
 
+### Un controlador habla con un servicio, nunca con un repositorio
+
+La regla de dependencia va de *dirección*, y un controlador que se salta la capa
+de aplicación para llegar a infraestructura la cumple tal y como está escrita
+—por eso hace falta decir esto aparte—.
+
+En el hueco que se salta viven dos decisiones: **qué puede ver un cliente** y
+**qué significa la respuesta**. Un repositorio sabe contar filas. No sabe cuáles
+merecen publicarse, en qué orden ni cuántas; y un controlador que respondiera con
+filas estaría tomando las dos decisiones en la capa más lejana a ambas.
+
+Casi siempre no hay nada que recordar, porque no hay nada que se pueda romper:
+`CrudController` recibe un `ICrudService` y no acepta otra cosa, así que todo
+módulo `@Crud` tiene la forma correcta se piense en ella o no. La regla solo
+sostiene algo en el único caso en el que los cuatro ficheros se escriben desde
+cero: un informe, una búsqueda sobre varias tablas, un panel. Para eso está
+`monolite generate query`, que los escribe ya con las capas en su sitio.
+
 ---
 
 ## Ciclo de vida de una petición

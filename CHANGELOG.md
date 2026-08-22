@@ -11,6 +11,22 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **`@Transactional()` opened a transaction the repositories did not join.** The
+  guides have always said that every repository called inside one joins it and
+  that nothing is passed. Only `BaseModuleRepository` did, and a module has to
+  extend it; the stores the container binds are the driver's own, on
+  auto-commit. So a service that injected one and decorated its method opened a
+  transaction and then wrote outside it, on another connection — three
+  statements on three auto-commits, which look exactly like one transaction
+  until something in the middle throws and half the work is already committed
+  with nothing left to roll back. It did not reproduce in memory either, where
+  the transaction hands back the very same repository object, so a generated
+  suite passed and the same code lost writes the first time it met a real
+  engine. `registerPersistence` now wraps every store it binds in
+  `transactionAware`, which resolves the live one per call: the transaction's
+  while one is open, the pool's otherwise. Layers built without a transaction
+  context are untouched and keep the plain store.
+
 - **The release could publish and then fail to record what it published.** It
   pushed the version commit *after* the seven `npm publish` calls, on the
   reasoning that the irreversible step should go last. The reasoning had the
@@ -76,6 +92,38 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **`monolite generate query <name> --over <entity>`.** The shape you reach for
+  when the generic API runs out — aggregations, `GROUP BY`, views, stored
+  procedures — is four files written from a blank page: a small interface of
+  your own, an implementation on `executeRaw`, a service, a controller. It is
+  also the only place in a monolite project where the layering can go wrong, and
+  it did: writing a report by hand, the repository went into the controller and
+  returned the shape the client sees. Every `@Crud` module has it right without
+  anyone thinking about it, because `CrudController` takes an `ICrudService`
+  and will not take anything else. The schematic writes the four files with the
+  layering already correct, plus the tokens and a module descriptor, and wires
+  it into `composition/modules.ts` like any other. `--over` names the entity it
+  reads, which is the one thing that cannot be derived from the name typed; the
+  generated repository narrows that store with `asRawQueryable` and ships the
+  in-process fallback, so it answers on the in-memory driver too.
+- **`IRawQueryable<T>` and `asRawQueryable(store)`, in `monolite-data`.**
+  `executeRaw` is the documented escape hatch and it lived on no interface, so a
+  module injecting its store as `IGenericRepository<T>` — which is what the
+  container binds — could not see it, and every project needing a report would
+  invent its own narrowing. It is not on `IGenericRepository` because the
+  in-memory and MongoDB drivers have no SQL to run and a contract whose
+  implementations throw is not a contract; `asRawQueryable` returns `null`
+  there, which is what tells a report to use its fallback.
+- **A module may own no table.** `MonoliteModule.registration` is optional and
+  `entitiesOf` filters rather than maps, so a report, a search across several
+  tables, a dashboard, an import job or a webhook receiver joins the one list
+  instead of being registered by hand in the composition root. Nothing that has
+  an entity changes.
+- **The layering rule is written down.** `docs/{en,es}/architecture.md` stated
+  the dependency rule, which is about direction — and a controller reaching past
+  the application layer into infrastructure obeys it as written. It now says the
+  other thing, with the reason: what a client may see and what the answer means
+  both belong a layer below where a controller sits.
 - The generated project now uses the hardening `monolite-http` already shipped
   instead of a thinner copy of it: the per-IP rate limiter (health checks
   exempt), the allow-list CORS that exposes `X-Request-Id` and reports a blocked
