@@ -258,6 +258,14 @@ export class AppointmentsService extends CrudService<IAppointment, AppointmentDt
 layers down that were never told about it — resolves its store through that
 context and joins the same transaction. Nothing is passed.
 
+That resolution is what `registerPersistence` wires when it is given a
+`transactions` context — every store it binds joins whatever transaction is open
+and falls back to the pool when there is none. Generated projects pass it, so it
+is already true of yours. A composition root written by hand that omits it gets
+stores that write on their own connection regardless of the decorator, which is
+the quiet kind of wrong: three auto-commits look exactly like one transaction
+until something in the middle throws.
+
 Three things about it that are decisions rather than accidents:
 
 **It joins rather than nests.** A `@Transactional()` method called from inside

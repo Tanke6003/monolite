@@ -1,4 +1,6 @@
 import { HealthProbe, type IHealthProbe } from "monolite-core";
+import { AsyncTransactionContext } from "monolite-data";
+import type { IGenericRepository, ITransactionScope } from "monolite-data";
 import {
   container as rootContainer,
   createContainer,
@@ -202,5 +204,76 @@ describe("registerPersistence", () => {
     // ignores an undefined resource rather than making the caller branch.
     expect(layer).toHaveProperty("connection");
     expect(layer.driver).toBe("memory");
+  });
+});
+
+/**
+ * The bound store and the ambient transaction.
+ *
+ * `@Transactional()` opens a transaction and publishes it on an
+ * `ITransactionContext`; the documentation has always said every repository
+ * called underneath joins it. That was only true of `BaseModuleRepository`,
+ * which a module has to extend. The stores bound here are the driver's own —
+ * auto-commit — so a service that injected one and decorated its method opened
+ * a transaction and then wrote outside it, on another connection.
+ *
+ * It is quiet in exactly the wrong way: three statements on three auto-commits
+ * look like one transaction right up until something in the middle throws, and
+ * then half of it is committed with nothing left to roll back. And it does not
+ * show in memory, where the scope hands back the very same repository object,
+ * which is why the demo only broke once it was pointed at PostgreSQL.
+ */
+describe("the store a module injects", () => {
+  /** A stand-in for the store the driver would bind to the transaction. */
+  function boundStore() {
+    const inserted: string[] = [];
+    const store = {
+      insert: async (widget: Partial<IWidget>) => {
+        inserted.push(widget.name ?? "");
+        return widget as IWidget;
+      },
+    };
+    return { store, inserted };
+  }
+
+  it("joins the transaction that is open, instead of writing on the pool", async () => {
+    const transactions = new AsyncTransactionContext();
+    const { container } = registerOneEntity({ transactions });
+    const { store: bound, inserted } = boundStore();
+
+    const injected = container.resolve<IGenericRepository<IWidget>>(storeToken("WIDGETS"));
+    const before = (await injected.getAll()).length;
+
+    await transactions.run(
+      {
+        repository: () => bound as unknown as IGenericRepository<IWidget>,
+        lockRow: async () => true,
+      } as ITransactionScope,
+      () => injected.insert({ name: "inside" })
+    );
+
+    expect(inserted).toEqual(["inside"]);
+    // And nothing reached the pool's store, which is the half that used to fail.
+    expect(await injected.getAll()).toHaveLength(before);
+  });
+
+  it("uses the pool outside a transaction, which is every other call", async () => {
+    const transactions = new AsyncTransactionContext();
+    const { container } = registerOneEntity({ transactions });
+
+    const injected = container.resolve<IGenericRepository<IWidget>>(storeToken("WIDGETS"));
+    const before = (await injected.getAll()).length;
+
+    await injected.insert({ name: "outside" });
+
+    expect(await injected.getAll()).toHaveLength(before + 1);
+  });
+
+  it("is still the plain store when the layer was built without a context", async () => {
+    const { container, layer } = registerOneEntity();
+
+    // Nothing to join, so nothing to wrap: an application that never opens a
+    // transaction gets the driver's store with no proxy in front of it.
+    expect(container.resolve(storeToken("WIDGETS"))).toBe(layer.store("WIDGETS"));
   });
 });

@@ -158,6 +158,9 @@ export type {
 export { MongoConnector } from "./connectors/mongo-connector.js";
 export type { MongoConnectionConfig } from "./connectors/mongo-connector.js";
 
+// ----------------------------------------------------------  transactions  ---
+export { transactionAware } from "./transaction-aware.js";
+
 // --------------------------------------------------------------- testing ---
 
 export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./testing/repository-contract.js";
