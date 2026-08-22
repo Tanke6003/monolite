@@ -33,8 +33,9 @@ The CLI asks, in order:
 | Description / author / license | — / — / MIT | `package.json`, `LICENSE` |
 | Database family | SQL | which of the next questions you see |
 | Engine | PostgreSQL | the driver dependency, the docker service, the SQL dialect, the seed schema |
+| API documentation | Swagger UI | which reader is mounted: Swagger UI, Scalar, both, or none |
 | Connection details | per-engine defaults | `.env.example` (never a real password) |
-| Authentication | yes | adds `monolite-auth`, a login module and a guard on the example routes |
+| Authentication | **no** | adds `monolite-auth`, a login module and a guard on the example routes |
 | Example CRUD module | yes | one entity end to end, so the pattern is visible |
 | API prefix | `/api/v1` | `API_PREFIX` in the environment |
 | Package manager | npm | lockfile and the install command it runs |
@@ -190,4 +191,6 @@ pod that will not terminate is worse than one that terminates rudely.
 - [Data access](data-access.md) — the repository contract in depth
 - [Decorated routes and OpenAPI](routing.md)
 - [Generic CRUD](crud.md)
+- [Authentication](authentication.md)
+- [CLI reference](cli.md) — every schematic, and the `db:sql` / `db:migration` scripts
 - [Testing](testing.md)

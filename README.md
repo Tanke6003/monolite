@@ -110,10 +110,35 @@ npm run check      # all of the above
 The repository is an npm workspace. Packages reference each other through
 TypeScript project references, so `tsc --build` rebuilds only what changed.
 
+## Contributing
+
+Issues and pull requests are welcome, and disagreement about the design most of
+all — the packages are full of comments explaining why a decision went one way,
+and the ones that were argued about are the better half.
+
+- [Contributing](./CONTRIBUTING.md) — setup, where code goes, what the tests are
+  for, and the commit convention the release is computed from
+- [Code of conduct](./CODE_OF_CONDUCT.md) — the one rule that keeps a design
+  argument about the design
+- [Security](./SECURITY.md) — not through a public issue
+
+You do not need a database to contribute: `npm run check` runs with nothing
+installed, and the in-memory driver is a complete engine. Touching a driver or a
+dialect does need one, and `npm run engines:up` starts all five.
+
 ## Status
 
-`0.1.0`. The packages were extracted from a working production-shaped template and
-carry its test suite, but the public API is not frozen yet. Pin exact versions.
+`0.8.0`, and pre-1.0 in the way that matters: the seven packages share one
+version number and the public API can change in a minor release. Pin exact
+versions — the changelog records every break with the search and replace it
+needs.
+
+What that number does *not* mean is untested. The unit suite is 1100 assertions
+over every package; the scaffold suite generates five projects, type-checks
+every file each one writes and boots one to serve real requests; the
+documentation's examples are compiled in CI in both languages; and the
+integration suite runs the whole repository contract against PostgreSQL, MySQL,
+SQL Server, Oracle and MongoDB on every push.
 
 ## License
 

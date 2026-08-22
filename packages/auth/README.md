@@ -197,6 +197,7 @@ whose id you keep in your own table.
 | `ScryptPasswordHasher`, `ScryptPasswordHasherOptions` | The dependency-free hasher |
 | `requireAuth`, `requireRoles`, `authenticatedUser`, `RequireAuthOptions` | Route guards |
 | `AuthController`, `loginSchema`, `authResultSchema` | `POST /auth/login` |
+| `AUTH_TOKENS`, `AuthToken` | The DI identifiers, which is what you register your own `IUserProvider` under |
 
 ## License
 
