@@ -28,75 +28,6 @@ jobs:
     # a time on purpose.
     timeout-minutes: 30
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_PASSWORD: monolite
-          POSTGRES_USER: monolite
-          POSTGRES_DB: monolite
-        ports: ["55432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U monolite -d monolite"
-          --health-interval 3s
-          --health-timeout 5s
-          --health-retries 30
-
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: monolite
-          MYSQL_DATABASE: monolite
-        ports: ["55306:3306"]
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pmonolite --silent"
-          --health-interval 3s
-          --health-timeout 5s
-          --health-retries 40
-
-      mssql:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: "Monolite_2026!"
-          MSSQL_PID: Developer
-        ports: ["51433:1433"]
-        options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Monolite_2026! -C -Q 'SELECT 1' || exit 1"
-          --health-interval 5s
-          --health-timeout 10s
-          --health-retries 40
-
-      mongo:
-        image: mongo:7
-        ports: ["57017:27017"]
-        # A replica set of one, initiated from the health check so the whole
-        # thing stays in this file. MongoDB refuses to open a transaction on a
-        # standalone, and transactions are half of what this suite checks.
-        options: >-
-          --health-cmd "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }\" | grep -q 1"
-          --health-interval 3s
-          --health-timeout 10s
-          --health-retries 40
-        # The set advertises an address only reachable inside the container, so
-        # the driver is told not to go looking; see `MONGO_OPTIONS` below.
-
-      oracle:
-        # The community build of Oracle Database Free. Far smaller than the
-        # vendor image and it needs no registry login, which is what makes it
-        # runnable here at all.
-        image: gvenzl/oracle-free:slim
-        env:
-          ORACLE_PASSWORD: monolite
-          APP_USER: monolite
-          APP_USER_PASSWORD: monolite
-        ports: ["51521:1521"]
-        options: >-
-          --health-cmd healthcheck.sh
-          --health-interval 10s
-          --health-timeout 10s
-          --health-retries 60
-
     steps:
       - uses: actions/checkout@v4
 
@@ -107,6 +38,19 @@ jobs:
 
       - run: npm ci
 
+      # The same compose file a developer runs, rather than the same five servers
+      # redeclared as service containers.
+      #
+      # Two reasons, and the second is why this is not a preference. A second
+      # declaration is a second thing to keep in step, and it would drift the
+      # first time somebody bumped an image locally. And service containers
+      # cannot set a command: MongoDB needs `--replSet` to accept a transaction
+      # at all, so the health check would try to initiate a replica set on a
+      # server that was never started with replication enabled — which is
+      # exactly how this failed the first time it ran.
+      - name: Start the engines
+        run: npm run engines:up
+
       # The suite refuses to skip an engine it was asked for, so naming all five
       # here is what makes a server that failed to come up a red build rather
       # than a quiet one. "Integration tests passed" has to mean something.
@@ -114,11 +58,18 @@ jobs:
         run: npm run test:integration
         env:
           MONOLITE_IT_ENGINES: postgres,mysql,mssql,oracle,mongodb
-          MONOLITE_IT_MONGO_OPTIONS: directConnection=true
 
-      # It also generates the schema it runs against, from the entity metadata,
-      # so a green run is a statement about the DDL generator too. Worth saying
-      # out loud in the log rather than leaving in a comment.
+      - name: What the engines said while it ran
+        if: failure()
+        run: docker compose -f docker/integration/docker-compose.yml logs --tail 80
+
+      - name: Stop them
+        if: always()
+        run: npm run engines:down
+
+      # The suite also generates the schema it runs against, from the entity
+      # metadata, so a green run is a statement about the DDL generator too.
+      # Worth saying in the log rather than leaving in a comment.
       - name: What that just verified
         if: success()
         run: |
