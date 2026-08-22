@@ -436,8 +436,49 @@ const statusColumn = store.schema.columnOf("status");
 const rows = await store.executeRaw<{ STATUS: string; TOTAL: number }>(sql, binds);
 ```
 
-A module that takes that path usually keeps a JavaScript fallback for the non-SQL
-engines, so it still works under the in-memory driver and MongoDB.
+Neither member is on `IGenericRepository`, which is what the container binds and
+what a module normally injects. Ask for them with `asRawQueryable`:
+
+```ts
+import { asRawQueryable } from "monolite-data";
+import type { IGenericRepository } from "monolite-data";
+
+interface IAppointment {
+  pkAppointment: number;
+  status: string;
+}
+
+async function countByStatus(
+  store: IGenericRepository<IAppointment>
+): Promise<{ status: string; total: number }[]> {
+  const sql = asRawQueryable(store);
+
+  if (!sql) {
+    const all = await store.getAll();
+    const counts = new Map<string, number>();
+    for (const one of all) counts.set(one.status, (counts.get(one.status) ?? 0) + 1);
+    return [...counts].map(([status, total]) => ({ status, total }));
+  }
+
+  const column = sql.schema.columnOf("status");
+  const rows = await sql.executeRaw<{ STATUS: string; TOTAL: number }>(
+    `SELECT ${column} AS STATUS, COUNT(*) AS TOTAL FROM ${sql.schema.table} GROUP BY ${column}`
+  );
+
+  return rows.map((row) => ({ status: row.STATUS, total: Number(row.TOTAL) }));
+}
+```
+
+The `null` is the point. The in-memory and MongoDB drivers have no SQL to run and
+cannot pretend otherwise, so `executeRaw` is not on the shared contract: putting
+it there would mean two of the three implementations throwing, and a contract
+whose implementations throw is not a contract. `IRawQueryable<T>` says the true
+thing — *some* stores can run SQL — and asking is one line instead of the
+narrowing each project would otherwise invent for itself.
+
+Keep the fallback rather than treating `null` as a misconfiguration: the
+in-memory driver is what the generated test suite runs on, so the branch that
+computes the same answer in the process is the one your tests exercise.
 
 ---
 

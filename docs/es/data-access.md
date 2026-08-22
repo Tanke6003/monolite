@@ -446,6 +446,53 @@ const statusColumn = store.schema.columnOf("status");
 const rows = await store.executeRaw<{ STATUS: string; TOTAL: number }>(sql, binds);
 ```
 
+Ninguno de los dos miembros está en `IGenericRepository`, que es lo que registra
+el contenedor y lo que un módulo inyecta normalmente. Se piden con
+`asRawQueryable`:
+
+```ts
+import { asRawQueryable } from "monolite-data";
+import type { IGenericRepository } from "monolite-data";
+
+interface IAppointment {
+  pkAppointment: number;
+  status: string;
+}
+
+async function countByStatus(
+  store: IGenericRepository<IAppointment>
+): Promise<{ status: string; total: number }[]> {
+  const sql = asRawQueryable(store);
+
+  if (!sql) {
+    const all = await store.getAll();
+    const counts = new Map<string, number>();
+    for (const one of all) counts.set(one.status, (counts.get(one.status) ?? 0) + 1);
+    return [...counts].map(([status, total]) => ({ status, total }));
+  }
+
+  const column = sql.schema.columnOf("status");
+  const rows = await sql.executeRaw<{ STATUS: string; TOTAL: number }>(
+    `SELECT ${column} AS STATUS, COUNT(*) AS TOTAL FROM ${sql.schema.table} GROUP BY ${column}`
+  );
+
+  return rows.map((row) => ({ status: row.STATUS, total: Number(row.TOTAL) }));
+}
+```
+
+El `null` es justamente el punto. Los drivers en memoria y de MongoDB no tienen
+SQL que ejecutar y no pueden fingir lo contrario, así que `executeRaw` no está en
+el contrato común: ponerlo ahí obligaría a que dos de las tres implementaciones
+lanzaran, y un contrato cuyas implementaciones lanzan no es un contrato.
+`IRawQueryable<T>` dice lo que sí es cierto —*algunos* almacenes saben ejecutar
+SQL— y preguntarlo es una línea en vez del narrowing que cada proyecto se
+inventaría por su cuenta.
+
+Conviene mantener el camino alternativo en lugar de tratar el `null` como un
+error de configuración: el driver en memoria es sobre el que corre la suite
+generada, así que la rama que calcula la misma respuesta en el proceso es la que
+tus pruebas ejercitan.
+
 Un módulo que toma ese camino suele mantener un respaldo en JavaScript para los
 motores que no son SQL, así que sigue funcionando con el driver de memoria y con
 MongoDB.

@@ -8,6 +8,7 @@ import type {
   QueryOptions,
   WhereFilter,
 } from "../contracts/generic-repository.js";
+import type { IRawQueryable } from "../contracts/raw-queryable.js";
 import type { ISqlExecutor, SqlExecuteResult } from "../contracts/sql-executor.js";
 import type { AuditAction, AuditActor, IAuditTrail } from "../contracts/audit-trail.js";
 import { EntityMetadata, EntitySchema } from "../metadata/entity-metadata.js";
@@ -31,7 +32,7 @@ import type { SqlDialect } from "../dialects/sql-dialect.js";
  * mapping, so no user data is ever concatenated into the SQL.
  */
 export class SqlGenericRepository<T extends object, TKey = number>
-  implements IGenericRepository<T, TKey>
+  implements IGenericRepository<T, TKey>, IRawQueryable<T>
 {
   readonly schema: EntitySchema<T>;
 

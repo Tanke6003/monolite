@@ -161,6 +161,10 @@ export type { MongoConnectionConfig } from "./connectors/mongo-connector.js";
 // ----------------------------------------------------------  transactions  ---
 export { transactionAware } from "./transaction-aware.js";
 
+// ------------------------------------------------------------------  raw  ---
+export { asRawQueryable } from "./contracts/raw-queryable.js";
+export type { IRawQueryable } from "./contracts/raw-queryable.js";
+
 // --------------------------------------------------------------- testing ---
 
 export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./testing/repository-contract.js";
