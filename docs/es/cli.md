@@ -127,6 +127,7 @@ mi-api/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   el cableado propio del motor
 │   ├── composition/modules.ts        la única lista a la que se añade un módulo
+│   ├── scripts/              db:sql y db:migration, sobre esa misma lista
 │   └── presentation/routes.ts           monta todos los controladores decorados
 └── tests/smoke.test.ts       pasa a la primera
 ```
@@ -134,6 +135,29 @@ mi-api/
 El proyecto compila y su suite de pruebas pasa antes de que escribas una línea. Ese
 es el contrato al que la CLI se somete, y CI lo comprueba en cada push generando dos
 proyectos y ejecutándolos.
+
+---
+
+## Los scripts que trae un proyecto
+
+Dos de ellos no van de ejecutar la aplicación, y son la razón de que el scaffold
+ya no te diga que te escribas el esquema tú.
+
+| Script | Qué hace |
+| --- | --- |
+| `npm run db:sql` | `CREATE TABLE` de cada entidad registrada, por dialecto |
+| `npm run db:migration -- <nombre>` | Lo que cambió desde la anterior, como un `.sql` con marca de tiempo |
+
+```bash
+npm run db:sql -- --out db/schema.sql
+npm run db:migration -- add-invoice-notes
+```
+
+Viven en el proyecto y no en el CLI, y no es casualidad: `monolite-cli` **no
+tiene dependencias de ejecución** y por tanto no puede cargar tus entidades. Tu
+proyecto ya las tiene. En [acceso a datos](data-access.md) está qué tiene que
+decir el mapeo, por qué no hay runner de migraciones y lo único que un diff no
+puede ver.
 
 ---
 

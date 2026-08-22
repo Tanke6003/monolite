@@ -11,6 +11,15 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **The scaffold suite could fail on a mistake the previous run made.** It
+  generated into one fixed directory and removed it on the way out, and on
+  Windows a directory a just-closed server still holds is briefly undeletable —
+  so `rmSync` threw part way through and left a tree with some of its folders
+  gone. The next run generated into what was left and failed an assertion about
+  files the generator had written perfectly well, which is two runs of debugging
+  the wrong thing. Each run now works inside a directory named after its own
+  process, and prunes on the way in as well as out.
+
 - **`@Transactional()` opened a transaction the repositories did not join.** The
   guides have always said that every repository called inside one joins it and
   that nothing is passed. Only `BaseModuleRepository` did, and a module has to
@@ -92,6 +101,49 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **DDL from the entity metadata: `db:sql` and `db:migration`.** This was the
+  largest gap in the toolkit. `defineEntity` already carried every fact a
+  `CREATE TABLE` needs — physical names, types, the key and whether it is
+  generated, the soft-delete flag, the timestamps, the audit columns and, since
+  relations were declared, the foreign keys — and none of it was used for that.
+  So the schema was maintained twice: once as metadata the code reads, once as
+  SQL written by hand, with nothing checking that the two agreed.
+
+  They disagree in ways that are hard to guess at. The mapping writes a boolean
+  as `1` and `0`, so a column declared `BOOLEAN` in PostgreSQL rejects every
+  insert the repository makes — a demo lost an afternoon to exactly that before
+  the column became `SMALLINT`, which is what the generator emits. Oracle,
+  SQL Server, PostgreSQL and MySQL each get their own type map;
+  `ddlDialectFor` answers `null` for the two engines that have no schema
+  rather than pretending to have one.
+
+  A generated project gets two scripts over the same `MODULES` list the
+  application is built from: `db:sql` writes the whole schema, and
+  `db:migration -- <name>` writes what changed since the last one. They live in
+  the project because `monolite-cli` has no runtime dependencies and cannot
+  load your entities; your project already has them.
+
+  **When nothing changed, no migration is written** — a tool that emits an empty
+  file every run teaches people to stop reading its output. Anything that
+  destroys data is written commented out. And a rename is emitted as a drop and
+  an add with a note saying so, because nothing in the mapping distinguishes the
+  two and guessing would silently drop a populated column.
+
+  **There is no runner, on purpose.** The output is plain SQL for umzug,
+  node-pg-migrate, Flyway or `psql < file`. Owning a runner means owning an
+  applied-migrations table, locking, ordering and rollback, and a toolkit you
+  adopt one package at a time should not make you switch migration tools to use
+  its entity mapping. Generating at startup was rejected for a shorter reason: a
+  process that alters a schema on boot alters production on a bad deploy.
+
+  Verified against PostgreSQL 16 end to end — script applied, columns, keys,
+  constraints and indexes read back from `information_schema`, and a generated
+  migration applied to a live table.
+- **Five optional fields on the mapping, read by the generator and nothing
+  else.** `length` (255, or `"max"`), `precision`/`scale`, `nullable` (true,
+  except the key), `unique`, `default` (literal SQL), plus `indexes` on the
+  entity for the composite case. An entity that sets none of them still maps,
+  queries and writes exactly as before.
 - **`monolite generate query <name> --over <entity>`.** The shape you reach for
   when the generic API runs out — aggregations, `GROUP BY`, views, stored
   procedures — is four files written from a blank page: a small interface of

@@ -126,6 +126,7 @@ my-api/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   the engine-specific wiring
 │   ├── composition/modules.ts        the one list a module is added to
+│   ├── scripts/              db:sql and db:migration, over that same list
 │   └── presentation/routes.ts           mounts every decorated controller
 └── tests/smoke.test.ts       passes on the first run
 ```
@@ -133,6 +134,29 @@ my-api/
 The project builds and its test suite passes before you write a line. That is the
 contract the CLI holds itself to, and CI checks it on every push by generating two
 projects and running them.
+
+---
+
+## The scripts a project ships with
+
+Two of them are not about running the application, and they are the reason the
+scaffold no longer tells you to go and write the schema yourself.
+
+| Script | What it does |
+| --- | --- |
+| `npm run db:sql` | `CREATE TABLE` for every registered entity, per dialect |
+| `npm run db:migration -- <name>` | What changed since the last one, as a timestamped `.sql` |
+
+```bash
+npm run db:sql -- --out db/schema.sql
+npm run db:migration -- add-invoice-notes
+```
+
+They live in the project rather than in the CLI, and that is not an accident:
+`monolite-cli` has **no runtime dependencies** and therefore cannot load your
+entities. Your project already has them. See
+[data access](data-access.md) for what the mapping needs to say, for why there is
+no migration runner, and for the one thing a diff cannot see.
 
 ---
 

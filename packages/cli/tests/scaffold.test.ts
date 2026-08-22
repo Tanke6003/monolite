@@ -3,6 +3,7 @@ import path from "node:path";
 import ts from "typescript";
 import { missingSchemaRefs } from "monolite-http";
 
+import { emitSchema, postgresDdl } from "monolite-data";
 import { generateCommand } from "../src/commands/generate";
 import { newCommand } from "../src/commands/new";
 
@@ -25,15 +26,27 @@ import { newCommand } from "../src/commands/new";
  */
 
 /**
- * Inside the repository, not in `os.tmpdir()`, and outside `packages/`.
+ * Inside the repository, not in `os.tmpdir()`, outside `packages/`, and in a
+ * directory of this run's own.
  *
  * Inside, because the generated project imports `express`, `zod` and the rest,
  * and the only way those resolve is by walking up to this repository's
  * `node_modules`. Outside `packages/`, because Jest collects `**\/tests\/**`
  * under it and would otherwise try to run the scaffold's own smoke test as if
  * it were one of ours.
+ *
+ * Per run, because one fixed path reused by everybody is a flake waiting to
+ * happen on Windows: a directory a just-closed server still holds is briefly
+ * undeletable, so the teardown's `rmSync` throws **part way through** and leaves
+ * a tree with some of its folders gone. The next run generates into what is
+ * left, finds files missing that the generator wrote perfectly well, and fails
+ * an assertion about the wrong thing entirely. The parent is pruned on the way
+ * in as well as on the way out, and the run works inside a child named after
+ * its own process — so even a prune that fails completely cannot hand this run
+ * somebody else's leftovers.
  */
-const SCRATCH = path.resolve(__dirname, "..", "..", "..", ".scaffold-tests");
+const SCRATCH_ROOT = path.resolve(__dirname, "..", "..", "..", ".scaffold-tests");
+const SCRATCH = path.join(SCRATCH_ROOT, String(process.pid));
 
 const PACKAGES = path.resolve(__dirname, "..", "..");
 
@@ -233,13 +246,42 @@ function generateInto(target: string, ...argv: string[]): void {
   }
 }
 
+/**
+ * Cleaned on the way in as well as on the way out.
+ *
+ * The teardown alone is not enough, and the way it fails is nasty. On Windows a
+ * directory a just-closed server still holds is briefly undeletable, so
+ * `rmSync` throws and leaves a half-removed tree behind — and then the *next*
+ * run generates into it, finds `tests/` already gone, and fails an assertion
+ * about a suite the generator wrote perfectly well. Two runs later somebody is
+ * debugging the wrong thing.
+ *
+ * Removing it first makes every run start from the same state whatever the last
+ * one managed to clean up.
+ */
 beforeAll(() => {
+  discard(SCRATCH_ROOT);
   fs.mkdirSync(SCRATCH, { recursive: true });
 });
 
 afterAll(() => {
-  fs.rmSync(SCRATCH, { recursive: true, force: true });
+  discard(SCRATCH);
 });
+
+/**
+ * Removes a tree, and does not fail the suite when it cannot.
+ *
+ * `force` already swallows a missing directory; a **busy** one still throws,
+ * and turning scratch space the next run will clear anyway into a red build
+ * would report a tidiness problem as a broken generator.
+ */
+function discard(directory: string): void {
+  try {
+    fs.rmSync(directory, { recursive: true, force: true });
+  } catch {
+    // Left for the next run's `beforeAll`, which works in a directory of its own.
+  }
+}
 
 describe("the projects `monolite new` writes", () => {
   // Generating three projects and running the compiler over each is well past
@@ -545,6 +587,40 @@ describe("the projects `monolite new` writes", () => {
 
         expect(repository).toContain("Promise<RevenueRow[]>");
         expect(repository).not.toContain("RevenueDTO");
+      });
+
+      /**
+       * The DDL a project can generate for the modules it was given.
+       *
+       * The scaffold used to print `the table has to exist in the database too`
+       * and stop there, which left the reader to write the schema by hand from
+       * the mapping the generator had just produced — two descriptions of one
+       * table, kept in agreement by nobody. This is that message coming true.
+       *
+       * It reads the *emitted* module list rather than the sources, because what
+       * matters is that the entity the generator wrote is one the emitter can
+       * read, and the compiled tree is the closest thing to what `db:sql` loads.
+       */
+      it("emits DDL for the entities it generated", () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { MODULES } = require(path.join(target, "dist", "composition", "modules.js")) as {
+          MODULES: { registration?: { metadata: unknown } }[];
+        };
+
+        const entities = MODULES.map((one) => one.registration?.metadata).filter(Boolean);
+        const script = emitSchema(entities as never[], postgresDdl);
+
+        expect(script).toContain("CREATE TABLE PRODUCTS (");
+        expect(script).toContain("CREATE TABLE INVOICES (");
+        expect(script).toContain("NAME VARCHAR(150) NOT NULL");
+
+        // The one that used to cost an afternoon: the mapping writes 1 and 0, so
+        // the column cannot be BOOLEAN, and only the mapping knows that.
+        expect(script).toContain("AVAILABLE SMALLINT DEFAULT 1 NOT NULL");
+
+        // The query module carries no registration, so it contributes no table —
+        // which is the other half of a module being allowed not to own one.
+        expect(script).not.toContain("REVENUE");
       });
 
       it("serves the example module, seeded", async () => {
