@@ -90,11 +90,12 @@ export function printGenerateHelp(): void {
   line("command works from any subdirectory — and refuses to run outside a project.");
   line();
   line(heading("Schematics"));
-  line(`  ${flag("module")}       Entity + store registration + service + controller, wired with @Crud`);
+  line(`  ${flag("module")}       Entity + store registration + BLL + controller, wired with @Crud`);
   line(`  ${flag("entity")}       Domain interface and its table mapping`);
-  line(`  ${flag("service")}      CrudService subclass for an existing entity`);
-  line(`  ${flag("controller")}   CrudController subclass for an existing service`);
-  line(`  ${flag("query")}        Repository + service + controller for what the generic API cannot express`);
+  line(`  ${flag("bll")}          CrudBLL subclass for an existing entity`);
+  line(`  ${flag("controller")}   CrudController subclass for an existing BLL`);
+  line(`  ${flag("query")}        Repository + BLL + controller for what the generic API cannot express`);
+  line(`  ${flag("repository")}   This entity's store plus its own queries, on executeRaw`);
   line();
   line(heading("Options"));
   line(`  ${flag("--force")}      Overwrite files that already exist`);
@@ -106,5 +107,6 @@ export function printGenerateHelp(): void {
   line(color.dim("  monolite generate module invoice"));
   line(color.dim("  monolite g entity payment-method"));
   line(color.dim("  monolite g query revenue --over invoice"));
+  line(color.dim("  monolite g repository invoice"));
   line();
 }

@@ -28,8 +28,8 @@ export interface AuthUserWithSecret extends AuthUser {
 export interface IUserProvider {
   /**
    * `null` when the user does not exist. It never throws for "not found" —
-   * telling a missing user apart from a broken lookup is what lets the service
-   * answer both cases identically on purpose (see `AuthService`).
+   * telling a missing user apart from a broken lookup is what lets the BLL
+   * answer both cases identically on purpose (see `AuthBLL`).
    */
   findByEmail(email: string): Promise<AuthUserWithSecret | null>;
 }
@@ -84,15 +84,15 @@ export interface SignedToken {
  *
  * Generic over the payload so a caller gets its own claims back typed, instead
  * of casting a bag of `unknown` at every call site. The default implementation
- * is JWT (see `jwt.token-service.ts`), but nothing above this interface knows
+ * is JWT (see `jwt.token-bll.ts`), but nothing above this interface knows
  * that: an application with opaque tokens backed by a store implements the same
  * two methods.
  */
-export interface ITokenService {
+export interface ITokenBLL {
   /**
    * Signs `payload` and reports the lifetime that was applied.
    *
-   * @param expiresIn Overrides the service's default lifetime for this token.
+   * @param expiresIn Overrides the BLL's default lifetime for this token.
    */
   sign<TPayload extends object>(payload: TPayload, expiresIn?: string | number): SignedToken;
 
@@ -109,12 +109,12 @@ export interface ITokenService {
  * in this package either feeds it (the user provider, the hasher) or consumes
  * what it produced (the middleware that verifies the token).
  */
-export interface IAuthService {
+export interface IAuthBLL {
   /**
    * Exchanges credentials for a token.
    *
    * @throws AppError 401 when the credentials do not check out — always the
-   * same error, whatever the reason (see `AuthService`).
+   * same error, whatever the reason (see `AuthBLL`).
    */
   login(credentials: Credentials): Promise<AuthResult>;
 }

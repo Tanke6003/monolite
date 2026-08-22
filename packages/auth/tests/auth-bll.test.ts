@@ -21,11 +21,11 @@
  */
 import { AppError } from "monolite-core";
 import {
-  AuthService,
+  AuthBLL,
   ScryptPasswordHasher,
   type AuthUserWithSecret,
   type IPasswordHasher,
-  type ITokenService,
+  type ITokenBLL,
   type IUserProvider,
 } from "monolite-auth";
 
@@ -38,10 +38,10 @@ const ana: AuthUserWithSecret = {
 };
 
 interface Harness {
-  service: AuthService;
+  service: AuthBLL;
   users: jest.Mocked<IUserProvider>;
   hasher: jest.Mocked<IPasswordHasher>;
-  tokens: jest.Mocked<ITokenService>;
+  tokens: jest.Mocked<ITokenBLL>;
 }
 
 function harness(options: { dummyPasswordHash?: string; expiresIn?: string | number } = {}): Harness {
@@ -55,14 +55,14 @@ function harness(options: { dummyPasswordHash?: string; expiresIn?: string | num
   const tokens = {
     sign: jest.fn(() => ({ token: "signed-token", expiresIn: 3600 })),
     verify: jest.fn(),
-  } as unknown as jest.Mocked<ITokenService>;
+  } as unknown as jest.Mocked<ITokenBLL>;
 
-  return { service: new AuthService(users, hasher, tokens, options), users, hasher, tokens };
+  return { service: new AuthBLL(users, hasher, tokens, options), users, hasher, tokens };
 }
 
 /** Runs a login that is expected to fail and hands back the error it produced. */
 async function failedLogin(
-  service: AuthService,
+  service: AuthBLL,
   credentials: { email: string; password: string }
 ): Promise<AppError> {
   try {
@@ -290,7 +290,7 @@ describe("the timing of a failed login", () => {
   const tokens = {
     sign: () => ({ token: "t", expiresIn: 1 }),
     verify: () => ({}),
-  } as unknown as ITokenService;
+  } as unknown as ITokenBLL;
 
   /** The fastest of several runs: the least noisy statistic available here. */
   const fastestOf = async (attempt: () => Promise<unknown>): Promise<number> => {
@@ -312,7 +312,7 @@ describe("the timing of a failed login", () => {
       findByEmail: async (email) => (email === known.email ? known : null),
     };
 
-    const service = new AuthService(users, hasher, tokens);
+    const service = new AuthBLL(users, hasher, tokens);
 
     // Warm up, so the one-off derivation of the dummy hash is not counted.
     await failedLogin(service, { email: "nobody@example.com", password: "x" });

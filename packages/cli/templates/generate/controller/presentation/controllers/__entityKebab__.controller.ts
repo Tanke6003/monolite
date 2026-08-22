@@ -8,7 +8,7 @@ import {
   update__entityName__Schema,
   __entityCamel__QuerySchema,
 } from "../../application/dtos/__entityKebab__.dto";
-import type { __entityName__Service } from "../../application/services/__entityKebab__.service";
+import type { __entityName__BLL } from "../../application/bll/__entityKebab__.bll";
 import { __entityUpper___TOKENS } from "../../composition/modules/__entityKebab__.tokens";
 
 /**
@@ -41,9 +41,9 @@ import { __entityUpper___TOKENS } from "../../composition/modules/__entityKebab_
 })
 export class __entityName__Controller extends CrudController {
   constructor(
-    @inject(__entityUpper___TOKENS.service) service: __entityName__Service,
+    @inject(__entityUpper___TOKENS.bll) bll: __entityName__BLL,
     @inject(TOKENS.IRequestContext) context: IRequestContext
   ) {
-    super(service, context, "__resourceLabel__");
+    super(bll, context, "__resourceLabel__");
   }
 }

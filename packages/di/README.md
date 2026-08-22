@@ -21,8 +21,8 @@ the factories and the composition-root helpers already written.
 The split also draws the line the framework cares about most: **the framework
 scaffolding is registered here; your features are registered by you.** The two
 modules this package ships (`registerPlugins` and `registerPersistence`) cover
-the cross-cutting services and the persistence layer, which every application
-needs and no application wants to write again. Your repositories, services and
+the cross-cutting pieces and the persistence layer, which every application
+needs and no application wants to write again. Your repositories, BLLs and
 controllers stay in your own modules, in your own repository, and go on the same
 container right after.
 
@@ -32,14 +32,14 @@ container right after.
 
 | Export | What it is |
 | --- | --- |
-| `TOKENS` | The framework-level identifiers: `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext`, `IHealthProbe`, `ITokenService`, `IFileStorage`, `IDbPlugin`, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore`. |
+| `TOKENS` | The framework-level identifiers: `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext`, `IHealthProbe`, `ITokenBLL`, `IFileStorage`, `IDbPlugin`, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore`. |
 | `Token`, `TokenName` | The value and the key types of the table. |
 | `storeToken` | The token an entity's generic repository is registered under (`USERS` → `USERSStore`). |
 
 tsyringe resolves by string, so a typo in an `@inject("ILoger")` compiles and
 blows up at run time, with the process already up. Going through `TOKENS` means
 the compiler sees the typo. Feature tokens are *not* here on purpose: your
-service, your repository and your controller belong to your application, and
+BLL, your repository and your controller belong to your application, and
 hosting them here would make every consumer inherit a vocabulary of entities it
 does not have. Declare your own table and use both side by side.
 
@@ -75,8 +75,21 @@ dependency.
 
 | Export | What it registers |
 | --- | --- |
-| `registerPlugins` | `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext` and, if given, `ITokenService` and `IFileStorage`. |
-| `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. |
+| `registerPlugins` | `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext` and, if given, `ITokenBLL` and `IFileStorage`. |
+| `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Each store is wrapped so it joins whatever transaction is open, which is what makes `@Transactional()` true of the repositories a module injects. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. |
+| `registerModules` | Every feature module's own bindings, from the one list in `composition/modules.ts`. Order does not matter: tsyringe resolves when somebody asks, not when something is registered. |
+
+### Modules
+
+| Export | What it is |
+| --- | --- |
+| `MonoliteModule<T>`, `AnyMonoliteModule` | A feature module as one value: its entity registration, its bindings and its controller. One line in one list instead of three edits in three files, which is also what makes it something a generator can insert. |
+| `entitiesOf` | The registrations the persistence layer wants, in the order they were listed. |
+
+`registration` is optional. A module that owns no table — a report reading
+entities that already exist, a search across several, a dashboard, a webhook
+receiver — leaves it off and joins the same list, instead of needing a second
+place to be registered.
 
 ## Building a composition root
 
@@ -157,7 +170,7 @@ export function registerUsers(container: DependencyContainer): void {
   // requests, so a singleton would save nothing and would hide an accidental
   // shared state the day somebody adds a field to the class.
   registerClass(container, APP_TOKENS.IUsersRepository, UsersRepository);
-  registerClass(container, APP_TOKENS.IUsersService, UsersService);
+  registerClass(container, APP_TOKENS.IUsersBLL, UsersBLL);
   registerClass(container, APP_TOKENS.IUsersController, UsersController);
 }
 ```
@@ -172,7 +185,7 @@ that table instead of falling back to memory: a misspelled
 `DATA_SOURCE=postgress` would otherwise start in memory and the failure would
 surface much later, as data that does not persist.
 
-Whichever engine comes out, the services receive exactly the same
+Whichever engine comes out, the BLLs receive exactly the same
 `IGenericRepository<T>`. The in-memory driver is the one that makes the test
 suite run without bringing a container up, and it is the reason `connection` is
 optional: there is nothing to open and nothing to close.
@@ -211,7 +224,7 @@ factories here are plain functions and are perfectly usable on their own:
 import { createPersistenceLayer } from "monolite-di";
 
 const persistence = createPersistenceLayer({ envs, logger, entities, auditLog });
-const users = new UsersService(persistence.store("USERS"), persistence.unitOfWork);
+const users = new UsersBLL(persistence.store("USERS"), persistence.unitOfWork);
 ```
 
 And if you would rather not install this package either, `monolite-core` and

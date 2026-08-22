@@ -19,12 +19,12 @@ Every package works on its own. Install the one you need and ignore the rest.
 | Package | What it is | Depends on |
 | --- | --- | --- |
 | [`monolite-core`](./packages/core) | Errors, logger and request-context contracts, `AsyncLocalStorage` request identity, health probe. Zero dependencies. | — |
-| [`monolite-data`](./packages/data) | One `IGenericRepository<T>` over in-memory, Oracle, SQL Server, PostgreSQL, MySQL and MongoDB. Unit of work, SQL dialects, filter compilers. | `core` |
+| [`monolite-data`](./packages/data) | One `IGenericRepository<T>` over in-memory, Oracle, SQL Server, PostgreSQL, MySQL and MongoDB. Unit of work, SQL dialects, filter compilers, and the DDL and migrations generated from the same mapping. | `core` |
 | [`monolite-http`](./packages/http) | `@ApiController` / `@Get` / `@Post` decorators, router builder, Zod validation, error handler, security defaults, OpenAPI 3.1 generation. | `core` |
-| [`monolite-crud`](./packages/crud) | Generic `CrudService` / `CrudController` and a `@Crud()` decorator: five endpoints per entity, each one overridable. Ambient transactions via `@Transactional()`. | `core`, `data`, `http` |
+| [`monolite-crud`](./packages/crud) | Generic `CrudBLL` / `CrudController` and a `@Crud()` decorator: five endpoints per entity, each one overridable. Ambient transactions via `@Transactional()`. | `core`, `data`, `http` |
 | [`monolite-auth`](./packages/auth) | Optional authentication: login, JWT issuing and verification, password hashing, `requireAuth` / `requireRoles` guards. | `core`, `http` |
 | [`monolite-di`](./packages/di) | The tsyringe composition root, kept separate so nothing else depends on a container. | `core`, `data` |
-| [`monolite-cli`](./packages/cli) | `monolite new` — scaffolds a project and asks which database you want. | — |
+| [`monolite-cli`](./packages/cli) | `monolite new` — scaffolds a project and asks which database you want. `monolite generate` writes a module, an entity, a BLL, a controller, a query or a repository into it. Zero runtime dependencies. | — |
 
 ## Quick start
 
@@ -56,8 +56,8 @@ import { ApiController } from "monolite-http";
 @ApiController("/branches", { tag: "Branches", token: BRANCH_TOKENS.controller })
 @Crud({ resource: "branch", dto: "Branch", schemas: branchSchemas })
 export class BranchesController extends CrudController {
-  constructor(service: BranchesService, context: IRequestContext) {
-    super(service, context, "branch");
+  constructor(bll: BranchesBLL, context: IRequestContext) {
+    super(bll, context, "branch");
   }
 }
 ```
@@ -73,8 +73,14 @@ hundred files. Monolite's `monolite-data` puts every engine behind the same
 contract and every engine-specific difference behind a `SqlDialect`, so switching
 from Oracle to PostgreSQL is a configuration change plus one dialect object, not a
 rewrite. The same idea drives the rest: the OpenAPI document is generated from the
-routing metadata rather than maintained beside it, and transactions are ambient
+routing metadata rather than maintained beside it, the database schema is generated
+from the entity mapping rather than written twice, and transactions are ambient
 rather than threaded through every method signature.
+
+Where the generic API stops, it stops on purpose and says so. Aggregations, views
+and stored procedures go through `executeRaw` behind the `IRawQueryable`
+contract, and `monolite generate query` / `generate repository` write that shape
+with the layering already right.
 
 Read [the architecture guide](./docs/en/architecture.md) for the reasoning behind
 each of those decisions, including the trade-offs they cost.

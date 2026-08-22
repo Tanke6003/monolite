@@ -3,11 +3,11 @@
 Authentication you can plug your own everything into.
 
 The package brings the parts that are identical in every application — the login
-flow, a token service, a password hasher, the middleware that guards a route —
+flow, a token BLL, a password hasher, the middleware that guards a route —
 and deliberately refuses to know the parts that are not. **Where your users
 live** is `IUserProvider`, which you implement. **How passwords are hashed** is
 `IPasswordHasher`, with a dependency-free implementation included. **What a
-token is made of** is `ITokenService`, with JWT as the default.
+token is made of** is `ITokenBLL`, with JWT as the default.
 
 Nothing here is mandatory: no other package in the toolkit depends on this one,
 and an application that already authenticates somewhere else can take
@@ -27,16 +27,16 @@ and `monolite-http`.
 ```ts
 import {
   AuthController,
-  AuthService,
-  JwtTokenService,
+  AuthBLL,
+  JwtTokenBLL,
   ScryptPasswordHasher,
   requireAuth,
   requireRoles,
 } from "monolite-auth";
 
-const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
+const tokens = new JwtTokenBLL({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
-const auth = new AuthService(new SqlUserProvider(repository), hasher, tokens);
+const auth = new AuthBLL(new SqlUserProvider(repository), hasher, tokens);
 
 // The login route. `guards` is optional; a rate limiter belongs there.
 const controller = new AuthController(auth, [loginRateLimiter]);
@@ -84,7 +84,7 @@ export class SqlUserProvider implements IUserProvider {
 }
 ```
 
-`AuthService` lower-cases and trims the address before handing it over, so store
+`AuthBLL` lower-cases and trims the address before handing it over, so store
 and query your emails lower-cased.
 
 ## Plugging in your own hasher
@@ -127,7 +127,7 @@ export class Argon2PasswordHasher implements IPasswordHasher {
 }
 ```
 
-Pass it to `AuthService` and nothing else changes. Because every hash carries
+Pass it to `AuthBLL` and nothing else changes. Because every hash carries
 its scheme at the front, old and new can coexist while stored passwords are
 migrated on next login.
 
@@ -147,9 +147,9 @@ deliberately costs, and that difference is measurable across a network.
 
 ## Guarding routes
 
-`requireAuth(tokenService, options?)` reads `Authorization: Bearer`, verifies the
+`requireAuth(tokenBLL, options?)` reads `Authorization: Bearer`, verifies the
 token and publishes the identity — on the request, and into the request context
-when you pass one, which is what lets a service three layers down know who is
+when you pass one, which is what lets a BLL three layers down know who is
 asking without threading the user through every signature.
 
 ```ts
@@ -182,7 +182,7 @@ merely re-signs a still-valid access token does not extend a session so much as
 delete the expiry that was the point of having one. The store is a decision
 about your persistence, which is precisely what this package refuses to know.
 
-An application that wants refresh tokens has everything it needs: `ITokenService`
+An application that wants refresh tokens has everything it needs: `ITokenBLL`
 signs and verifies whatever payload you give it, including a long-lived one
 whose id you keep in your own table.
 
@@ -191,9 +191,9 @@ whose id you keep in your own table.
 | Export | What it is |
 | --- | --- |
 | `AuthUser`, `AuthUserWithSecret`, `Credentials`, `AuthResult`, `TokenClaims`, `SignedToken` | The vocabulary |
-| `IUserProvider`, `IPasswordHasher`, `ITokenService`, `IAuthService` | The four seams |
-| `AuthService`, `AuthServiceOptions` | The login flow |
-| `JwtTokenService`, `JwtTokenServiceOptions` | Signing and verifying JWTs |
+| `IUserProvider`, `IPasswordHasher`, `ITokenBLL`, `IAuthBLL` | The four seams |
+| `AuthBLL`, `AuthBLLOptions` | The login flow |
+| `JwtTokenBLL`, `JwtTokenBLLOptions` | Signing and verifying JWTs |
 | `ScryptPasswordHasher`, `ScryptPasswordHasherOptions` | The dependency-free hasher |
 | `requireAuth`, `requireRoles`, `authenticatedUser`, `RequireAuthOptions` | Route guards |
 | `AuthController`, `loginSchema`, `authResultSchema` | `POST /auth/login` |

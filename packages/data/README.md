@@ -47,6 +47,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | `IQueryable<T>`, `QueryOptions<T>`, `WhereFilter<T>`, `FieldOperators<V>`, `OrderByClause<T>`, `PagedResult<T>`, `FieldFilter<V>`, `SortDirection` | The query vocabulary. |
 | `IUnitOfWork`, `ITransactionScope` | Transactions with an explicit boundary: `execute(scope => ...)`, commit at the end, rollback on throw, `lockRow` when a decision depends on what was just read. |
 | `ITransactionContext` | The ambient transaction, so a repository joins it without being handed it. |
+| `IRawQueryable<T>`, `asRawQueryable` | The escape hatch as a contract: `executeRaw` and `schema`, on the stores that have SQL to run. `asRawQueryable` answers `null` on the in-memory and MongoDB drivers, which is what tells a module it needs a fallback. |
 | `IAuditTrail`, `AuditEntry`, `AuditActor`, `AuditAction`, `AUDIT_ACTIONS`, `IAuditLog` | The change log written by the repository after every write. |
 | `ISqlExecutor`, `SqlExecuteOptions`, `SqlExecuteResult` | The minimum needed to talk to a SQL engine, implemented by both a pool and a transaction. |
 | `IDbPlugin`, `ISqlDbPlugin`, `DbEngine` | The connector lifecycle: open, check, close. |
@@ -57,6 +58,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | --- | --- |
 | `defineEntity` | Identity helper; it only exists so TypeScript infers `T` and checks that `columns` covers the model. |
 | `EntityMetadata<T>`, `ColumnMetadata`, `ColumnDefinition`, `ColumnKind`, `SoftDeleteMetadata<T>`, `TimestampMetadata<T>`, `AuditMetadata<T>` | The mapping vocabulary: EF Core's `ModelBuilder` without decorators, so domain models stay pure interfaces. |
+| `RelationMetadata<T>`, `IndexMetadata<T>` | What a foreign key points at, and the composite indexes. Declarative and inert — the repository reads neither; the include a BLL declares and the generated DDL do. |
 | `EntitySchema<T>` | The normalized view every driver reads: resolves shorthands, indexes by column, converts values both ways. `columnOf` throws on an unmapped property, which is the barrier that keeps arbitrary names out of the generated query. |
 
 ### Query
@@ -81,7 +83,20 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | `MemoryUnitOfWork`, `SqlUnitOfWork`, `MongoUnitOfWork` | One unit of work per family, all behind `IUnitOfWork`. |
 | `AsyncTransactionContext` | `ITransactionContext` on `AsyncLocalStorage`. |
 | `MemoryAuditTrail`, `SqlAuditTrail`, `MongoAuditTrail` | The change log, written through the same scope as the audited operation, so it lands in the same commit. |
-| `BaseModuleRepository` | Optional base class for a per-module repository: joins the ambient transaction and logs failures without a try/catch in every method. |
+| `BaseModuleRepository` | Optional base class for a per-module repository: forwards the whole contract to the store and logs failures without a try/catch in every method. `monolite generate repository` writes one. |
+| `transactionAware` | Wraps a store so it resolves through `ITransactionContext` on every call — the transaction's when one is open, the pool's otherwise. `registerPersistence` applies it to every store it binds, which is what makes `@Transactional()` true of the repositories a module actually injects. |
+
+### Schema generation
+
+| Export | What it is |
+| --- | --- |
+| `emitSchema`, `emitTable`, `TableDdl`, `EmitOptions` | `CREATE TABLE` from the same mapping the repository reads, so the schema and the code that queries it stop being two descriptions kept in agreement by hand. Tables first, then constraints: a foreign key can point at a table declared later. |
+| `DdlDialect`, `ddlDialectFor`, `DDL_DIALECTS`, `oracleDdl`, `sqlServerDdl`, `postgresDdl`, `mysqlDdl` | What differs between engines when *creating* a schema, kept apart from `SqlDialect` because it is read once by a command rather than on every statement. `ddlDialectFor` answers `null` for the engines that have no schema. |
+| `snapshotOf`, `diffSnapshots`, `emptySnapshot`, `SchemaSnapshot`, `TableSnapshot`, `ColumnSnapshot`, `ForeignKeySnapshot`, `IndexSnapshot`, `DiffOptions` | The migration half. Against a committed snapshot, never the live database; nothing at all when nothing changed; and anything that destroys data emitted commented out. |
+
+A generated project drives both through `npm run db:sql` and
+`npm run db:migration -- <name>`. See
+[data access](../../docs/en/data-access.md#generating-the-schema).
 
 ### Testing
 

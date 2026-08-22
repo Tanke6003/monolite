@@ -10,7 +10,7 @@
  * The last four fields are filled in by the generic repository, not by your
  * code: `available` is the soft-delete flag, the timestamps come from the
  * entity's `timestamps` mapping and the two `*By` columns from the request
- * context, so no service has to carry the current user down to the CRUD.
+ * context, so no BLL has to carry the current user down to the CRUD.
  */
 export interface I__entityName__ {
   __pkProperty__: number;

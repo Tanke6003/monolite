@@ -1,5 +1,5 @@
 import type { DependencyContainer, MonoliteModule } from "monolite-di";
-import { __entityName__Service } from "../../application/services/__entityKebab__.service";
+import { __entityName__BLL } from "../../application/bll/__entityKebab__.bll";
 import { __entityName__Repository } from "../../infrastructure/persistence/__entityKebab__.repository";
 import { __entityName__Controller } from "../../presentation/controllers/__entityKebab__.controller";
 import { __entityUpper___TOKENS } from "./__entityKebab__.tokens";
@@ -18,7 +18,7 @@ import { __entityUpper___TOKENS } from "./__entityKebab__.tokens";
  */
 export function __registerFn__(container: DependencyContainer): void {
   container.register(__entityUpper___TOKENS.repository, { useClass: __entityName__Repository });
-  container.register(__entityUpper___TOKENS.service, { useClass: __entityName__Service });
+  container.register(__entityUpper___TOKENS.bll, { useClass: __entityName__BLL });
   container.register(__entityUpper___TOKENS.controller, { useClass: __entityName__Controller });
 }
 

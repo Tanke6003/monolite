@@ -8,7 +8,7 @@ import type { I__overName__ } from "../../domain/models/__overKebab__.model";
  * One row of the __resourceLabel__, as the database answers it.
  *
  * It is not the DTO. Nothing here has crossed the HTTP boundary yet, and the
- * decision about what a client may see belongs a layer up — see the service.
+ * decision about what a client may see belongs a layer up — see the BLL.
  */
 export interface __entityName__Row {
   total: number;

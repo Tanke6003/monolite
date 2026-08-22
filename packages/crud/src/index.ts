@@ -3,7 +3,7 @@
  *
  * One decorator over a class that extends `CrudController` gives a resource its
  * list / getOne / create / update / softDelete over HTTP, with validation and
- * OpenAPI derived from the very same Zod schemas. Underneath, `CrudService`
+ * OpenAPI derived from the very same Zod schemas. Underneath, `CrudBLL`
  * does for the service layer what the generic repository did for the data
  * layer: you supply a repository and a mapper, and the pass-through everybody
  * used to write by hand comes for free.
@@ -14,14 +14,14 @@
  */
 
 // -------------------------------------------------------------  service  ---
-export { CrudService } from "./crud.service.js";
+export { CrudBLL } from "./crud.bll.js";
 export type {
-  CrudServiceOptions,
+  CrudBLLOptions,
   EntityMapper,
-  ICrudService,
+  ICrudBLL,
   ListOptions,
   PaginatedDTO,
-} from "./crud.service.js";
+} from "./crud.bll.js";
 
 // ----------------------------------------------------------  controller  ---
 export { CrudController } from "./crud.controller.js";
@@ -32,7 +32,7 @@ export { Crud } from "./crud.decorator.js";
 export type { CrudOptions, CrudVerb } from "./crud.decorator.js";
 
 // ------------------------------------------------------  transactions  ---
-export { lockRow, Transactional, TransactionalService } from "./transactional.js";
+export { lockRow, Transactional, TransactionalBLL } from "./transactional.js";
 
 // --------------------------------------------------------------  mapping  ---
 export { createMapper, hydrated, hydratedFields, isHydratedField } from "./mapper.js";

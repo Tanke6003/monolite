@@ -61,7 +61,7 @@ export interface PluginsOptions {
   transactions?: Binding<ITransactionContext>;
 
   /**
-   * Token service, registered under `TOKENS.ITokenService` when given.
+   * Token service, registered under `TOKENS.ITokenBLL` when given.
    *
    * Its contract lives in the auth package, which this one deliberately does
    * not depend on, so the binding is passed through untouched. As a class it is
@@ -69,7 +69,7 @@ export interface PluginsOptions {
    * in the constructor, so rebuilding it on every resolution would only repeat
    * the work.
    */
-  tokenService?: Binding<object>;
+  tokenBLL?: Binding<object>;
 
   /**
    * File storage, registered under `TOKENS.IFileStorage` when given.
@@ -136,8 +136,8 @@ export function registerPlugins(options: PluginsOptions): Plugins {
     AsyncTransactionContext
   );
 
-  if (options.tokenService) {
-    registerBinding<object>(container, TOKENS.ITokenService, options.tokenService);
+  if (options.tokenBLL) {
+    registerBinding<object>(container, TOKENS.ITokenBLL, options.tokenBLL);
   }
 
   if (options.fileStorage) {

@@ -2,10 +2,10 @@
 
 > 🇪🇸 [Leer en español](../es/crud.md) · package: `monolite-crud`
 
-`monolite-data` removed the repetition below the service: one repository
+`monolite-data` removed the repetition below the BLL: one repository
 implementation instead of six. `monolite-crud` removes what was left above it —
 the controller that parses an id, wraps everything in `try/catch` and calls a
-service that only forwards to the repository.
+BLL that only forwards to the repository.
 
 ---
 
@@ -17,16 +17,16 @@ service that only forwards to the repository.
 @Crud({ resource: "branch", dto: "Branch", schemas: branchSchemas })
 export class BranchesController extends CrudController {
   constructor(
-    @inject(BRANCH_TOKENS.service) service: BranchesService,
+    @inject(BRANCH_TOKENS.bll) bll: BranchesBLL,
     @inject(TOKENS.IRequestContext) context: IRequestContext
   ) {
-    super(service, context, "branch");
+    super(bll, context, "branch");
   }
 }
 ```
 
 ```ts
-export class BranchesService extends CrudService<IBranch, BranchDTO> {
+export class BranchesBLL extends CrudBLL<IBranch, BranchDTO> {
   constructor(@inject(BRANCH_TOKENS.store) store: IGenericRepository<IBranch>) {
     super(store, branchMapper, { field: "pkBranch", direction: "asc" });
   }
@@ -90,7 +90,7 @@ no flag, no opt-out list:
 @Crud({ resource: "appointment", dto: "Appointment", schemas })
 export class AppointmentsController extends CrudController {
   constructor(
-    private readonly appointments: AppointmentsService,
+    private readonly appointments: AppointmentsBLL,
     context: IRequestContext
   ) {
     super(appointments, context, "appointment");
@@ -119,7 +119,7 @@ This works because routes are mounted [by specificity](routing.md), so
 `/appointments/upcoming` is registered ahead of `/appointments/:id` regardless of
 where the decorator put it.
 
-The service side works the same way: override `create` in your `CrudService`
+The BLL side works the same way: override `create` in your `CrudBLL`
 subclass, or override the `buildWhere` hook to change how `list` translates query
 parameters into a filter.
 
@@ -164,10 +164,10 @@ A book carries its author's *name*, not just the key — the key is what a clien
 sends back when it edits, the name is what it has to print, and a listing that
 carries only the key costs a request per row.
 
-Declare the relation once, where the service is built:
+Declare the relation once, where the BLL is built:
 
 ```ts
-export class BooksService extends CrudService<IBook, BookDTO> {
+export class BooksBLL extends CrudBLL<IBook, BookDTO> {
   constructor(books: IGenericRepository<IBook>, authors: IGenericRepository<IAuthor>) {
     super(books, bookMapper, {
       orderBy: { field: "name", direction: "asc" },
@@ -198,8 +198,8 @@ const bookMapper = createMapper<IBook, BookDTO>({
 ```
 
 That is the whole of it. `list`, `getOne`, `create` and `update` all resolve it,
-because they all go through one place inside `CrudService` — and **a field
-declared with `hydrated()` that no include fills stops the service from being
+because they all go through one place inside `CrudBLL` — and **a field
+declared with `hydrated()` that no include fills stops the BLL from being
 constructed**, naming the field. The mistake this replaces is not hypothetical:
 calling `loadRelated` by hand in each of the four verbs and remembering only two
 produces a resource that carries its author when it was read and not when it was
@@ -219,15 +219,15 @@ wrote itself.
 ## Transactions
 
 A use case that writes in more than one place needs a transaction. Threading one
-through controller → service → repository would put a parameter in every signature
+through controller → BLL → repository would put a parameter in every signature
 for the benefit of the few methods that use it, so the transaction is **ambient**:
 
 ```ts
-export class AppointmentsService extends CrudService<IAppointment, AppointmentDto> {
+export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
   constructor(
     repository: IGenericRepository<IAppointment>,
     // Injected rather than inherited: `lockRow` is a standalone function exactly
-    // so that a service already extending `CrudService` is not forced into a
+    // so that a BLL already extending `CrudBLL` is not forced into a
     // second base class. See the note below.
     private readonly transactions: ITransactionContext
   ) {
@@ -277,8 +277,8 @@ with the in-memory driver and no unit of work registered gets a rejected promise
 with a clear message, not a synchronous throw from inside a decorator, which is
 much harder to trace back.
 
-**`lockRow` is a standalone function, not a base-class method.** A service that
-needs a row lock may already extend `CrudService`, and TypeScript has no multiple
+**`lockRow` is a standalone function, not a base-class method.** A BLL that
+needs a row lock may already extend `CrudBLL`, and TypeScript has no multiple
 inheritance. Passing the transaction context explicitly costs one argument and
 avoids forcing an inheritance chain on anyone.
 
@@ -296,12 +296,12 @@ Generated projects ship that index in every engine's schema.
 
 ---
 
-## What `CrudService` gives you
+## What `CrudBLL` gives you
 
 | Member | Purpose |
 | --- | --- |
 | `list(options)` | Paginated read; `options.withDeleted` includes soft-deleted rows, `options.query` feeds `buildWhere` |
-| `getOne(id)` | `null` when absent — the controller turns that into a 404, so the service stays HTTP-free |
+| `getOne(id)` | `null` when absent — the controller turns that into a 404, so the BLL stays HTTP-free |
 | `create(input)` | Insert, then map to the DTO |
 | `update(id, input)` | |
 | `softDelete(id)` | |
@@ -310,8 +310,8 @@ Generated projects ship that index in every engine's schema.
 | `includes` | Relations resolved on every verb, declared at construction with `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |
 
-The service knows nothing about HTTP: it returns `null`, not a 404, and throws
-`AppError`, not a response. That is what lets the same service back a CLI command,
+The BLL knows nothing about HTTP: it returns `null`, not a 404, and throws
+`AppError`, not a response. That is what lets the same BLL back a CLI command,
 a scheduled job or a message consumer without carrying Express into them.
 
 ---

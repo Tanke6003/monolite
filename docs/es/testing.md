@@ -47,7 +47,7 @@ estructurales, cuyo comportamiento no es evidente al leerlas.
   mantienen aislados entre flujos concurrentes.
 
 Lo que **no** lleva prueba unitaria es la ceremonia por entidad. Una prueba que
-afirma que `UsersService.create` llama a `usersRepository.insert` reescribe la
+afirma que `UsersBLL.create` llama a `usersRepository.insert` reescribe la
 implementación en un segundo idioma; pasa mientras los dos archivos estén de
 acuerdo entre sí y no dice nada sobre si alguno de los dos es correcto. Esos flujos
 van en pruebas de punta a punta, donde una petición real produce una fila real.
@@ -148,7 +148,7 @@ lo demás.
 
 No necesitan nada levantado. `tests/setup/test-env.ts` fuerza `DATA_SOURCE=memory`
 antes de que se cargue un solo módulo, así que las pruebas reciben el repositorio
-real, los servicios reales y las rutas reales sobre el driver en memoria. Apunta esa
+real, las BLL reales y las rutas reales sobre el driver en memoria. Apunta esa
 variable a un motor y las mismas pruebas corren contra él: la metadata de la entidad
 no cambia.
 

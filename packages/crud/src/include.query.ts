@@ -65,11 +65,11 @@ export async function loadRelated<TParent, TRelated, TKey = number>(
  * when it was read and not when it was written, and the compiler is happy
  * because the DTO declares the field either way.
  *
- * Declared here instead, and applied by `CrudService` in one place. There is no
+ * Declared here instead, and applied by `CrudBLL` in one place. There is no
  * longer anywhere to forget.
  */
 export interface Include<TDto> {
-  /** The DTO property this fills; `CrudService` checks the mapper declared it. */
+  /** The DTO property this fills; `CrudBLL` checks the mapper declared it. */
   readonly into: Extract<keyof TDto, string>;
   /** Fills that property on a whole page, in one batched query. */
   hydrate(dtos: TDto[]): Promise<void>;
@@ -98,7 +98,7 @@ export interface IncludeDefinition<
 }
 
 /**
- * Declares one relation, ready to hand to `CrudService`.
+ * Declares one relation, ready to hand to `CrudBLL`.
  *
  * @example
  * super(books, bookMapper, {

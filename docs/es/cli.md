@@ -173,18 +173,19 @@ monolite g query revenue --over invoice
 
 | Schematic | Qué escribe |
 | --- | --- |
-| `module` | Entidad + registro del almacén + servicio + controlador, cableados con `@Crud` |
+| `module` | Entidad + registro del almacén + BLL + controlador, cableados con `@Crud` |
 | `entity` | La interfaz de dominio y su mapeo a tabla |
-| `service` | Una subclase de `CrudService` para una entidad existente |
-| `controller` | Una subclase de `CrudController` para un servicio existente |
-| `query` | Repositorio + servicio + DTO + controlador, para lo que la API genérica no expresa |
+| `bll` | Una subclase de `CrudBLL` para una entidad existente |
+| `controller` | Una subclase de `CrudController` para una BLL existente |
+| `query` | Repositorio + BLL + DTO + controlador, para lo que la API genérica no expresa |
+| `repository` | El almacén de una entidad existente más sus propias consultas, sobre `executeRaw` |
 
 ### `generate query`
 
 Las agregaciones, los `GROUP BY`, las vistas y los procedimientos almacenados
 quedan fuera de la API genérica a propósito: expresarlos la convertiría en un
 ORM. Lo que se escribe en su lugar son cuatro ficheros: una interfaz propia y
-pequeña, una implementación sobre `executeRaw`, un servicio y un controlador.
+pequeña, una implementación sobre `executeRaw`, una BLL y un controlador.
 
 ```bash
 monolite g query revenue --over invoice
@@ -193,8 +194,8 @@ monolite g query revenue --over invoice
 ```
 src/infrastructure/persistence/revenue.repository.ts   interfaz + implementación
 src/application/dtos/revenue.dto.ts                    la forma publicada
-src/application/services/revenue.service.ts            filas -> DTO
-src/presentation/controllers/revenue.controller.ts     inyecta el servicio
+src/application/bll/revenue.bll.ts                     filas -> DTO
+src/presentation/controllers/revenue.controller.ts     inyecta la BLL
 src/composition/modules/revenue.tokens.ts              sus tres identificadores
 src/composition/modules/revenue.module.ts              sus bindings, sin registro
 ```
@@ -213,13 +214,74 @@ El agregado que calcula —cuántas filas hay, el id más bajo y el más alto—
 marcador de posición, cierto en cualquier tabla, para que el módulo responda
 antes de que escribas una línea. Sustitúyelo. Lo que merece la pena conservar es
 la forma que lo rodea: binds en vez de concatenación, nombres de columna sacados
-del mapeo y un controlador que habla con el servicio.
+del mapeo y un controlador que habla con la BLL.
 
 Eso último es la razón de ser de este schematic. Todo módulo `@Crud` mantiene
 bien las capas sin que nadie piense en ello, porque `CrudController` recibe un
-`ICrudService` y no acepta otra cosa. Una consulta es el único sitio de un
+`ICrudBLL` y no acepta otra cosa. Una consulta es el único sitio de un
 proyecto monolite donde los cuatro ficheros se escriben desde cero, así que es el
 único donde la regla se puede romper —ver [arquitectura](architecture.md)—.
+
+### `generate repository`
+
+No hace falta uno para hacer CRUD, y conviene decirlo primero: `defineEntity` ya
+produjo un repositorio que selecciona, inserta, actualiza, pagina, filtra y borra
+lógicamente en todos los motores. Un módulo que solo haga eso debería inyectarlo
+directamente. Una clase que reenvía diecisiete métodos y no añade ninguno es una
+capa por tenerla, y por eso esto no forma parte de `generate module`.
+
+Genera uno el día en que el módulo necesita una consulta que la API genérica no
+expresa a propósito: una agregación, un `GROUP BY`, una vista, un procedimiento
+almacenado.
+
+```bash
+monolite g repository invoice
+```
+
+```
+src/infrastructure/persistence/invoice.repository.ts   la interfaz y la clase
+```
+
+Extiende `BaseModuleRepository`, que reenvía el contrato entero al almacén y
+envuelve cada llamada en un guard que registra el error del driver y relanza uno
+neutro — así un `ORA-00001` se queda en el log y no llega nunca a un cliente. El
+método de ejemplo enseña la forma: `asRawQueryable` para preguntar si este motor
+tiene SQL que ejecutar, la agregación si lo tiene, y el camino en proceso si no,
+porque el driver en memoria es el que usa tu suite generada.
+
+El almacén que inyecta ya se suma a la transacción que esté abierta —eso es
+cierto de todos los almacenes registrados desde 0.6.0—, así que aquí no hay que
+decirle nada de eso.
+
+**¿`repository` o `query`?** Un repositorio pertenece a una entidad y añade
+métodos a *su* almacén. Una consulta no tiene tabla propia y calcula una
+respuesta sobre varias, así que viene con su BLL, su DTO y su controlador. Si te
+encuentras dándole al repositorio de una entidad un método que lee otras dos, la
+respuesta era una consulta.
+
+#### El binding
+
+```
+i Registered in src/composition/modules/invoice.module.ts:
+    import { InvoicesRepository } from "../../infrastructure/persistence/invoice.repository";
+    container.register(INVOICE_TOKENS.repository, { useClass: InvoicesRepository });
+```
+
+Dos líneas y no una, porque la clase hay que importarla antes de poder
+registrarla. Van encima de un marcador `// monolite:bindings` que el módulo trae
+— y a diferencia de `modules.ts`, este es un fichero que casi seguro has
+editado, que es justo la situación en la que un generador tiene que ir con
+cuidado. Mueve el marcador, renómbralo o bórralo y no se toca nada: el comando
+imprime las dos líneas.
+
+El token ya estaba declarado. `<ENTIDAD>_TOKENS.repository` lo escribe
+`generate module` y simplemente no lo registra nadie hasta que hay algo que
+registrar, lo que le ahorra al generador tener que reabrir la tabla de tokens.
+
+Lo que queda para ti es una línea en la BLL: inyectar
+`<ENTIDAD>_TOKENS.repository` donde hoy inyecta `<ENTIDAD>_TOKENS.store`, y
+ensanchar su tipo a la interfaz nueva. Esa sí es una decisión —puede que la BLL
+quiera el almacén pelado— así que se imprime en vez de hacerse.
 
 ### Cableado
 

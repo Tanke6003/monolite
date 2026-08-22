@@ -5,8 +5,10 @@ import { ENGINES, type EngineId } from "../config/engines.js";
 import { printGenerateHelp } from "../help.js";
 import { findProject, type MonoliteProject } from "../project.js";
 import {
+  entityVars,
   isSchematic,
   NEEDS_OVER,
+  RENAMED_SCHEMATICS,
   renderSchematic,
   SCHEMATICS,
   type Schematic,
@@ -15,7 +17,7 @@ import { color } from "../util/colors.js";
 import { FileWriter } from "../util/files.js";
 import { created, fail, hint, info, line, title, warn } from "../util/log.js";
 import type { RenderContext } from "../util/render.js";
-import { wireModule } from "../util/wiring.js";
+import { wireBinding, wireModule } from "../util/wiring.js";
 
 const OPTIONS = {
   force: { type: "boolean" },
@@ -62,8 +64,20 @@ export function generateCommand(argv: string[]): number {
     return 1;
   }
 
-  if (!isSchematic(schematicName)) {
-    fail(`unknown schematic "${schematicName}"`);
+  const renamed = RENAMED_SCHEMATICS[schematicName];
+
+  if (renamed) {
+    // A redirect rather than a failure: the schematic did not go away, it was
+    // renamed with the layer, and telling somebody their command is unknown
+    // when the thing it asks for still exists is the worse answer.
+    info(`"${schematicName}" is now "${renamed}"; generating that`);
+    line();
+  }
+
+  const schematic = renamed ?? schematicName;
+
+  if (!isSchematic(schematic)) {
+    fail(`unknown schematic "${schematic}"`);
     hint(`schematics: ${SCHEMATICS.join(", ")}`);
     return 1;
   }
@@ -83,14 +97,14 @@ export function generateCommand(argv: string[]): number {
 
   const over = parsed.values.over;
 
-  if (NEEDS_OVER.includes(schematicName) && !over) {
-    fail(`the "${schematicName}" schematic needs the entity it reads`);
-    hint(`usage: monolite generate ${schematicName} ${entityName} --over <entity>`);
+  if (NEEDS_OVER.includes(schematic) && !over) {
+    fail(`the "${schematic}" schematic needs the entity it reads`);
+    hint(`usage: monolite generate ${schematic} ${entityName} --over <entity>`);
     hint("a query owns no table; --over names the one whose store it injects");
     return 1;
   }
 
-  return emit(project, schematicName, entityName, {
+  return emit(project, schematic, entityName, {
     force: Boolean(parsed.values.force),
     wire: !parsed.values["no-wire"],
     over,
@@ -144,6 +158,13 @@ function emit(
   if (schematic === "module" || schematic === "query") {
     reportWiring(project.root, project.sourceRoot, name, options.wire, schematic);
   }
+
+  // A repository is not a module; it is one binding inside one that already
+  // exists, which is why it goes through a marker of its own.
+  if (schematic === "repository") {
+    reportBinding(project.root, project.sourceRoot, name, options.wire);
+  }
+
   return 0;
 }
 
@@ -191,6 +212,50 @@ function reportWiring(
   // the mapping they had just generated — two descriptions of one schema, kept
   // in agreement by nobody.
   hint("`db:sql` writes it from the entity you just generated; `db:migration` writes the change");
+}
+
+/**
+ * Registers a generated repository in the module it belongs to.
+ *
+ * Unlike a module, this one is written into a file the developer already owns
+ * and has probably edited — which is the situation a generator has to be
+ * careful in, and exactly what the marker makes safe. No marker, no edit: the
+ * two lines are printed instead, which is what the command did before any of
+ * this was automated.
+ */
+function reportBinding(root: string, sourceRoot: string, name: string, wire: boolean): void {
+  const vars = entityVars(name);
+  const constant = `${vars.entityPlural}Repository`;
+
+  const binding = {
+    constant,
+    importLine:
+      `import { ${constant} } from ` +
+      `"../../infrastructure/persistence/${vars.entityKebab}.repository";`,
+    register:
+      `  container.register(${vars.entityUpper}_TOKENS.repository, ` +
+      `{ useClass: ${constant} });`,
+  };
+
+  const wiring = wire ? wireBinding(root, sourceRoot, vars.entityKebab, binding) : null;
+
+  if (wiring?.wired) {
+    info(`Registered in ${color.bold(wiring.file)}:`);
+    for (const inserted of wiring.lines) line(`    ${inserted}`);
+  } else {
+    const reason = wiring?.reason ? ` (${wiring.reason})` : "";
+    const file =
+      wiring?.file ??
+      path.join(sourceRoot, "composition", "modules", `${vars.entityKebab}.module.ts`);
+
+    info(`Two lines left, in ${color.bold(file)}${reason}:`);
+    for (const inserted of [binding.importLine, binding.register.trim()]) line(`    ${inserted}`);
+  }
+
+  line();
+  hint(
+    "inject it in the BLL with `@inject(TOKENS.repository)` where the plain store is today"
+  );
 }
 
 /**

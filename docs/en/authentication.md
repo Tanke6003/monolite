@@ -3,7 +3,7 @@
 > 🇪🇸 [Leer en español](../es/authentication.md) · package: `monolite-auth`
 
 Optional and pluggable. The package supplies what is the same in every
-application — the login flow, a token service, a password hasher, the middleware
+application — the login flow, a token BLL, a password hasher, the middleware
 that guards a route — and deliberately refuses to know the parts that are not.
 
 **No other package depends on this one.** An application that authenticates
@@ -17,7 +17,7 @@ elsewhere can take `requireAuth` alone, or nothing at all.
 | --- | --- | --- |
 | `IUserProvider` | **You** | Where users live is your decision — a table, an LDAP directory, an array. The package must not impose a schema. |
 | `IPasswordHasher` | Included (`ScryptPasswordHasher`), swappable | What is sufficient today will not be in five years. Swapping to argon2 must not touch anything else. |
-| `ITokenService` | Included (`JwtTokenService`), swappable | An application with opaque tokens backed by a store implements the same two methods. |
+| `ITokenBLL` | Included (`JwtTokenBLL`), swappable | An application with opaque tokens backed by a store implements the same two methods. |
 
 ```ts
 export interface IUserProvider {
@@ -28,7 +28,7 @@ export interface IUserProvider {
 
 That is the entire integration surface. `AuthUserWithSecret` is `{ id, name,
 email, roles, passwordHash }`, and `passwordHash` is the one field that never
-leaves the service.
+leaves the BLL.
 
 ---
 
@@ -37,17 +37,17 @@ leaves the service.
 ```ts
 import {
   AuthController,
-  AuthService,
-  JwtTokenService,
+  AuthBLL,
+  JwtTokenBLL,
   ScryptPasswordHasher,
   requireAuth,
   requireRoles,
 } from "monolite-auth";
 
-const tokens = new JwtTokenService({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
+const tokens = new JwtTokenBLL({ secret: process.env.JWT_SECRET!, expiresIn: "1h" });
 const hasher = new ScryptPasswordHasher();
 
-const auth = new AuthService(new MyUserProvider(usersRepository), hasher, tokens);
+const auth = new AuthBLL(new MyUserProvider(usersRepository), hasher, tokens);
 
 const app = createApp({
   controllers: [...controllers, new AuthController(auth)],
@@ -71,7 +71,7 @@ the same 401 with the same message. Distinguishing them turns the login endpoint
 into an account-existence oracle: an attacker learns which addresses are
 registered without guessing a single password.
 
-**It spends the same time on both.** When the user does not exist, the service
+**It spends the same time on both.** When the user does not exist, the BLL
 still runs the hash verification, against a dummy hash. Skipping it would return
 in microseconds instead of the ~100 ms a real scrypt comparison costs, and that
 difference is measurable over a network — the identical message would leak through
@@ -170,7 +170,7 @@ Being explicit, because the gaps matter more than the features:
   is the client discarding it. Real revocation needs a denylist, which is the same
   storage decision as above.
 - **No OAuth or OIDC.** If you need one, verify the provider's token with your own
-  `ITokenService` implementation and keep the rest of this package as it is.
+  `ITokenBLL` implementation and keep the rest of this package as it is.
 
 Each of those is a deliberate omission rather than a missing feature. A framework
 that guesses at them ships something you have to undo.
@@ -181,7 +181,7 @@ that guesses at them ships something you have to undo.
 
 | Variable | Notes |
 | --- | --- |
-| `JWT_SECRET` | Required when the JWT token service is used. There is **no default** — a framework that ships a fallback signing key ships a forged-token vulnerability to everyone who forgot to override it. |
+| `JWT_SECRET` | Required when the JWT token BLL is used. There is **no default** — a framework that ships a fallback signing key ships a forged-token vulnerability to everyone who forgot to override it. |
 | `JWT_EXPIRES_IN` | Default `1h`. Accepts the `jsonwebtoken` duration syntax. |
 
 Verify the secret is present at startup and fail loudly if it is not. Failing at

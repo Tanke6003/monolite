@@ -4,14 +4,14 @@ import type {
   AuthResult,
   AuthUser,
   Credentials,
-  IAuthService,
+  IAuthBLL,
   IPasswordHasher,
-  ITokenService,
+  ITokenBLL,
   IUserProvider,
 } from "./contracts.js";
 
-export interface AuthServiceOptions {
-  /** Lifetime of the issued token. Falls back to the token service's default. */
+export interface AuthBLLOptions {
+  /** Lifetime of the issued token. Falls back to the token BLL's default. */
   expiresIn?: string | number;
   /**
    * Hash to check the password against when the email is unknown.
@@ -46,23 +46,23 @@ function invalidCredentials(): AppError {
  *
  * It knows nothing about where users are stored, how passwords are hashed or
  * what a token is made of — those are the three interfaces it is constructed
- * with. That is what lets the same service sit on top of a SQL table, an LDAP
+ * with. That is what lets the same BLL sit on top of a SQL table, an LDAP
  * directory or a fixture array in a test.
  */
-export class AuthService implements IAuthService {
+export class AuthBLL implements IAuthBLL {
   /** Memoised; see `dummyHash`. */
   private dummy?: Promise<string>;
 
   constructor(
     private readonly users: IUserProvider,
     private readonly hasher: IPasswordHasher,
-    private readonly tokens: ITokenService,
-    private readonly options: AuthServiceOptions = {}
+    private readonly tokens: ITokenBLL,
+    private readonly options: AuthBLLOptions = {}
   ) {}
 
   async login(credentials: Credentials): Promise<AuthResult> {
     // Normalised here rather than in the route schema so it holds however the
-    // service is called. Addresses are case-insensitive in practice, and a user
+    // BLL is called. Addresses are case-insensitive in practice, and a user
     // who registered as "Ana@example.com" will type "ana@example.com" sooner or
     // later; providers can therefore store and look up lower-cased.
     const email = credentials.email.trim().toLowerCase();

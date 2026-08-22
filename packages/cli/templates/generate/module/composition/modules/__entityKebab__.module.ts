@@ -1,5 +1,5 @@
 import type { DependencyContainer, EntityRegistration, MonoliteModule } from "monolite-di";
-import { __entityName__Service } from "../../application/services/__entityKebab__.service";
+import { __entityName__BLL } from "../../application/bll/__entityKebab__.bll";
 import type { I__entityName__ } from "../../domain/models/__entityKebab__.model";
 import { __entityConst__ } from "../../infrastructure/persistence/entities/__entityKebab__.entity";
 import { __entityName__Controller } from "../../presentation/controllers/__entityKebab__.controller";
@@ -21,14 +21,14 @@ const SEED = [
  * What the persistence layer needs in order to build this entity's repository.
  *
  * It is data rather than a call because the layer is assembled once, over every
- * entity at the same time: that is what lets the unit of work hand a service
- * the *same* repository inside a transaction as outside one. Add this constant
- * to the list in `composition/entities.ts` and the store is registered under
- * the token below with no further wiring.
+ * entity at the same time: that is what lets the unit of work hand a BLL
+ * the *same* repository inside a transaction as outside one. It travels inside
+ * the module descriptor below, so listing that module in `composition/modules.ts`
+ * — which the generator does for you — is all the wiring the store needs.
  */
 export const __entityPluralUpper___ENTITY_REGISTRATION: EntityRegistration<I__entityName__> = {
   // The logical name the unit of work indexes by. It matches the table so that
-  // a service asking a transaction for `"__entityPluralUpper__"` is asking for
+  // a BLL asking a transaction for `"__entityPluralUpper__"` is asking for
   // the obvious thing.
   name: "__entityPluralUpper__",
   metadata: __entityConst__,
@@ -48,10 +48,14 @@ export const __entityPluralUpper___ENTITY_REGISTRATION: EntityRegistration<I__en
  * The repository is not here — it is registered by the persistence layer from
  * the registration above, because it is the one object that must be shared: a
  * second one per request would mean a second connection pool.
+ *
+ * The marker at the end is where `monolite generate repository` inserts. Move
+ * it or delete it and that command goes back to printing the line to add.
  */
 export function __registerFn__(container: DependencyContainer): void {
-  container.register(__entityUpper___TOKENS.service, { useClass: __entityName__Service });
+  container.register(__entityUpper___TOKENS.bll, { useClass: __entityName__BLL });
   container.register(__entityUpper___TOKENS.controller, { useClass: __entityName__Controller });
+  // monolite:bindings
 }
 
 /**

@@ -4,7 +4,7 @@ The CRUD you stop writing.
 
 `monolite-data` removed the SQL: you describe a table and get a repository.
 This package does the same thing one layer up. You supply a repository and a
-mapper, and you get the service; you put one decorator on the controller, and
+mapper, and you get the BLL; you put one decorator on the controller, and
 you get the five routes with their validation and their OpenAPI. What
 disappears is the pass-through — the `try/catch` that defers to the global error
 handler, the id parsing that turns `/users/abc` into a 400, the 404 when there
@@ -12,7 +12,7 @@ is no row, the status code of each verb — which every module used to write
 identically.
 
 Nothing here is all-or-nothing: any verb can be dropped and declared by hand,
-`buildWhere` is the seam for a module's own filtering, and a service with real
+`buildWhere` is the seam for a module's own filtering, and a BLL with real
 business rules overrides the verb that has them and keeps the other four.
 
 ## Install
@@ -44,14 +44,14 @@ const userMapper = createMapper<IUser, UserDTO>({
 });
 ```
 
-**2. The service** is the repository plus the mapper. Override `buildWhere` when
+**2. The BLL** is the repository plus the mapper. Override `buildWhere` when
 the listing has to filter:
 
 ```ts
-import { CrudService } from "monolite-crud";
+import { CrudBLL } from "monolite-crud";
 import type { IGenericRepository, QueryOptions } from "monolite-data";
 
-export class UsersService extends CrudService<IUser, UserDTO> {
+export class UsersBLL extends CrudBLL<IUser, UserDTO> {
   constructor(repository: IGenericRepository<IUser>) {
     super(repository, userMapper, { field: "name", direction: "asc" });
   }
@@ -78,8 +78,8 @@ import { ApiController } from "monolite-http";
   schemas: { create: createUserSchema, update: updateUserSchema, query: listUsersSchema },
 })
 export class UsersController extends CrudController {
-  constructor(service: UsersService, context: IRequestContext) {
-    super(service, context, "user");
+  constructor(bll: UsersBLL, context: IRequestContext) {
+    super(bll, context, "user");
   }
 }
 ```
@@ -97,7 +97,7 @@ Drop it from `verbs` and declare it with its own route decorator:
 @Crud({ resource: "user", dto: "User", verbs: ["list", "getOne", "update"] })
 export class UsersController extends CrudController {
   constructor(
-    private readonly users: UsersService,
+    private readonly users: UsersBLL,
     context: IRequestContext
   ) {
     super(users, context, "user");
@@ -118,12 +118,12 @@ letting the second one be silently unreachable.
 
 `@Transactional()` replaces the `unitOfWork.execute(...)` that used to wrap a
 method body. If a transaction is already open it joins it instead of nesting
-another, so two transactional services calling each other share one commit.
+another, so two transactional BLLs calling each other share one commit.
 
 ```ts
-import { lockRow, Transactional, TransactionalService } from "monolite-crud";
+import { lockRow, Transactional, TransactionalBLL } from "monolite-crud";
 
-export class AppointmentsService extends TransactionalService {
+export class AppointmentsBLL extends TransactionalBLL {
   @Transactional()
   async book(branchId: number, slot: Date): Promise<void> {
     // Must be the first statement: MySQL fixes the snapshot on the first
@@ -135,8 +135,8 @@ export class AppointmentsService extends TransactionalService {
 }
 ```
 
-A service that already extends `CrudService` cannot also extend
-`TransactionalService` — TypeScript has no multiple inheritance — so `lockRow`
+A BLL that already extends `CrudBLL` cannot also extend
+`TransactionalBLL` — TypeScript has no multiple inheritance — so `lockRow`
 is exported as a standalone function too, taking the transaction context
 explicitly.
 
@@ -159,11 +159,11 @@ const branches = await loadRelated(appointments, {
 
 | Export | What it is |
 | --- | --- |
-| `CrudService`, `ICrudService`, `ListOptions`, `PaginatedDTO`, `EntityMapper` | The service layer and its contracts |
+| `CrudBLL`, `ICrudBLL`, `ListOptions`, `PaginatedDTO`, `EntityMapper` | The business layer and its contracts |
 | `CrudController`, `ICrudController` | The five HTTP handlers |
 | `Crud`, `CrudOptions`, `CrudVerb` | The decorator that mounts the routes |
 | `createMapper`, `Mapper`, `MappingProfile`, `FieldMapping`, `MappedField`, `ComputedField` | Declarative entity <-> DTO mapping |
-| `Transactional`, `TransactionalService`, `lockRow` | Ambient transactions |
+| `Transactional`, `TransactionalBLL`, `lockRow` | Ambient transactions |
 | `loadRelated`, `IncludeSpec` | Batched loading of an N:1 relation |
 
 ## License

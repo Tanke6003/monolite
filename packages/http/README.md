@@ -76,7 +76,7 @@ const createUser = z.object({
 
 @ApiController("/users", { tag: "Users", token: "IUsersController" })
 export class UsersController extends BaseController {
-  constructor(context: IRequestContext, private readonly users: IUsersService) {
+  constructor(context: IRequestContext, private readonly users: IUsersBLL) {
     super(context);
   }
 

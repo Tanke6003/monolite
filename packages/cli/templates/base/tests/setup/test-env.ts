@@ -15,7 +15,7 @@ process.env.NODE_ENV = "test";
  * In memory, whichever engine this project was scaffolded for.
  *
  * The entity metadata is the same for every driver, so the in-memory one gives
- * the tests the real repository, the real unit of work and the real service —
+ * the tests the real repository, the real unit of work and the real BLL —
  * everything except a socket. An end-to-end suite that needs a container first
  * is a suite that stops being run.
  *

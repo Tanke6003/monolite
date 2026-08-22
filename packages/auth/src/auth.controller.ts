@@ -1,7 +1,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { ApiController, Post } from "monolite-http";
 import { z } from "zod";
-import type { Credentials, IAuthService } from "./contracts.js";
+import type { Credentials, IAuthBLL } from "./contracts.js";
 import { AUTH_TOKENS } from "./tokens.js";
 
 /** The body of `POST /auth/login`. Exported so an app can reuse or extend it. */
@@ -29,7 +29,7 @@ export const authResultSchema = z.object({
 });
 
 /**
- * The HTTP face of `AuthService`: one route, and everything it needs to be
+ * The HTTP face of `AuthBLL`: one route, and everything it needs to be
  * documented and validated.
  *
  * There is no `POST /auth/refresh`. Refreshing honestly means a second,
@@ -58,7 +58,7 @@ export class AuthController {
    * server too.
    */
   constructor(
-    private readonly auth: IAuthService,
+    private readonly auth: IAuthBLL,
     private readonly guards: RequestHandler[] = []
   ) {}
 

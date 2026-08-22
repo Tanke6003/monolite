@@ -56,7 +56,7 @@ Architecture, and the CLI scaffolds exactly this shape:
 ┌─────────────────────────────────────────────────────┐
 │  Presentation   controllers, middlewares            │  ← monolite-http
 ├─────────────────────────────────────────────────────┤
-│  Application    services, DTOs, use cases           │  ← monolite-crud
+│  Application    BLLs, DTOs, use cases               │  ← monolite-crud
 ├─────────────────────────────────────────────────────┤
 │  Domain         interfaces and models, no imports   │  ← your code only
 ├─────────────────────────────────────────────────────┤
@@ -68,7 +68,7 @@ The dependency rule is unchanged: inner layers know nothing about outer ones. Wh
 the packages add is that the outer layers are now mostly *supplied* rather than
 written. Your domain models and business rules stay yours.
 
-### A controller talks to a service, never to a repository
+### A controller talks to a BLL, never to a repository
 
 The dependency rule is about *direction*, and a controller reaching past the
 application layer into infrastructure obeys it as written — which is why this
@@ -81,7 +81,7 @@ that answered with rows would be making both calls in the layer furthest from
 either.
 
 Most of the time nothing has to be remembered, because nothing can go wrong:
-`CrudController` takes an `ICrudService` and will not take anything else, so
+`CrudController` takes an `ICrudBLL` and will not take anything else, so
 every `@Crud` module has the shape whether or not anyone thought about it. The
 rule is only load-bearing in the one case where all four files are written from a
 blank page — a report, a search across several tables, a dashboard. That is what
@@ -105,9 +105,9 @@ Router built from decorator metadata                      monolite-http
     │  auth guard, then Zod validation of body/query/params
     ▼
 Controller                                                yours, or monolite-crud
-    │  reads the request, calls the service
+    │  reads the request, calls the BLL
     ▼
-Service                                                   yours, or monolite-crud
+BLL                                                       yours, or monolite-crud
     │  business rules. Opens a transaction with @Transactional()
     │  when the use case writes in more than one place
     ▼
@@ -280,13 +280,13 @@ entity, each with validation, pagination and an OpenAPI entry. The decorator onl
 fills gaps: declare a method with the same name and yours wins. Add
 `verbs: ["list", "getOne"]` and it registers only those.
 
-`@Transactional()` opens a transaction around a service method and publishes it to
+`@Transactional()` opens a transaction around a BLL method and publishes it to
 the ambient `ITransactionContext`, so every repository called inside joins it
 without being passed anything. It *joins* an existing transaction rather than
 nesting a second one.
 
 `lockRow(transactions, entity, id)` is a standalone function rather than a base
-class method, because a service that needs it may already extend something else and
+class method, because a BLL that needs it may already extend something else and
 TypeScript has no multiple inheritance. Taking a row lock as the first statement of
 the transaction matters on MySQL, where REPEATABLE READ pins the snapshot at the
 first read.
@@ -300,12 +300,12 @@ compiles cleanly and only explodes when that class is constructed. `TOKENS` exis
 so the compiler catches it instead.
 
 Only *framework-level* tokens live in this package. Your feature tokens
-(`IUsersService`, `IBranchesRepository`) belong to your app, registered from your
+(`IUsersBLL`, `IBranchesRepository`) belong to your app, registered from your
 own module files, so a module is a file plus a line in the composition root — and
 removing one is deleting both.
 
 Lifetimes: plugins are singletons — the request context and the transaction context
-*must* be, for the reason given above. Repositories, services and controllers are
+*must* be, for the reason given above. Repositories, BLLs and controllers are
 transient; they hold no state between requests.
 
 ---

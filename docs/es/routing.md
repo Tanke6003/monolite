@@ -13,7 +13,7 @@ OpenAPI. No se escriben por separado y no pueden discrepar entre sí.
 ```ts
 @ApiController("/users", { tag: "Users", token: USER_TOKENS.controller })
 export class UsersController extends BaseController {
-  constructor(private readonly users: IUsersService, context: IRequestContext) {
+  constructor(private readonly users: IUsersBLL, context: IRequestContext) {
     super(context);
   }
 
@@ -197,7 +197,7 @@ Nada más: ni archivo de rutas, ni archivo de documentación, ni tabla de módul
 ## Lo que esto no resuelve
 
 El controlador sigue teniendo su `try/catch` y su `Number(req.params.id)` en cada
-manejador, y en un módulo sin reglas el servicio sigue siendo un pase a través del
+manejador, y en un módulo sin reglas la BLL sigue siendo un pase a través del
 repositorio. Eso es otra clase de repetición, y se ataca con una capa de CRUD
 genérico por encima del repositorio genérico —ver [crud.md](crud.md)— no con más
 decoradores.

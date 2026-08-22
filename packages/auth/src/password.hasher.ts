@@ -89,7 +89,7 @@ function memoryBudget(cost: number, blockSize: number): number {
  * **Swapping it out.** Everything in this package talks to `IPasswordHasher`,
  * never to this class. An application that wants argon2id writes twenty lines
  * implementing `hash` and `verify` over the `argon2` package and passes that to
- * `AuthService` instead; nothing else changes. The encoded hashes carry their
+ * `AuthBLL` instead; nothing else changes. The encoded hashes carry their
  * scheme at the front precisely so both can coexist while stored passwords are
  * migrated on next login.
  *

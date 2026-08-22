@@ -1,5 +1,5 @@
 import type { ITransactionContext, ITransactionScope, IUnitOfWork } from "monolite-data";
-import { Transactional, TransactionalService, lockRow } from "monolite-crud";
+import { Transactional, TransactionalBLL, lockRow } from "monolite-crud";
 
 /**
  * A fake unit of work and transaction context, chained the way the real ones
@@ -34,7 +34,7 @@ function harness() {
   };
 }
 
-class Service extends TransactionalService {
+class Service extends TransactionalBLL {
   /** Whether a transaction was open each time the method ran. */
   public readonly seen: boolean[] = [];
 
@@ -121,7 +121,7 @@ describe("@Transactional", () => {
     // It rejects rather than throwing: the decorated method is awaited, and a
     // synchronous error escaping something that looks asynchronous slips past
     // the caller's try/catch.
-    await expect(new Loose().something()).rejects.toThrow(/Extend TransactionalService/i);
+    await expect(new Loose().something()).rejects.toThrow(/Extend TransactionalBLL/i);
   });
 });
 
@@ -139,7 +139,7 @@ describe("lockRow", () => {
   /**
    * It stands on its own, and not only as a method of the base class, because
    * TypeScript has no multiple inheritance: a service that already extends
-   * `CrudService` cannot also extend `TransactionalService`, and it still needs
+   * `CrudBLL` cannot also extend `TransactionalBLL`, and it still needs
    * to lock.
    */
   it("works as a plain function for a service that cannot extend the base", async () => {

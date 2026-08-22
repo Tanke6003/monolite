@@ -122,7 +122,7 @@ describe("verify", () => {
 
   /**
    * Every one of these is a `false`, never a throw. The contract says so, and
-   * the reason is the caller: `AuthService` treats an unreadable hash as a
+   * the reason is the caller: `AuthBLL` treats an unreadable hash as a
    * failed login, and an exception there would answer 500 to a request that
    * simply had the wrong password.
    */

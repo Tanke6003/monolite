@@ -2,11 +2,11 @@
  * `monolite-auth` — optional, pluggable authentication.
  *
  * The package supplies the parts that are the same in every application — the
- * login flow, a token service, a password hasher, the middleware that guards a
+ * login flow, a token BLL, a password hasher, the middleware that guards a
  * route — and refuses to know the parts that are not. Where users live is
  * `IUserProvider`, which the application implements; how passwords are hashed
  * is `IPasswordHasher`, with an implementation included that needs nothing but
- * Node; what a token is made of is `ITokenService`, with JWT as the default.
+ * Node; what a token is made of is `ITokenBLL`, with JWT as the default.
  *
  * Nothing here is mandatory. An application that already authenticates
  * elsewhere can take `requireAuth` alone, or nothing at all: no other package
@@ -19,9 +19,9 @@ export type {
   AuthUser,
   AuthUserWithSecret,
   Credentials,
-  IAuthService,
+  IAuthBLL,
   IPasswordHasher,
-  ITokenService,
+  ITokenBLL,
   IUserProvider,
   SignedToken,
   TokenClaims,
@@ -32,16 +32,16 @@ export { AUTH_TOKENS } from "./tokens.js";
 export type { AuthToken } from "./tokens.js";
 
 // ---------------------------------------------------------------  tokens  ---
-export { JwtTokenService } from "./jwt.token-service.js";
-export type { JwtTokenServiceOptions } from "./jwt.token-service.js";
+export { JwtTokenBLL } from "./jwt.token-bll.js";
+export type { JwtTokenBLLOptions } from "./jwt.token-bll.js";
 
 // -------------------------------------------------------------  hashing  ---
 export { ScryptPasswordHasher } from "./password.hasher.js";
 export type { ScryptPasswordHasherOptions } from "./password.hasher.js";
 
 // ---------------------------------------------------------------  login  ---
-export { AuthService } from "./auth.service.js";
-export type { AuthServiceOptions } from "./auth.service.js";
+export { AuthBLL } from "./auth.bll.js";
+export type { AuthBLLOptions } from "./auth.bll.js";
 
 // ----------------------------------------------------------  middleware  ---
 // The claim-to-identity mapping is not re-exported: it is `toCurrentUser` in

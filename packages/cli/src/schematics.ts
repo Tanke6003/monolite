@@ -4,7 +4,23 @@ import { copyTemplateTree, type FileWriter } from "./util/files.js";
 import { pluralize, toCamelCase, toKebabCase, toPascalCase, toUpperSnakeCase } from "./util/naming.js";
 import type { RenderContext } from "./util/render.js";
 
-export const SCHEMATICS = ["module", "entity", "service", "controller", "query"] as const;
+export const SCHEMATICS = [
+  "module",
+  "entity",
+  "bll",
+  "controller",
+  "query",
+  "repository",
+] as const;
+
+/**
+ * Names that used to work, so a script or a habit does not simply fail.
+ *
+ * `service` was the schematic until the layer was renamed. It still resolves,
+ * with a line saying what it resolved to — an unrecognised subcommand is a
+ * worse answer than a redirect, and this costs one line and one map.
+ */
+export const RENAMED_SCHEMATICS: Record<string, Schematic> = { service: "bll" };
 
 export type Schematic = (typeof SCHEMATICS)[number];
 
@@ -20,13 +36,18 @@ export function isSchematic(value: string): value is Schematic {
  */
 const PARTS: Record<Schematic, string[]> = {
   entity: ["entity"],
-  service: ["service"],
+  bll: ["bll"],
   controller: ["controller"],
-  module: ["entity", "service", "controller", "module"],
+  module: ["entity", "bll", "controller", "module"],
   // Its own tree rather than a composition of the others: a query has no
-  // entity, its service maps rows instead of a mapper, and its controller is
+  // entity, its business layer maps rows instead of a mapper, and its controller is
   // written by hand because there is no resource for `@Crud` to describe.
   query: ["query"],
+  // Not part of `module`: an entity gets a working repository from
+  // `defineEntity` alone, and a class that forwards seventeen methods and adds
+  // nothing is a layer for the sake of having one. This is generated the day a
+  // module needs a query the generic API does not express.
+  repository: ["repository"],
 };
 
 /** The schematics that need `--over`; see `overVars`. */
@@ -64,7 +85,11 @@ export function entityVars(rawName: string): Record<string, string> {
     routePath: `/${pluralize(kebab)}`,
     entityConst: `${toUpperSnakeCase(plural)}_ENTITY`,
     storeToken: `${plural}Store`,
-    serviceToken: `I${plural}Service`,
+    bllToken: `I${plural}BLL`,
+    // Bound only once `generate repository` has run; until then it is a name
+    // nobody asks for, which costs a line and saves the generator from having
+    // to reopen a file somebody has been editing.
+    repositoryToken: `I${plural}Repository`,
     controllerToken: `I${plural}Controller`,
     registerFn: `register${plural}`,
     dtoName: `${singular}DTO`,

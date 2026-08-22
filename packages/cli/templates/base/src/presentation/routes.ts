@@ -4,7 +4,7 @@ import type { RequestHandler } from "express";
 // #endif
 // #if auth
 import { AUTH_TOKENS, requireAuth } from "monolite-auth";
-import type { ITokenService } from "monolite-auth";
+import type { ITokenBLL } from "monolite-auth";
 // #endif
 import { registerController, registeredControllers } from "monolite-http";
 import { container } from "../composition/container";
@@ -45,7 +45,7 @@ export function registerRoutes(): Router {
   // Every route is behind the guard unless its decorator marked it `public`. If
   // leaving one open is going to be an oversight, let the oversight be closing
   // it rather than the other way round.
-  const guard = requireAuth(container.resolve<ITokenService>(AUTH_TOKENS.ITokenService));
+  const guard = requireAuth(container.resolve<ITokenBLL>(AUTH_TOKENS.ITokenBLL));
   // #else
   const guard = openToEveryone;
   // #endif

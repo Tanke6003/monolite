@@ -23,7 +23,7 @@ describe("TOKENS", () => {
         "IRequestContext",
         "ITransactionContext",
         "IHealthProbe",
-        "ITokenService",
+        "ITokenBLL",
         "IFileStorage",
         "IDbPlugin",
         "IUnitOfWork",

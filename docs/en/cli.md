@@ -172,18 +172,19 @@ monolite g query revenue --over invoice
 
 | Schematic | What it writes |
 | --- | --- |
-| `module` | Entity + store registration + service + controller, wired with `@Crud` |
+| `module` | Entity + store registration + BLL + controller, wired with `@Crud` |
 | `entity` | The domain interface and its table mapping |
-| `service` | A `CrudService` subclass for an existing entity |
-| `controller` | A `CrudController` subclass for an existing service |
-| `query` | Repository + service + DTO + controller, for what the generic API cannot express |
+| `bll` | A `CrudBLL` subclass for an existing entity |
+| `controller` | A `CrudController` subclass for an existing BLL |
+| `query` | Repository + BLL + DTO + controller, for what the generic API cannot express |
+| `repository` | An existing entity's store plus its own queries, on `executeRaw` |
 
 ### `generate query`
 
 Aggregations, `GROUP BY`, views and stored procedures are outside the generic
 API on purpose — expressing them would turn it into an ORM. What you write
 instead is four files: a small interface of your own, an implementation on
-`executeRaw`, a service, a controller.
+`executeRaw`, a BLL, a controller.
 
 ```bash
 monolite g query revenue --over invoice
@@ -192,8 +193,8 @@ monolite g query revenue --over invoice
 ```
 src/infrastructure/persistence/revenue.repository.ts   interface + implementation
 src/application/dtos/revenue.dto.ts                    the published shape
-src/application/services/revenue.service.ts            rows -> DTO
-src/presentation/controllers/revenue.controller.ts     injects the service
+src/application/bll/revenue.bll.ts                     rows -> DTO
+src/presentation/controllers/revenue.controller.ts     injects the BLL
 src/composition/modules/revenue.tokens.ts              its three identifiers
 src/composition/modules/revenue.module.ts              its bindings, no registration
 ```
@@ -212,14 +213,73 @@ The aggregate it computes — how many rows, the lowest and highest id — is a
 placeholder, true of any table so that the module answers before you have
 written a line. Replace it. What is worth keeping is the shape around it: binds
 instead of concatenation, column names out of the mapping, and a controller that
-talks to the service.
+talks to the BLL.
 
 That last one is the reason this schematic exists at all. Every `@Crud` module
 keeps the layering right without anyone thinking about it, because
-`CrudController` takes an `ICrudService` and will not take anything else. A
+`CrudController` takes an `ICrudBLL` and will not take anything else. A
 query is the one place in a monolite project where all four files are written
 from a blank page, so it is the only place the rule can be broken — see
 [architecture](architecture.md).
+
+### `generate repository`
+
+You do not need one to do CRUD, and that is worth saying first: `defineEntity`
+already produced a repository that selects, inserts, updates, pages, filters and
+soft-deletes on every engine. A module that only does those should inject it
+directly. A class that forwards seventeen methods and adds nothing is a layer
+for the sake of having one, which is why this is not part of `generate module`.
+
+Generate one the day the module needs a query the generic API deliberately does
+not express — an aggregate, a `GROUP BY`, a view, a stored procedure:
+
+```bash
+monolite g repository invoice
+```
+
+```
+src/infrastructure/persistence/invoice.repository.ts   the interface and the class
+```
+
+It extends `BaseModuleRepository`, which forwards the whole contract to the
+store and wraps every call in a guard that logs the driver's error and re-throws
+a neutral one — so an `ORA-00001` stays in the log and never reaches a client.
+The example method shows the shape: `asRawQueryable` to ask whether this engine
+has SQL to run, the aggregate when it does, and the in-process fallback when it
+does not, because the in-memory driver is what your generated suite uses.
+
+The store it injects already joins whatever transaction is open — that has been
+true of every bound store since 0.6.0, so nothing here has to be told about one.
+
+**`repository` or `query`?** A repository belongs to one entity and adds
+methods to *its* store. A query owns no table and computes an answer across
+several, so it comes with a BLL, a DTO and a controller of its own. If you find
+yourself giving an entity's repository a method that reads two other tables, the
+answer was a query.
+
+#### The binding
+
+```
+i Registered in src/composition/modules/invoice.module.ts:
+    import { InvoicesRepository } from "../../infrastructure/persistence/invoice.repository";
+    container.register(INVOICE_TOKENS.repository, { useClass: InvoicesRepository });
+```
+
+Two lines rather than one, because the class has to be imported before it can be
+bound. They go above a `// monolite:bindings` marker the module ships with —
+and unlike `modules.ts`, this is a file you have almost certainly edited, which
+is exactly the situation a generator has to be careful in. Move the marker,
+rename it or delete it and nothing is touched: the command prints the two lines
+instead.
+
+The token was already declared. `<ENTITY>_TOKENS.repository` is written by
+`generate module` and simply goes unbound until there is something to bind to
+it, which saves the generator from having to reopen the token table.
+
+What is left to you is one line in the BLL: inject
+`<ENTITY>_TOKENS.repository` where it injects `<ENTITY>_TOKENS.store` today,
+and widen its type to the new interface. That one is a decision — the BLL may
+well want the plain store — so it is printed rather than made.
 
 ### Wiring
 

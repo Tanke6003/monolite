@@ -76,7 +76,7 @@ on outside production.
 
 `__pmRun__ test` runs both suites and needs nothing running: `tests/setup/test-env.ts`
 forces `DATA_SOURCE=memory`, so the end-to-end tests get the real repository, the real
-services and the real routes without a container to bring up first. Point that variable
+BLLs and the real routes without a container to bring up first. Point that variable
 at an engine to run the very same tests against one.
 
 They drive the application in memory through supertest — no port is bound, so the suite
@@ -93,18 +93,19 @@ src/
   config/env.ts               Reading configuration; pure, and unit tested
   composition/
     container.ts              Composition root: what implements what
-    entities.ts               The entities the persistence layer is built from
+    modules.ts                Every feature module, in one list
 <!-- #if auth -->
-    auth.module.ts            Login, token service and hasher, wired up
+    auth.module.ts            Login, token BLL and hasher, wired up
 <!-- #endif -->
     modules/                  One registration file per feature module
   domain/models/              Entities, as plain interfaces
   application/
     dtos/                     What crosses the HTTP boundary, plus its validation
-    services/                 Use cases
+    bll/                      Use cases
   infrastructure/
     logger.ts                 ILogger over stdout, dependency free
     persistence/entities/     Entity to table mapping
+  scripts/                    db:sql and db:migration, over that same list
   presentation/
     routes.ts                 Mounts every decorated controller
     controllers/              One controller per module
@@ -180,19 +181,40 @@ means a second router, because the contract is the code.
 npx monolite generate module invoice
 ```
 
-That writes the entity, its table mapping, the DTO with its validation, the service, the
-controller and the registration file — the same seven files the example module is made
-of. The CLI prints the three lines you then add yourself, in `composition/entities.ts`,
-`composition/container.ts` and `presentation/routes.ts`: a generator that edits your own
-files is a generator that eventually mangles them.
+That writes the entity, its table mapping, the DTO with its validation, the BLL, the
+controller and the module descriptor — the same files the example module is made of —
+and adds one line to `composition/modules.ts`:
 
-The entity has to be listed in `composition/entities.ts` rather than registering itself,
-and that is not an oversight: the unit of work indexes the repositories by entity name
-when the persistence layer is assembled, so an entity that arrived later would have a
-store and no seat in any transaction.
+```
+i Wired into src/composition/modules.ts:
+    import { INVOICE_MODULE } from "./modules/invoice.module";
+    INVOICE_MODULE,
+```
 
-The individual pieces are available too: `generate entity`, `generate service`,
-`generate controller`.
+One line in one file, because the descriptor carries the entity registration, the
+bindings and the controller together. It used to be three edits in three files, none of
+them a decision and any of them forgettable into a module that compiles perfectly and is
+never served. What made that version impossible to automate safely was not the editing;
+it was that the edits were spread out.
+
+The licence to write comes from the `// monolite:modules` marker in that file. Move it,
+rename it or delete it and nothing is touched — the command prints the line instead, which
+is what it always used to do. `--no-wire` says the same thing on purpose.
+
+The individual pieces are available too: `generate entity`, `generate bll`,
+`generate controller`. And two for when the generic API runs out:
+
+```bash
+npx monolite generate repository invoice          # this entity's own queries
+npx monolite generate query revenue --over invoice  # an answer across entities
+```
+
+A **repository** belongs to one entity and adds methods to its store, on `executeRaw`.
+A **query** owns no table — it computes an answer across entities that already exist, so
+it comes with its own BLL, DTO and controller, and its module descriptor carries no
+entity registration at all. Both are generated with the controller injecting the BLL and
+never the repository, which is the one rule the CRUD path enforces by type and these
+files cannot.
 
 ## How a module fits together
 
@@ -203,7 +225,7 @@ A plain CRUD module writes no query and no route:
 - **`infrastructure/persistence/entities/*.entity.ts`** — `defineEntity` maps it to a
   table. This is the only file that names a column; from here `monolite-data` generates
   the whole CRUD.
-- **`application/services/*.service.ts`** — extends `CrudService`, which already knows
+- **`application/bll/*.bll.ts`** — extends `CrudBLL`, which already knows
   how to page, map and soft delete. A module with a real rule overrides the one verb
   that has it and keeps the rest.
 - **`presentation/controllers/*.controller.ts`** — `@ApiController` gives it a prefix,
@@ -214,9 +236,24 @@ A plain CRUD module writes no query and no route:
 ## The database
 
 `docker-compose.yml` brings up __engineLabel__ and nothing else — the compose file was
-generated for the engine this project chose. The application never creates tables: the
-generic repository reads and writes them, so the schema is yours to manage, by migration
-or by hand.
+generated for the engine this project chose.
+
+The application never creates tables, and it never will: a process that alters a schema on
+boot is a process that alters production on a bad deploy. What it will do is write the SQL
+for you, from the same mapping the repository reads:
+
+```bash
+__pmRun__ db:sql -- --out db/schema.sql        # every table, for __engineLabel__
+__pmRun__ db:migration -- add-invoice-notes    # only what changed since the last one
+```
+
+Apply either with whatever you already use — umzug, node-pg-migrate, Flyway,
+`psql < file`. Nothing is run for you, and nothing is written when nothing changed.
+
+Read the migration before applying it. Anything that destroys data is emitted commented
+out, and a renamed column comes out as a drop and an add with a note saying so: nothing in
+the mapping distinguishes a rename from a real drop, and guessing would silently discard a
+populated column.
 <!-- #endif -->
 <!-- #if memory -->
 ## The database

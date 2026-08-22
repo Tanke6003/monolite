@@ -4,9 +4,9 @@ import { api, API, headers, type Api } from "./support/api";
  * The example module, over HTTP, through everything.
  *
  * Every one of these goes through the real chain: the router the decorators
- * built, the Zod schema that validates the body, `CrudController`, `CrudService`,
+ * built, the Zod schema that validates the body, `CrudController`, `CrudBLL`,
  * the mapper, the generic repository and the error handler on the way out. The
- * point is not to test `CrudService` again — it has unit tests of its own in the
+ * point is not to test `CrudBLL` again — it has unit tests of its own in the
  * toolkit — but to prove this module is *wired*: that the token resolves, the
  * routes are where the document says they are, and the status codes are the ones
  * a client will branch on.

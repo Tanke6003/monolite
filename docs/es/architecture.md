@@ -57,7 +57,7 @@ siendo Clean Architecture, y la CLI genera exactamente esta forma:
 ┌─────────────────────────────────────────────────────┐
 │  Presentación   controladores, middlewares          │  ← monolite-http
 ├─────────────────────────────────────────────────────┤
-│  Aplicación     servicios, DTOs, casos de uso       │  ← monolite-crud
+│  Aplicación     BLLs, DTOs, casos de uso            │  ← monolite-crud
 ├─────────────────────────────────────────────────────┤
 │  Dominio        interfaces y modelos, sin imports   │  ← sólo tu código
 ├─────────────────────────────────────────────────────┤
@@ -70,7 +70,7 @@ fuera. Lo que aportan los paquetes es que ahora las capas de fuera vienen *dadas
 en vez de escritas. Tus modelos de dominio y tus reglas de negocio siguen siendo
 tuyos.
 
-### Un controlador habla con un servicio, nunca con un repositorio
+### Un controlador habla con una BLL, nunca con un repositorio
 
 La regla de dependencia va de *dirección*, y un controlador que se salta la capa
 de aplicación para llegar a infraestructura la cumple tal y como está escrita
@@ -82,7 +82,7 @@ merecen publicarse, en qué orden ni cuántas; y un controlador que respondiera 
 filas estaría tomando las dos decisiones en la capa más lejana a ambas.
 
 Casi siempre no hay nada que recordar, porque no hay nada que se pueda romper:
-`CrudController` recibe un `ICrudService` y no acepta otra cosa, así que todo
+`CrudController` recibe un `ICrudBLL` y no acepta otra cosa, así que todo
 módulo `@Crud` tiene la forma correcta se piense en ella o no. La regla solo
 sostiene algo en el único caso en el que los cuatro ficheros se escriben desde
 cero: un informe, una búsqueda sobre varias tablas, un panel. Para eso está
@@ -105,9 +105,9 @@ Router construido a partir de los decoradores             monolite-http
     │  guarda de autenticación, luego validación Zod de body/query/params
     ▼
 Controlador                                               tuyo, o monolite-crud
-    │  lee la petición, llama al servicio
+    │  lee la petición, llama a la BLL
     ▼
-Servicio                                                  tuyo, o monolite-crud
+BLL                                                       tuya, o monolite-crud
     │  reglas de negocio. Abre una transacción con @Transactional()
     │  cuando el caso de uso escribe en más de un sitio
     ▼
@@ -285,13 +285,13 @@ entidad, cada uno con validación, paginación y su entrada de OpenAPI. El decor
 sólo rellena huecos: declara un método con el mismo nombre y gana el tuyo. Añade
 `verbs: ["list", "getOne"]` y registra sólo esos.
 
-`@Transactional()` abre una transacción alrededor de un método de servicio y la
+`@Transactional()` abre una transacción alrededor de un método de una BLL y la
 publica en el `ITransactionContext` ambiental, de modo que todo repositorio llamado
 dentro se suma sin recibir nada. *Se suma* a una transacción existente en vez de
 anidar una segunda.
 
 `lockRow(transactions, entity, id)` es una función suelta y no un método de una
-clase base, porque un servicio que la necesite puede ya estar extendiendo otra cosa
+clase base, porque una BLL que la necesite puede ya estar extendiendo otra cosa
 y TypeScript no tiene herencia múltiple. Que el bloqueo sea la primera sentencia de
 la transacción importa en MySQL, donde REPEATABLE READ fija la foto en la primera
 lectura.
@@ -305,12 +305,12 @@ tsyringe resuelve por token de cadena, lo que significa que una errata en
 construye. `TOKENS` existe para que el compilador la cace antes.
 
 En este paquete sólo viven los tokens *del framework*. Tus tokens de negocio
-(`IUsersService`, `IBranchesRepository`) pertenecen a tu aplicación y se registran
+(`IUsersBLL`, `IBranchesRepository`) pertenecen a tu aplicación y se registran
 desde tus propios archivos de módulo, así que un módulo es un archivo más una línea
 en la raíz de composición, y quitarlo es borrar los dos.
 
 Tiempos de vida: los plugins son singletons — el contexto de petición y el de
-transacción *tienen* que serlo, por lo dicho arriba. Repositorios, servicios y
+transacción *tienen* que serlo, por lo dicho arriba. Repositorios, BLLs y
 controladores son transitorios; no guardan estado entre peticiones.
 
 ---

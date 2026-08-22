@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from "express";
 import { AppError, type CurrentUser, type IRequestContext } from "monolite-core";
 import { toCurrentUser as defaultToCurrentUser } from "monolite-http";
-import type { ITokenService, TokenClaims } from "./contracts.js";
+import type { ITokenBLL, TokenClaims } from "./contracts.js";
 
 /**
  * Where the verified identity is parked on the request.
@@ -58,7 +58,7 @@ export interface RequireAuthOptions {
  *
  * The kernel's error mapper already knows how to read `jsonwebtoken`'s errors,
  * but letting them travel raw would tie the shape of a 401 to which library
- * happens to be behind `ITokenService`. Translating here means an application
+ * happens to be behind `ITokenBLL`. Translating here means an application
  * with opaque tokens produces exactly the same response. The expired/invalid
  * distinction survives the translation because clients branch on it: expired
  * means "renew", invalid means "sign in again".
@@ -84,7 +84,7 @@ function unauthorized(error: unknown): AppError {
  *
  * On success it publishes the identity twice over — on the request, where
  * `requireRoles` and `authenticatedUser` find it, and into the request context
- * if one was supplied, which is what lets a service three layers down know who
+ * if one was supplied, which is what lets a BLL three layers down know who
  * is asking without the identity being threaded through every signature.
  *
  * A token that verifies but carries no identifiable claims is still allowed
@@ -93,7 +93,7 @@ function unauthorized(error: unknown): AppError {
  * `BaseController.requireUserId()` turn it away where that decision belongs.
  */
 export function requireAuth(
-  tokenService: ITokenService,
+  tokenBLL: ITokenBLL,
   options: RequireAuthOptions = {}
 ): RequestHandler {
   const toCurrentUser = options.toCurrentUser ?? defaultToCurrentUser;
@@ -119,7 +119,7 @@ export function requireAuth(
 
     let claims: TokenClaims;
     try {
-      claims = tokenService.verify(token);
+      claims = tokenBLL.verify(token);
     } catch (error) {
       next(unauthorized(error));
       return;

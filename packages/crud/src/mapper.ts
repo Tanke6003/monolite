@@ -153,7 +153,7 @@ export function createMapper<TEntity extends object, TDto extends object>(
  * a field that is genuinely always null, and nothing anywhere knew that
  * something else was supposed to fill it in.
  *
- * `CrudService` reads the marker and refuses to be constructed if a field
+ * `CrudBLL` reads the marker and refuses to be constructed if a field
  * carrying it has no include behind it. That is the whole point: the mistake it
  * replaces was a resource that quietly answered `author: null` on two verbs out
  * of four.
