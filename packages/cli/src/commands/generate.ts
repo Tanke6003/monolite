@@ -187,6 +187,10 @@ function reportWiring(
   }
 
   warn("the table has to exist in the database too; the generic repository does not create it");
+  // It used to end there, which left the reader to write the DDL by hand from
+  // the mapping they had just generated — two descriptions of one schema, kept
+  // in agreement by nobody.
+  hint("`db:sql` writes it from the entity you just generated; `db:migration` writes the change");
 }
 
 /**

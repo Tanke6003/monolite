@@ -21,6 +21,8 @@
     "test": "jest",
     "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
     "typecheck": "tsc --noEmit",
+    "db:sql": "tsx src/scripts/db-sql.ts",
+    "db:migration": "tsx src/scripts/db-migration.ts",
     "check": "__pmRun__ typecheck && __pmRun__ lint && __pmRun__ test"
   },
   "dependencies": { __dependencies__ },
