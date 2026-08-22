@@ -1,0 +1,70 @@
+name: Documentation
+description: A page that is wrong, missing, or true of a version that has passed
+title: "[docs] "
+labels: ["documentation"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Its own form, and not a footnote on the bug report, because this
+        repository treats the documentation as something that can be *wrong*
+        rather than merely thin. Its examples are type-checked in CI, both
+        languages are kept structurally in step, and a guide that describes a
+        layout the scaffold stopped writing is a defect with a version number.
+
+        If the code is what is broken, the bug report is the better form: fixing
+        the sentence would only make the documentation agree with a mistake.
+
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: The file, and the heading if you have it.
+      placeholder: docs/en/data-access.md — "Where the generic API stops"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is wrong with it
+      options:
+        - It says something that is not true
+        - It describes an older version
+        - The example does not work
+        - Something is missing entirely
+        - The two languages disagree
+    validations:
+      required: true
+
+  - type: textarea
+    id: says
+    attributes:
+      label: What it says
+      description: Quote it, so the two versions can be compared without hunting.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reality
+    attributes:
+      label: What is actually the case
+      description: >-
+        And how you know — the code, a test, or what happened when you followed
+        it. "It did not work" is a bug report; "it does X and the page says Y"
+        is this.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: languages
+    attributes:
+      label: Which language
+      description: >-
+        English is written first and the Spanish pages mirror it, so a fix
+        usually lands in both. Ticking only one is fine — say so and somebody
+        will carry it across.
+      options:
+        - label: English
+        - label: Español

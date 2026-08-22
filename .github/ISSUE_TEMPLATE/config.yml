@@ -3,3 +3,23 @@
 # is still worth having, and a repository that only accepts what its template
 # anticipated stops hearing about anything it did not anticipate.
 blank_issues_enabled: true
+
+contact_links:
+  - name: How to run it, and how it is meant to be used
+    url: https://github.com/Tanke6003/monolite/tree/master/docs
+    about: >-
+      Both languages, and the guides answer most "how do I" questions faster
+      than an issue will. Getting started, architecture, data access, routing,
+      CRUD, authentication, the CLI and testing.
+
+  - name: Contributing
+    url: https://github.com/Tanke6003/monolite/blob/master/CONTRIBUTING.md
+    about: >-
+      Setup, where code goes, what the tests are for, and the commit convention
+      the release is driven by. Read this before opening a pull request.
+
+  - name: Reporting something security-sensitive
+    url: https://github.com/Tanke6003/monolite/blob/master/SECURITY.md
+    about: >-
+      Not through a public issue. A vulnerability in a published package is
+      installed by everyone who runs npm install before it is fixed.
