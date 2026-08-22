@@ -53,6 +53,10 @@ export class FakeSqlExecutor implements ISqlExecutor {
   sqlAt(index: number): string {
     return (this.calls[index]?.sql ?? "").replace(/\s+/g, " ").trim();
   }
+
+  bindsAt(index: number): Record<string, unknown> {
+    return (this.calls[index]?.binds ?? {}) as Record<string, unknown>;
+  }
 }
 
 export const silentLogger = {

@@ -297,7 +297,32 @@ export function buildMongoConfig(envs: IEnvs): MongoConnectionConfig {
     database: envs.getEnv("MONGO_DB") || "testdb",
     username: envs.getEnv("MONGO_USER") || undefined,
     password: envs.getEnv("MONGO_PASSWORD") || undefined,
+    options: parseMongoOptions(envs.getEnv("MONGO_OPTIONS")),
   };
+}
+
+/**
+ * `MONGO_OPTIONS` as the connection string's query, e.g.
+ * `directConnection=true&replicaSet=rs0`.
+ *
+ * A raw query string rather than one variable per option, because the list is
+ * the driver's and grows without asking: pinning it to the handful anybody
+ * thought of today is how a connector ends up unable to reach a server two
+ * years from now.
+ */
+function parseMongoOptions(raw?: string): Record<string, string> | undefined {
+  const trimmed = raw?.trim().replace(/^\?/, "");
+  if (!trimmed) return undefined;
+
+  const options: Record<string, string> = {};
+
+  for (const pair of trimmed.split("&")) {
+    const [key, ...rest] = pair.split("=");
+    if (!key) continue;
+    options[decodeURIComponent(key)] = decodeURIComponent(rest.join("=") ?? "");
+  }
+
+  return Object.keys(options).length ? options : undefined;
 }
 
 /** Dialect of each engine Sequelize speaks. */

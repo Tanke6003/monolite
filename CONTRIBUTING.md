@@ -5,6 +5,25 @@
 Thanks for taking the time. This document covers the conventions that are not
 obvious from reading the code.
 
+## Where to start
+
+If you are looking for something to pick up: the
+[open issues](https://github.com/Tanke6003/monolite/issues) carry the reasoning
+behind each one, because the templates ask for it. Anything labelled
+`documentation` is a good first change — the guides are type-checked in CI, so
+you get told immediately whether an example you wrote works.
+
+You do not need a database to contribute. `npm run check` runs with nothing
+installed, and the in-memory driver is a complete engine.
+
+Two things worth knowing before you open anything:
+
+- **A reasoned disagreement is welcome and is the point.** This repository
+  argues about design in the open; see the [code of conduct](./CODE_OF_CONDUCT.md)
+  for the one rule that makes that work.
+- **Something security-sensitive does not go in an issue.** Seven packages are
+  published from here — see [SECURITY.md](./SECURITY.md).
+
 ## Setup
 
 ```bash
@@ -67,6 +86,27 @@ A test must **discriminate**: it has to fail if the behaviour it describes is
 removed. The quickest way to check is to break the mechanism on purpose and
 confirm the test goes red. A test that passes both with and without the feature is
 worse than no test, because it buys confidence it has not earned.
+
+### Against real engines
+
+`npm test` verifies the drivers against an array and two doubles. Good doubles —
+they evaluate the generated SQL rather than nodding at it — and still unable to
+catch the class of bug where the engine and the double disagree. That class has
+shipped repeatedly: a soft-delete flag the SQL driver never wrote, an
+`ON DELETE` clause one engine has no word for, a `CALL` the connector could not
+make, and a `like` that ignored case on two of the four.
+
+```bash
+npm run engines:up          # PostgreSQL, MySQL, SQL Server, MongoDB, Oracle
+npm run test:integration
+npm run engines:down
+```
+
+Touching a driver, a dialect, a connector or the DDL generator means running
+this. CI runs it on every push, so a change that only passes the unit suite will
+be caught — but an hour later and with less context than you have now.
+
+`MONOLITE_IT_ENGINES=postgres` narrows it while you work.
 
 ## Commits
 

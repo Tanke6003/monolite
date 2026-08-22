@@ -159,7 +159,9 @@ const branches = await loadRelated(appointments, {
 
 | Export | What it is |
 | --- | --- |
-| `CrudBLL`, `ICrudBLL`, `ListOptions`, `PaginatedDTO`, `EntityMapper` | The business layer and its contracts |
+| `CrudBLL`, `ICrudBLL`, `CrudBLLOptions`, `ListOptions`, `PaginatedDTO`, `EntityMapper` | The business layer and its contracts |
+| `include`, `Include`, `IncludeDefinition` | A relation declared once, where the BLL is built, instead of hydrated by hand in each of the four verbs |
+| `hydrated`, `HydratedField`, `hydratedFields`, `isHydratedField` | The DTO field an include fills. A field declared `hydrated()` that no include fills stops the BLL from being built, rather than answering `null` for ever |
 | `CrudController`, `ICrudController` | The five HTTP handlers |
 | `Crud`, `CrudOptions`, `CrudVerb` | The decorator that mounts the routes |
 | `createMapper`, `Mapper`, `MappingProfile`, `FieldMapping`, `MappedField`, `ComputedField` | Declarative entity <-> DTO mapping |

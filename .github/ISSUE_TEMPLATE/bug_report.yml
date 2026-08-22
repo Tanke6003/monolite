@@ -1,0 +1,126 @@
+name: Bug report
+description: Something the toolkit already claims to do, and does not
+title: "[bug] "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for behaviour that contradicts what the documentation, a
+        type signature or a test says. If the toolkit works as described and the
+        description is the problem, open an enhancement instead.
+
+        The fields below ask for one thing above all: **a case somebody else can
+        run**. Nearly every bug this project has fixed was found by reducing it
+        to twenty lines and an engine, and nearly every one that took a week to
+        fix arrived without that.
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Where it goes wrong. Pick "several" if you are not sure yet.
+      options:
+        - monolite-core
+        - monolite-data
+        - monolite-http
+        - monolite-crud
+        - monolite-di
+        - monolite-auth
+        - monolite-cli
+        - a generated project
+        - several
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >-
+        The version of the package above. `npm ls monolite-data` prints it, and
+        "latest" is not one — half the reports that cannot be reproduced turn
+        out to be against something that was fixed two releases ago.
+      placeholder: "0.9.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      description: >-
+        Which one this happens on. It matters more than it looks: the engines
+        disagree about collation, about result-set shapes and about whole
+        clauses, and several bugs here have been true of exactly one of them.
+      options:
+        - in-memory
+        - PostgreSQL
+        - MySQL / MariaDB
+        - SQL Server
+        - Oracle
+        - MongoDB
+        - not about the data layer
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what said so
+      description: >-
+        Quote the guide, the signature or the test you were going by. A bug is a
+        gap between a promise and the behaviour, and naming the promise is what
+        turns a disagreement about taste into one about correctness.
+      placeholder: |
+        `docs/en/crud.md` says every repository called inside `@Transactional()`
+        joins the transaction and that nothing is passed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happens instead
+      description: >-
+        Including the error, in full. A stack trace with the middle cut out is
+        usually missing the frame that explains it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: A case that shows it
+      description: >-
+        The smallest entity, service or request that fails. If it needs a
+        database, say which image and which settings — `docker/integration`
+        has the five this repository tests against.
+      render: typescript
+      placeholder: |
+        const product = await store.insert({ name: "widget" });
+        // 1 row inserted, and this reads 0:
+        console.log((await store.getAll()).length);
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: What you did instead
+      description: >-
+        Optional, and worth more than it sounds. A workaround shows which part
+        of the design the bug is really in, and it is what other people will
+        find while the fix is being written.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before opening
+      options:
+        - label: I checked this happens on the latest release
+        - label: I looked for an open issue describing the same thing
+        - label: >-
+            The case above is one somebody else can run — no internal package,
+            no private database

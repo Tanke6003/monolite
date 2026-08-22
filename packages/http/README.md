@@ -255,6 +255,54 @@ the second — restarting does not fix someone else's database.
   draining, and they publish the resolved `apiPrefix` so a client can discover
   where the API is mounted instead of assuming it.
 
+## What it exports
+
+The six other packages list theirs; this one did not, and it has the largest
+surface of the seven. Grouped by what you would be reaching for.
+
+### Declaring routes
+
+| Export | What it is |
+| --- | --- |
+| `ApiController`, `Get`, `Post`, `Put`, `Patch`, `Delete` | The decorators. One declaration produces the route, its validation and its slice of the OpenAPI document, so the three cannot disagree. |
+| `RouteOptions`, `ResponseSpec`, `RouteMetadata`, `ControllerMetadata`, `HttpMethod`, `PathParamType` | What a decorator accepts and what it records. |
+| `BaseController`, `parseId` | The little a hand-written controller shares: the id in the path, parsed and refused if it is not one. |
+| `registerControllers`, `registeredControllers`, `getControllerMetadata`, `ControllerType`, `ControllerRegistration` | The registry the router is built from. Exported because a project that mounts its own router needs the same list. |
+| `sortedRoutes`, `bySpecificity`, `joinPath` | Mounting order. `/books/featured` has to be tried before `/books/:id`, or the literal path is swallowed by the parameter. |
+
+### The document
+
+| Export | What it is |
+| --- | --- |
+| `buildOpenApiDocument`, `BuildOpenApiDocumentOptions`, `OpenApiServer` | OpenAPI 3.1 from the same metadata that produced the routes. |
+| `buildOpenApiPaths`, `BuildPathsOptions`, `OpenApiPaths` | The paths alone, for a document assembled elsewhere. |
+| `defineDto`, `definePagedDto`, `buildDtoComponents` | A Zod schema published as a component, so an operation references it instead of repeating its shape. |
+| `missingSchemaRefs` | Every `$ref` in the document that resolves to nothing. The generated `mountDocs` runs it at startup, because a dangling reference still serves a 200 and only the reader notices. |
+| `DEFAULT_SECURITY_SCHEMES`, `ERROR_RESPONSE_SCHEMA`, `ERROR_SCHEMA_NAME` | The pieces every document here carries. |
+| `DocsReader`, `areDocsEnabled`, `docsCspDirectives`, `SCALAR_CDN_ORIGIN` | Which reader is mounted, and the policy it needs in order not to come out blank. |
+
+### The chain
+
+| Export | What it is |
+| --- | --- |
+| `createApp`, `CreateAppOptions`, `HttpApp` | The whole middleware chain in the order that makes it work, which is the order this README argues for. |
+| `errorHandler`, `notFoundHandler`, `ErrorHandlerOptions` | One place anything thrown becomes a response, and an unknown route answers in the same shape as a known one. |
+| `requestContext`, `REQUEST_ID_HEADER`, `toCurrentUser`, `currentUserName`, `TokenClaims` | The request identity, over `AsyncLocalStorage`, so nothing has to thread a user through four layers. |
+| `httpLogger`, `HttpLoggerOptions` | One access line per request. |
+| `healthRoutes`, `HealthRoutesOptions` | Readiness, liveness, and `/health` as the alias a load balancer configured with the bare path expects. |
+| `validateBody`, `validateQuery` | Zod at the boundary, for a route declared by hand. |
+
+### Security and configuration
+
+| Export | What it is |
+| --- | --- |
+| `buildHelmetOptions`, `DEFAULT_CSP_DIRECTIVES`, `SECURITY_DEFAULTS` | The headers, and the CSP that stays off until `CSP_ENABLED=true` — see the note above about a blank documentation page. |
+| `buildCorsOptions`, `resolveAllowedOrigins` | An allow-list rather than a wildcard, answering a blocked origin in the API's own error shape. |
+| `buildRateLimiter`, `buildAuthRateLimiter` | Per-IP, with the health checks exempt and the login endpoint on a tighter budget than the rest. |
+| `resolveApiPrefix`, `resolveLegacyPrefix`, `DEFAULT_API_PREFIX`, `DEFAULT_LEGACY_PREFIX` | Where the API is mounted, and the older prefix kept alive beside it. |
+| `resolveBodyLimit`, `resolveTrustProxy` | The two that are wrong by default in every framework: an unbounded body and a blindly trusted `X-Forwarded-For`. |
+| `EnvSource`, `processEnv` | Where all of the above is read from. |
+
 ## Configuration
 
 Everything is read through `EnvSource`, a one-method interface (`getEnv(key)`)

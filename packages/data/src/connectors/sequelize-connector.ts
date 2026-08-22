@@ -56,6 +56,23 @@ function toMessage(err: unknown): string {
 }
 
 /**
+ * Whether this statement must be the only one in its batch.
+ *
+ * T-SQL only, and only about the `@@ROWCOUNT` probe below: the body of a
+ * `CREATE PROCEDURE` runs to the end of the batch, so a statement appended
+ * after it does not run *after* it — it is compiled *into* it, and the
+ * procedure then returns a spurious row to everybody who calls it forever. The
+ * same is true of CREATE FUNCTION, TRIGGER and VIEW.
+ *
+ * A keyword check rather than a parser, because that is all the question needs:
+ * the four objects with a body are the four that begin this way, and none of
+ * them reports a row count worth reading, so a false positive costs nothing.
+ */
+function ownsItsBatch(sql: string): boolean {
+  return /^\s*(create|alter)\s+(or\s+alter\s+)?(procedure|proc|function|trigger|view)\b/i.test(sql);
+}
+
+/**
  * Connector for the SQL engines Sequelize speaks: SQL Server, PostgreSQL and
  * MySQL/MariaDB.
  *
@@ -70,6 +87,96 @@ function toMessage(err: unknown): string {
  * according to the dialect, so it is safe against injection, but it does not
  * reuse execution plans the way a real bind would.
  */
+/**
+ * MySQL answers a `CALL` with more than one result set.
+ *
+ * A procedure returns its own rows *and* a status packet, and one that returns
+ * nothing answers with the status packet alone. Neither shape is what the two
+ * paths below were written for: the row reader handed back the packet as if it
+ * were a row, and the affected-rows reader crashed inside Sequelize trying to
+ * map something that is not an array.
+ *
+ * The consequence was that `executeRaw` — the documented way to call a stored
+ * procedure — could not call one at all on MySQL. It went unnoticed because the
+ * only thing that had ever run it was a double, and a double accepts a `CALL`
+ * that no server would.
+ */
+interface OkPacket {
+  affectedRows: number;
+  serverStatus: number;
+  fieldCount: number;
+}
+
+function isOkPacket(value: unknown): value is OkPacket {
+  if (value === null || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.affectedRows === "number" &&
+    typeof candidate.serverStatus === "number" &&
+    typeof candidate.fieldCount === "number"
+  );
+}
+
+/**
+ * The rows out of whatever MySQL answered.
+ *
+ * Read off a live server rather than reasoned about, because the driver uses
+ * four different shapes and only two of them are documented anywhere:
+ *
+ * | statement          | raw answer                        |
+ * | ------------------ | --------------------------------- |
+ * | `SELECT`           | `[rows, rows]` — first is an array |
+ * | `CALL` that reads  | `[row, row, ...]` — already flat   |
+ * | `CALL` that writes | `undefined`                        |
+ * | `UPDATE`, DDL      | `[okPacket, okPacket]`             |
+ *
+ * The third is the one that used to crash: Sequelize's `SELECT` normaliser
+ * calls `.map` on it, so `executeRaw` could not call a writing procedure on
+ * MySQL at all — the documented escape hatch, on one of the six engines.
+ */
+function mysqlRows<TRow>(answered: unknown): TRow[] {
+  if (answered === undefined || answered === null) return [];
+  if (!Array.isArray(answered)) return isOkPacket(answered) ? [] : [answered as TRow];
+
+  const [first] = answered;
+
+  if (first === undefined) return [];
+  // An UPDATE or a DDL statement: a count, not a result set.
+  if (isOkPacket(first)) return [];
+  // A plain SELECT: the pair is (rows, metadata) and both are the rows.
+  if (Array.isArray(first)) return first as TRow[];
+
+  // A procedure that selected: the driver already flattened its result set.
+  return answered as TRow[];
+}
+
+/**
+ * The rows a MySQL statement touched, from whichever shape it reported.
+ *
+ * Measured, like `mysqlRows`, and the INSERT one is a trap: the pair is
+ * **(insertId, affectedRows)**, so reading the first element gives a row's id
+ * where a count was wanted. It is a plausible-looking number — a bulk insert of
+ * two rows reported nine, which was simply the auto-increment where it happened
+ * to be — and nothing but a real server would produce it.
+ *
+ * | statement          | raw answer                | count is        |
+ * | ------------------ | ------------------------- | --------------- |
+ * | `INSERT`           | `[insertId, affected]`    | the second      |
+ * | `UPDATE`, DDL      | `[okPacket, okPacket]`    | `affectedRows`  |
+ * | `CALL` that writes | `undefined`               | unreported: 0   |
+ */
+function mysqlAffected(answered: unknown): number {
+  if (!Array.isArray(answered)) return isOkPacket(answered) ? answered.affectedRows : 0;
+
+  const [first, second] = answered;
+
+  if (isOkPacket(first)) return first.affectedRows;
+  if (typeof second === "number") return second;
+
+  return 0;
+}
+
 export class SequelizeConnector implements ISqlDbPlugin {
   readonly engine: DbEngine;
   private readonly connection: Sequelize;
@@ -121,6 +228,16 @@ export class SequelizeConnector implements ISqlDbPlugin {
     transaction?: Transaction
   ): Promise<number> {
     if (this.engine === "mssql") {
+      // Nothing may be appended to a statement that owns its batch; see above.
+      if (ownsItsBatch(sql)) {
+        await this.connection.query(sql, {
+          replacements: binds,
+          type: driver().QueryTypes.RAW,
+          transaction,
+        });
+        return 0;
+      }
+
       // @@ROWCOUNT reflects the last statement of the batch, which is the write.
       const rows = (await this.connection.query(
         `${sql}; SELECT @@ROWCOUNT AS ${AFFECTED_ROWS};`,
@@ -128,6 +245,26 @@ export class SequelizeConnector implements ISqlDbPlugin {
       )) as Record<string, unknown>[];
 
       return Number(rows.at(-1)?.[AFFECTED_ROWS] ?? 0);
+    }
+
+    if (this.engine === "mysql") {
+      // `RAW` rather than `BULKUPDATE`: the latter assumes the driver answered
+      // with something it can map, and a `CALL` does not. Raw gives back what
+      // the server said, and `affectedFrom` reads the count out of it — the
+      // same number for an UPDATE, and the only way to get one for a CALL.
+      //
+      // Only MySQL: it is the engine that answers with status packets, and
+      // PostgreSQL's raw answer for an UPDATE is an empty row list, from which
+      // no count can be read at all.
+      // Not destructured: a procedure that only writes answers `undefined`, and
+      // there is nothing to take a first element of.
+      const answered = (await this.connection.query(sql, {
+        replacements: binds,
+        type: driver().QueryTypes.RAW,
+        transaction,
+      })) as unknown;
+
+      return mysqlAffected(answered);
     }
 
     const affected = (await this.connection.query(sql, {
@@ -171,6 +308,20 @@ export class SequelizeConnector implements ISqlDbPlugin {
       const expects = options.expects ?? "rows";
 
       if (expects === "rows") {
+        // Sequelize's `SELECT` normaliser assumes one result set. MySQL sends
+        // several for a `CALL`, and none at all for one that only writes, so
+        // that engine reads the raw answer and sorts the shapes out itself.
+        if (this.engine === "mysql") {
+          const answered = (await this.connection.query(sql, {
+            replacements: binds,
+            type: driver().QueryTypes.RAW,
+            transaction,
+          })) as unknown;
+
+          const rows = mysqlRows<TRow>(answered);
+          return { rows, rowsAffected: rows.length, outBinds: {} };
+        }
+
         const rows = (await this.connection.query(sql, {
           replacements: binds,
           type: driver().QueryTypes.SELECT,

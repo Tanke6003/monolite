@@ -79,7 +79,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | `SqlGenericRepository` | The single implementation behind all four SQL engines. Also `lockById` and `executeRaw`, the escape hatch for what the generic API deliberately does not express. |
 | `MongoGenericRepository`, `IMongoDataSource` | The document driver, same contract. |
 | `oracleDialect`, `sqlServerDialect`, `postgresDialect`, `mysqlDialect`, `SqlDialect` | What differs between SQL engines, and nothing else. |
-| `OracleConnector`, `SequelizeConnector`, `MongoConnector` | The connectors. Sequelize covers SQL Server, PostgreSQL and MySQL/MariaDB in one, because what differs lives in the dialect. |
+| `OracleConnector`, `SequelizeConnector`, `MongoConnector` | The connectors. Sequelize covers SQL Server, PostgreSQL and MySQL/MariaDB in one, because what differs lives in the dialect. `MongoConnectionConfig.options` carries the connection string's query — `directConnection`, `replicaSet`, `tls` — which a replica set behind a port mapping cannot be reached without. |
 | `MemoryUnitOfWork`, `SqlUnitOfWork`, `MongoUnitOfWork` | One unit of work per family, all behind `IUnitOfWork`. |
 | `AsyncTransactionContext` | `ITransactionContext` on `AsyncLocalStorage`. |
 | `MemoryAuditTrail`, `SqlAuditTrail`, `MongoAuditTrail` | The change log, written through the same scope as the audited operation, so it lands in the same commit. |
@@ -90,8 +90,8 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 
 | Export | What it is |
 | --- | --- |
-| `emitSchema`, `emitTable`, `TableDdl`, `EmitOptions` | `CREATE TABLE` from the same mapping the repository reads, so the schema and the code that queries it stop being two descriptions kept in agreement by hand. Tables first, then constraints: a foreign key can point at a table declared later. |
-| `DdlDialect`, `ddlDialectFor`, `DDL_DIALECTS`, `oracleDdl`, `sqlServerDdl`, `postgresDdl`, `mysqlDdl` | What differs between engines when *creating* a schema, kept apart from `SqlDialect` because it is read once by a command rather than on every statement. `ddlDialectFor` answers `null` for the engines that have no schema. |
+| `emitSchema`, `emitTable`, `TableDdl`, `EmitOptions`, `AnyEntityMetadata` | `CREATE TABLE` from the same mapping the repository reads, so the schema and the code that queries it stop being two descriptions kept in agreement by hand. Tables first, then constraints: a foreign key can point at a table declared later. |
+| `DdlDialect`, `OnDeleteRule`, `ddlDialectFor`, `DDL_DIALECTS`, `oracleDdl`, `sqlServerDdl`, `postgresDdl`, `mysqlDdl` | What differs between engines when *creating* a schema, kept apart from `SqlDialect` because it is read once by a command rather than on every statement. `ddlDialectFor` answers `null` for the engines that have no schema. |
 | `snapshotOf`, `diffSnapshots`, `emptySnapshot`, `SchemaSnapshot`, `TableSnapshot`, `ColumnSnapshot`, `ForeignKeySnapshot`, `IndexSnapshot`, `DiffOptions` | The migration half. Against a committed snapshot, never the live database; nothing at all when nothing changed; and anything that destroys data emitted commented out. |
 
 A generated project drives both through `npm run db:sql` and

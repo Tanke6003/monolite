@@ -24,6 +24,25 @@ export interface MongoConnectionConfig {
    */
   username?: string;
   password?: string;
+  /**
+   * Anything else the connection string can carry, appended as its query.
+   *
+   * It exists because without it there is no way to reach a replica set that
+   * does not advertise an address you can route to — which is every set behind
+   * a port mapping, a tunnel or a load balancer, and therefore every one a
+   * developer runs locally. The driver discovers the set's members and then
+   * dials the address the set names itself by, so a container advertising
+   * `localhost:27017` is unreachable from a host that mapped it elsewhere.
+   * `{ directConnection: true }` is the answer, and it could not be said.
+   *
+   * That mattered more than it looks: a transaction on MongoDB **requires** a
+   * replica set, so the engine's own transaction support was documented while
+   * the standard way of running one could not be connected to.
+   *
+   * Also the way to `replicaSet`, `tls`, `readPreference` and `authSource`
+   * when the default guess is wrong.
+   */
+  options?: Record<string, string | number | boolean>;
 }
 
 function toMessage(err: unknown): string {
@@ -68,12 +87,21 @@ export class MongoConnector implements IDbPlugin {
    * expects.
    */
   private buildUri(): string {
-    const { host, port, database, username, password } = this.config;
+    const { host, port, database, username, password, options } = this.config;
     const credentials = username
       ? `${encodeURIComponent(username)}:${encodeURIComponent(password ?? "")}@`
       : "";
 
-    return `mongodb://${credentials}${host}:${port}/${database}`;
+    const entries = Object.entries(options ?? {});
+    // Encoded for the same reason the password is: a value with an `&` in it
+    // would otherwise become two options, one of them invented.
+    const query = entries.length
+      ? `?${entries
+          .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+          .join("&")}`
+      : "";
+
+    return `mongodb://${credentials}${host}:${port}/${database}${query}`;
   }
 
   private getClient(): Promise<MongoClient> {

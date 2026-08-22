@@ -1,0 +1,95 @@
+# Every engine the toolkit claims to support, for the integration suite.
+#
+# The claim is "one contract over six engines", and until this existed CI had
+# verified none of them: the contract kit ran against the in-memory driver and a
+# MongoDB collection double, and the four SQL engines were tested through a
+# double of `ISqlExecutor`. Two real bugs got through that — a transaction the
+# repositories did not join, and a boolean column the mapping could not write
+# to — and both are the same shape: the engine does not behave like the double.
+#
+# Ports are deliberately unusual so this never collides with an engine somebody
+# already has running locally.
+name: monolite-integration
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: monolite
+      POSTGRES_USER: monolite
+      POSTGRES_DB: monolite
+    ports: ["55432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monolite -d monolite"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: monolite
+      MYSQL_DATABASE: monolite
+    ports: ["55306:3306"]
+    # `mysql_native_password` is off by default in 8.4+; the 8 image still has
+    # it, and pinning the major keeps the driver's default auth plugin working.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -pmonolite --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Monolite_2026!"
+      MSSQL_PID: Developer
+    ports: ["51433:1433"]
+    healthcheck:
+      # `-C` trusts the self-signed certificate the container generates; tools18
+      # refuses to connect without it.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Monolite_2026! -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 40
+
+  mongo:
+    image: mongo:7
+    # A replica set of one. Not optional: MongoDB refuses to start a session
+    # transaction on a standalone, and transactions are half of what this suite
+    # is here to check.
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports: ["57017:27017"]
+    healthcheck:
+      # Initiating from the healthcheck keeps the whole thing in one file. It is
+      # idempotent: once the set is up, `rs.status().ok` answers 1 and the
+      # initiate branch never runs again.
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }\" | grep -q 1",
+        ]
+      interval: 3s
+      timeout: 10s
+      retries: 40
+
+  oracle:
+    # The community build of Oracle Database Free: far smaller than the vendor
+    # image and it needs no registry login, which is what makes it runnable in
+    # CI at all.
+    image: gvenzl/oracle-free:slim
+    environment:
+      ORACLE_PASSWORD: monolite
+      APP_USER: monolite
+      APP_USER_PASSWORD: monolite
+    ports: ["51521:1521"]
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh"]
+      interval: 10s
+      timeout: 10s
+      retries: 60

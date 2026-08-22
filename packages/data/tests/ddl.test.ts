@@ -410,3 +410,87 @@ describe("the emitted schema and the generated SQL", () => {
     }
   });
 });
+
+/**
+ * The `ON DELETE` clause, which is not the same sentence on every engine.
+ *
+ * Found by running the generated schema against a real server: SQL Server has
+ * no `RESTRICT`, and `restrict` is the default every relation gets — so *no*
+ * generated schema could be created there at all, and every unit test agreed
+ * with the generator because they were checking it against itself.
+ */
+describe("ON DELETE, per engine", () => {
+  const withRule = (rule: "restrict" | "cascade" | "set null" | "no action") =>
+    defineEntity<{ pk: number; parent: number }>({
+      table: "CHILD",
+      primaryKey: "pk",
+      columns: {
+        pk: { name: "PK", kind: "number" },
+        parent: { name: "FK_PARENT", kind: "number" },
+      },
+      relations: { parent: { to: "PARENT", localKey: "parent", foreignKey: "pk", onDelete: rule } },
+    });
+
+  it("spells every rule out on PostgreSQL and MySQL", () => {
+    for (const dialect of [postgresDdl, mysqlDdl]) {
+      expect(emitTable(withRule("restrict"), dialect).foreignKeys[0]).toContain(
+        "ON DELETE RESTRICT"
+      );
+      expect(emitTable(withRule("cascade"), dialect).foreignKeys[0]).toContain("ON DELETE CASCADE");
+      expect(emitTable(withRule("set null"), dialect).foreignKeys[0]).toContain(
+        "ON DELETE SET NULL"
+      );
+    }
+  });
+
+  /** T-SQL has no `RESTRICT`; `NO ACTION` is the same refusal under a name it accepts. */
+  it("says NO ACTION where SQL Server would reject RESTRICT", () => {
+    expect(emitTable(withRule("restrict"), sqlServerDdl).foreignKeys[0]).toContain(
+      "ON DELETE NO ACTION"
+    );
+    expect(emitTable(withRule("restrict"), sqlServerDdl).foreignKeys[0]).not.toContain("RESTRICT");
+  });
+
+  /**
+   * Oracle has only `CASCADE` and `SET NULL`. Refusing the delete is what it
+   * does with no clause at all, so writing one would be a syntax error rather
+   * than a stricter constraint.
+   */
+  it("says nothing at all where Oracle has no clause for it", () => {
+    expect(emitTable(withRule("restrict"), oracleDdl).foreignKeys[0]).not.toContain("ON DELETE");
+    expect(emitTable(withRule("no action"), oracleDdl).foreignKeys[0]).not.toContain("ON DELETE");
+    expect(emitTable(withRule("cascade"), oracleDdl).foreignKeys[0]).toContain("ON DELETE CASCADE");
+  });
+});
+
+/**
+ * A soft-delete column can never be nullable, whatever the mapping said.
+ *
+ * Every read filters with `WHERE <flag> = <activeValue>`, so `NULL` there is
+ * neither alive nor deleted: the row exists and no query will ever return it.
+ * The mapping that declares a soft delete has already decided what an unset
+ * flag means, which makes it the stronger statement of the two.
+ */
+describe("the soft-delete column", () => {
+  const soft = defineEntity<{ pk: number; active: boolean }>({
+    table: "SOFT",
+    primaryKey: "pk",
+    columns: {
+      pk: { name: "PK", kind: "number" },
+      // Deliberately silent about both: the generator has to override it.
+      active: { name: "ACTIVE", kind: "boolean" },
+    },
+    softDelete: { property: "active", activeValue: 1, deletedValue: 0 },
+  });
+
+  it("is emitted NOT NULL and defaulted to the active value", () => {
+    expect(emitTable(soft, postgresDdl).create).toContain("ACTIVE SMALLINT DEFAULT 1 NOT NULL");
+  });
+
+  it("looks the same to the snapshot, so the first migration asks for nothing", () => {
+    const snapshot = snapshotOf([soft]);
+
+    expect(snapshot.tables.SOFT?.columns.ACTIVE).toMatchObject({ nullable: false, default: "1" });
+    expect(diffSnapshots(snapshot, snapshot, postgresDdl, { entities: [soft] })).toEqual([]);
+  });
+});

@@ -1,4 +1,11 @@
-import { EntitySchema, SqlWhereCompiler } from "monolite-data";
+import {
+  EntitySchema,
+  mysqlDialect,
+  oracleDialect,
+  postgresDialect,
+  sqlServerDialect,
+  SqlWhereCompiler,
+} from "monolite-data";
 import { ITestItem, TEST_ENTITY } from "../support/test-entity";
 
 const schema = new EntitySchema<ITestItem>(TEST_ENTITY);
@@ -123,5 +130,44 @@ describe("SqlWhereCompiler", () => {
 
   it("rejects an unmapped property, which is what stops an identifier being injected", () => {
     expect(() => compile({ "NAME; DROP TABLE ITEMS": 1 } as never)).toThrow(/is not mapped/);
+  });
+});
+
+/**
+ * `like` has to mean the same thing on every engine.
+ *
+ * The filter language promises it distinguishes case and that `ilike` does not.
+ * Two of the four SQL engines default to a case-insensitive collation — MySQL
+ * and SQL Server — so on those the bare keyword quietly behaves as `ilike`, and
+ * neither shows up without a real server because a double has no collation.
+ */
+describe("the case-sensitive LIKE, per engine", () => {
+  const like = (dialect: { buildLike?: (c: string, b: string, n: boolean) => string }) =>
+    new SqlWhereCompiler<ITestItem>(schema, "w", (value) => value, dialect.buildLike).compile({
+      name: { like: "%a%" },
+    }).sql;
+
+  it("is the bare keyword where the collation already distinguishes case", () => {
+    expect(like(oracleDialect)).toContain("NAME LIKE :w0");
+    expect(like(postgresDialect)).toContain("NAME LIKE :w0");
+  });
+
+  it("casts the pattern on MySQL, whose default collation does not", () => {
+    expect(like(mysqlDialect)).toContain("NAME LIKE BINARY :w0");
+  });
+
+  it("collates the column on SQL Server, for the same reason", () => {
+    expect(like(sqlServerDialect)).toContain("NAME COLLATE Latin1_General_BIN2 LIKE :w0");
+  });
+
+  it("negates without losing the engine's spelling", () => {
+    const negated = new SqlWhereCompiler<ITestItem>(
+      schema,
+      "w",
+      (value) => value,
+      mysqlDialect.buildLike
+    ).compile({ name: { notLike: "%a%" } }).sql;
+
+    expect(negated).toContain("NAME NOT LIKE BINARY :w0");
   });
 });

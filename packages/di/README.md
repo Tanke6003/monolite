@@ -67,6 +67,8 @@ dependency.
 | Export | What it does |
 | --- | --- |
 | `createPersistenceLayer` | Builds the generic repository of every entity, the unit of work, the change log and the connection, on the engine the configuration names. |
+| `EntityRegistration`, `AnyEntityRegistration` | What the layer builds one repository from: the name the unit of work indexes by, the mapping, the token, and the seed the in-memory driver starts with. |
+| `validateDataSourceEnv`, `missingDataSourceEnv` | The variables the configured engine cannot connect without, checked at startup so a missing password is a refusal to boot rather than a timeout on the first request. |
 | `resolveDriver`, `isOracleDriver` | Resolve `DATA_SOURCE` (and its aliases) into a driver, failing loudly on an unknown value. |
 | `buildOracleConfig`, `buildSequelizeConfig`, `buildMongoConfig` | Read each engine's own variable prefix, with defaults aligned with the reference compose file. |
 | `createLogger` | Picks the logging backend named by `LOG_DRIVER` out of the ones the application registered. |

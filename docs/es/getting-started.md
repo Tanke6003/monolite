@@ -33,8 +33,9 @@ La CLI pregunta, en este orden:
 | Descripción / autor / licencia | — / — / MIT | `package.json`, `LICENSE` |
 | Familia de base de datos | SQL | cuáles de las siguientes preguntas ves |
 | Motor | PostgreSQL | la dependencia del driver, el servicio de docker, el dialecto SQL, el esquema semilla |
+| Documentación de la API | Swagger UI | qué lector se monta: Swagger UI, Scalar, los dos, o ninguno |
 | Datos de conexión | valores por motor | `.env.example` (nunca una contraseña real) |
-| Autenticación | sí | añade `monolite-auth`, un módulo de login y una guarda en las rutas de ejemplo |
+| Autenticación | **no** | añade `monolite-auth`, un módulo de login y una guarda en las rutas de ejemplo |
 | Módulo CRUD de ejemplo | sí | una entidad de punta a punta, para que el patrón se vea |
 | Prefijo de la API | `/api/v1` | `API_PREFIX` en el entorno |
 | Gestor de paquetes | npm | el lockfile y el comando de instalación que ejecuta |

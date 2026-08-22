@@ -5,6 +5,25 @@
 Gracias por dedicarle tiempo. Este documento recoge las convenciones que no se
 deducen leyendo el código.
 
+## Por dónde empezar
+
+Si buscas algo que coger: los
+[issues abiertos](https://github.com/Tanke6003/monolite/issues) llevan el
+razonamiento detrás de cada uno, porque las plantillas lo piden. Cualquiera con
+la etiqueta `documentation` es un buen primer cambio: las guías se comprueban en
+CI, así que sabrás al momento si el ejemplo que escribiste funciona.
+
+No hace falta una base de datos para contribuir. `npm run check` corre sin nada
+instalado, y el driver en memoria es un motor completo.
+
+Dos cosas antes de abrir nada:
+
+- **Discrepar con argumentos es bienvenido y es el objetivo.** Aquí se discute de
+  diseño en abierto; en el [código de conducta](./CODE_OF_CONDUCT.md) está la
+  única regla que hace que eso funcione.
+- **Nada sensible en materia de seguridad va en un issue.** Desde aquí se
+  publican siete paquetes: ver [SECURITY.md](./SECURITY.md).
+
 ## Puesta en marcha
 
 ```bash
@@ -69,6 +88,28 @@ describe. La forma más rápida de comprobarlo es romper el mecanismo a propósi
 confirmar que la prueba se pone en rojo. Una prueba que pasa con y sin la
 funcionalidad es peor que ninguna prueba, porque da una confianza que no se ha
 ganado.
+
+### Contra motores reales
+
+`npm test` verifica los drivers contra un array y dos dobles. Buenos dobles
+—evalúan el SQL generado en vez de asentir— e incapaces igualmente de detectar la
+clase de fallo en la que el motor y el doble no coinciden. Esa clase se ha
+publicado varias veces: una marca de borrado lógico que el driver SQL nunca
+escribía, una cláusula `ON DELETE` que un motor no sabe decir, un `CALL` que el
+conector no podía hacer, y un `like` que ignoraba mayúsculas en dos de los cuatro.
+
+```bash
+npm run engines:up          # PostgreSQL, MySQL, SQL Server, MongoDB, Oracle
+npm run test:integration
+npm run engines:down
+```
+
+Tocar un driver, un dialecto, un conector o el generador de DDL implica ejecutar
+esto. CI lo corre en cada push, así que un cambio que solo pase la suite de
+unidad se detectará igualmente — pero una hora después y con menos contexto del
+que tienes ahora.
+
+`MONOLITE_IT_ENGINES=postgres` lo acota mientras trabajas.
 
 ## Commits
 

@@ -52,6 +52,24 @@ export interface SqlDialect {
   /** Pagination clause. */
   buildPagination(hasTake: boolean): string;
   /**
+   * A `LIKE` that distinguishes case, written the way this engine needs.
+   *
+   * The filter language promises `like` is case-sensitive and `ilike` is not.
+   * **Two of the four engines default to a case-insensitive collation** — MySQL
+   * and SQL Server — so on those the bare keyword quietly behaves as `ilike`:
+   * one operator meaning two different things depending on the engine, which is
+   * exactly what the shared contract exists to forbid. Neither shows up without
+   * a real server, because a double has no collation.
+   *
+   * A function rather than an operator string because the two fix it in
+   * different places: MySQL casts the pattern (`LIKE BINARY :p`) and SQL Server
+   * collates the column (`col COLLATE ... LIKE :p`).
+   *
+   * Optional, defaulting to the bare keyword: a dialect written elsewhere does
+   * not have to know this exists.
+   */
+  buildLike?(column: string, bind: string, negated: boolean): string;
+  /**
    * A read that locks a row by PK until commit, with the `:pk` bind.
    *
    * It is what serializes a use case that decides based on what it reads. The
@@ -168,6 +186,17 @@ export const sqlServerDialect: SqlDialect = {
    */
   buildRowLock: (table, primaryKeyColumn) =>
     `SELECT ${primaryKeyColumn} FROM ${table} WITH (UPDLOCK, HOLDLOCK) WHERE ${primaryKeyColumn} = :pk`,
+
+  /**
+   * The default collation of a SQL Server database — `..._CI_AS` — ignores
+   * case, so the column is compared under a binary one instead.
+   *
+   * `BIN2` rather than `BIN`: the older binary collation compares only the
+   * first character properly and sorts the rest by code point, which is a
+   * documented quirk nobody wants to inherit.
+   */
+  buildLike: (column, bind, negated) =>
+    `${column} COLLATE Latin1_General_BIN2 ${negated ? "NOT " : ""}LIKE ${bind}`,
 };
 
 /**
@@ -211,6 +240,14 @@ export const postgresDialect: SqlDialect = {
 export const mysqlDialect: SqlDialect = {
   name: "mysql",
   currentTimestamp: "CURRENT_TIMESTAMP(3)",
+
+  /**
+   * `BINARY` compares bytes, which is what makes this sensitive to case.
+   * Casting the pattern rather than the column is deliberate: the other way
+   * round gives the same answer and stops the engine using an index.
+   */
+  buildLike: (column, bind, negated) =>
+    `${column} ${negated ? "NOT " : ""}LIKE BINARY ${bind}`,
 
   buildInsert({ table, columns, values, identity }): InsertStatement {
     return {

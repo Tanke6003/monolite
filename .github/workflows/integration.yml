@@ -1,0 +1,78 @@
+# The six-engine claim, checked against the engines it is made about.
+#
+# `ci.yml` runs the unit suite, which verifies the packages against an array and
+# two doubles. That cannot catch the class of bug where the engine and the double
+# disagree, and that class shipped repeatedly: a transaction the repositories did
+# not join, a soft-delete flag the SQL driver never wrote, `ON DELETE RESTRICT`
+# on an engine that has no such clause, and a `CALL` the connector could not make
+# at all. Every one of them passed every unit test.
+#
+# It is a workflow of its own because it costs five database servers and a couple
+# of minutes, and `npm test` has to stay runnable with nothing installed — that
+# is what makes it the command anybody runs before a commit.
+name: Integration
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # Available by hand, for a branch that touches a driver and wants the answer
+  # before opening anything.
+  workflow_dispatch:
+
+jobs:
+  engines:
+    name: Every engine
+    runs-on: ubuntu-latest
+    # Oracle alone takes over a minute to open, and the suite runs one engine at
+    # a time on purpose.
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The same compose file a developer runs, rather than the same five servers
+      # redeclared as service containers.
+      #
+      # Two reasons, and the second is why this is not a preference. A second
+      # declaration is a second thing to keep in step, and it would drift the
+      # first time somebody bumped an image locally. And service containers
+      # cannot set a command: MongoDB needs `--replSet` to accept a transaction
+      # at all, so the health check would try to initiate a replica set on a
+      # server that was never started with replication enabled — which is
+      # exactly how this failed the first time it ran.
+      - name: Start the engines
+        run: npm run engines:up
+
+      # The suite refuses to skip an engine it was asked for, so naming all five
+      # here is what makes a server that failed to come up a red build rather
+      # than a quiet one. "Integration tests passed" has to mean something.
+      - name: Run the suite against all five
+        run: npm run test:integration
+        env:
+          MONOLITE_IT_ENGINES: postgres,mysql,mssql,oracle,mongodb
+
+      - name: What the engines said while it ran
+        if: failure()
+        run: docker compose -f docker/integration/docker-compose.yml logs --tail 80
+
+      - name: Stop them
+        if: always()
+        run: npm run engines:down
+
+      # The suite also generates the schema it runs against, from the entity
+      # metadata, so a green run is a statement about the DDL generator too.
+      # Worth saying in the log rather than leaving in a comment.
+      - name: What that just verified
+        if: success()
+        run: |
+          echo "::notice::The generated DDL was applied to PostgreSQL, MySQL, SQL Server and Oracle,"
+          echo "::notice::the shared repository contract passed on all five engines, and transactions,"
+          echo "::notice::row locks and stored procedures were exercised against real servers."

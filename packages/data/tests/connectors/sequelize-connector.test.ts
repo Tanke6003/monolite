@@ -16,7 +16,7 @@ const sequelize = {
 
 jest.mock("sequelize", () => ({
   Sequelize: jest.fn(() => sequelize),
-  QueryTypes: { SELECT: "SELECT", INSERT: "INSERT", BULKUPDATE: "BULKUPDATE" },
+  QueryTypes: { SELECT: "SELECT", INSERT: "INSERT", BULKUPDATE: "BULKUPDATE", RAW: "RAW" },
 }));
 
 import { Sequelize } from "sequelize";
@@ -100,9 +100,48 @@ describe("SequelizeConnector", () => {
     it("`rows` is the default mode", async () => {
       sequelize.query.mockResolvedValue([]);
 
-      await build("mysql").execute("SELECT 1");
+      await build("postgres").execute("SELECT 1");
 
       expect(lastOptions()).toMatchObject({ type: "SELECT" });
+    });
+
+    /**
+     * MySQL reads raw, and it is not a preference.
+     *
+     * Sequelize's `SELECT` normaliser assumes one result set. MySQL sends
+     * several for a `CALL` and none at all for one that only writes — the
+     * second of which reaches `results.map` inside Sequelize and throws, so
+     * `executeRaw` could not call a writing procedure on that engine at all.
+     * Reading raw and sorting the shapes out here is what makes the documented
+     * escape hatch true of all four SQL engines rather than three.
+     */
+    it("reads MySQL raw, because a CALL is not one result set", async () => {
+      sequelize.query.mockResolvedValue([[{ N: 1 }], [{ N: 1 }]]);
+
+      const result = await build("mysql").execute("SELECT 1");
+
+      expect(lastOptions()).toMatchObject({ type: "RAW" });
+      expect(result.rows).toEqual([{ N: 1 }]);
+    });
+
+    it("takes the first result set of a MySQL procedure and drops the status packet", async () => {
+      // What the driver answers for `CALL something_that_selects()`: the rows,
+      // already flattened, with no packet at the end.
+      sequelize.query.mockResolvedValue([{ PRODUCTS: 2, UNITS: 14 }]);
+
+      const result = await build("mysql").execute("CALL it_summary()");
+
+      expect(result.rows).toEqual([{ PRODUCTS: 2, UNITS: 14 }]);
+    });
+
+    it("answers nothing for a MySQL procedure that only writes", async () => {
+      // And this is the one that used to throw: not a list of anything.
+      sequelize.query.mockResolvedValue(undefined);
+
+      const result = await build("mysql").execute("CALL it_take_stock(1, 2)");
+
+      expect(result.rows).toEqual([]);
+      expect(result.rowsAffected).toBe(0);
     });
   });
 

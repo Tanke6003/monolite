@@ -11,6 +11,14 @@ module.exports = {
   testMatch: ["**/tests/**/*.test.ts"],
 
   /**
+   * The integration suite is excluded here and run by its own configuration.
+   * It needs five database containers; `npm test` must stay runnable with
+   * nothing installed, which is what makes it the command anybody runs before
+   * a commit.
+   */
+  testPathIgnorePatterns: ["/node_modules/", "\.integration\.test\.ts$"],
+
+  /**
    * Packages import each other by name (`monolite-core`), not by relative path,
    * so the tests must resolve those names to the *sources*. Pointing at `dist`
    * would mean every test run depends on a prior build, and a stale build would
