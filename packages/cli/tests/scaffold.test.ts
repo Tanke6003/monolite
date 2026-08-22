@@ -220,13 +220,13 @@ function emitJavaScript(target: string): void {
  * feeds: the module reaches HTTP because the generator wired it, or it does not
  * reach HTTP at all.
  */
-function generateInto(target: string, name: string): void {
+function generateInto(target: string, ...argv: string[]): void {
   const previous = process.cwd();
   const write = jest.spyOn(process.stdout, "write").mockReturnValue(true);
 
   try {
     process.chdir(target);
-    expect(generateCommand(["module", name])).toBe(0);
+    expect(generateCommand(argv)).toBe(0);
   } finally {
     process.chdir(previous);
     write.mockRestore();
@@ -337,7 +337,10 @@ describe("the projects `monolite new` writes", () => {
       let quiet: jest.SpyInstance[];
 
       beforeAll(async () => {
-        generateInto(target, "invoice");
+        generateInto(target, "module", "invoice");
+        // Over `product`, the example module's entity: the schematic exists for
+        // the case where the generic API has run out on a table you already have.
+        generateInto(target, "query", "revenue", "--over", "product");
         emitJavaScript(target);
 
         // The generated logger writes a JSON line per request, to stdout and to
@@ -442,6 +445,7 @@ describe("the projects `monolite new` writes", () => {
           "PaginatedInvoice",
           "PaginatedProduct",
           "Product",
+          "Revenue",
         ]);
       });
 
@@ -500,6 +504,49 @@ describe("the projects `monolite new` writes", () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ total: 2, page: 1 });
       });
+      /**
+       * The query schematic, held to the same bar as `generate module`: it is
+       * served, with nothing hand-edited in between.
+       *
+       * It reads the example module's two seeded rows through `executeRaw` on a
+       * SQL engine and through the in-process fallback in memory, and answers
+       * the same either way — which is the property the fallback exists for.
+       */
+      it("serves a query the generator wrote and wired", async () => {
+        const response = await fetch(`${base}/api/v1/revenues`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual([{ total: 2, lowestId: 1, highestId: 2 }]);
+      });
+
+      /**
+       * The shape, which is the other half of why this schematic exists.
+       *
+       * Every `@Crud` module keeps the layering right without anyone thinking
+       * about it, because `CrudController` takes an `ICrudService` and will not
+       * take anything else. A query is four files written from a blank page, so
+       * it is the one place in a monolite project where nothing enforces the
+       * rule — and the first time one was written by hand, the rule was broken:
+       * the controller held the repository and the repository returned the
+       * shape the client sees.
+       */
+      it("writes a query whose controller talks to the service, not the repository", () => {
+        const inside = (...parts: string[]) =>
+          fs.readFileSync(path.join(target, "src", ...parts), "utf8");
+
+        const controller = inside("presentation", "controllers", "revenue.controller.ts");
+
+        expect(controller).toContain("REVENUE_TOKENS.service");
+        expect(controller).not.toContain("REVENUE_TOKENS.repository");
+
+        // And from the other end: the repository answers rows, and the DTO is
+        // built a layer up, so what a client may see is decided in one place.
+        const repository = inside("infrastructure", "persistence", "revenue.repository.ts");
+
+        expect(repository).toContain("Promise<RevenueRow[]>");
+        expect(repository).not.toContain("RevenueDTO");
+      });
+
       it("serves the example module, seeded", async () => {
         const response = await fetch(`${base}/api/v1/products`);
 

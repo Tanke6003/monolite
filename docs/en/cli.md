@@ -143,6 +143,7 @@ Alias: `monolite g`.
 ```bash
 monolite generate module invoice
 monolite g entity payment-method
+monolite g query revenue --over invoice
 ```
 
 | Schematic | What it writes |
@@ -151,6 +152,50 @@ monolite g entity payment-method
 | `entity` | The domain interface and its table mapping |
 | `service` | A `CrudService` subclass for an existing entity |
 | `controller` | A `CrudController` subclass for an existing service |
+| `query` | Repository + service + DTO + controller, for what the generic API cannot express |
+
+### `generate query`
+
+Aggregations, `GROUP BY`, views and stored procedures are outside the generic
+API on purpose — expressing them would turn it into an ORM. What you write
+instead is four files: a small interface of your own, an implementation on
+`executeRaw`, a service, a controller.
+
+```bash
+monolite g query revenue --over invoice
+```
+
+```
+src/infrastructure/persistence/revenue.repository.ts   interface + implementation
+src/application/dtos/revenue.dto.ts                    the published shape
+src/application/services/revenue.service.ts            rows -> DTO
+src/presentation/controllers/revenue.controller.ts     injects the service
+src/composition/modules/revenue.tokens.ts              its three identifiers
+src/composition/modules/revenue.module.ts              its bindings, no registration
+```
+
+`--over` is required and names the entity the query reads: it is the one thing
+that cannot be derived from the name you typed. The generated repository injects
+that entity's store, narrows it with `asRawQueryable` and ships the in-process
+fallback for the drivers that have no SQL — which is the branch your generated
+test suite actually runs.
+
+The module it writes carries **no registration**, because a query owns no table.
+It still goes in `composition/modules.ts` like everything else, which is the
+whole reason it can be generated at all.
+
+The aggregate it computes — how many rows, the lowest and highest id — is a
+placeholder, true of any table so that the module answers before you have
+written a line. Replace it. What is worth keeping is the shape around it: binds
+instead of concatenation, column names out of the mapping, and a controller that
+talks to the service.
+
+That last one is the reason this schematic exists at all. Every `@Crud` module
+keeps the layering right without anyone thinking about it, because
+`CrudController` takes an `ICrudService` and will not take anything else. A
+query is the one place in a monolite project where all four files are written
+from a blank page, so it is the only place the rule can be broken — see
+[architecture](architecture.md).
 
 ### Wiring
 

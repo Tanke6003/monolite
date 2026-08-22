@@ -4,7 +4,7 @@ import { copyTemplateTree, type FileWriter } from "./util/files.js";
 import { pluralize, toCamelCase, toKebabCase, toPascalCase, toUpperSnakeCase } from "./util/naming.js";
 import type { RenderContext } from "./util/render.js";
 
-export const SCHEMATICS = ["module", "entity", "service", "controller"] as const;
+export const SCHEMATICS = ["module", "entity", "service", "controller", "query"] as const;
 
 export type Schematic = (typeof SCHEMATICS)[number];
 
@@ -23,7 +23,14 @@ const PARTS: Record<Schematic, string[]> = {
   service: ["service"],
   controller: ["controller"],
   module: ["entity", "service", "controller", "module"],
+  // Its own tree rather than a composition of the others: a query has no
+  // entity, its service maps rows instead of a mapper, and its controller is
+  // written by hand because there is no resource for `@Crud` to describe.
+  query: ["query"],
 };
+
+/** The schematics that need `--over`; see `overVars`. */
+export const NEEDS_OVER: readonly Schematic[] = ["query"];
 
 /**
  * Every name a module needs, derived from the one word the user typed.
@@ -69,9 +76,34 @@ export function entityVars(rawName: string): Record<string, string> {
   };
 }
 
+/**
+ * The entity a query reads, under its own set of names.
+ *
+ * A query owns no table, so the one thing a generator cannot derive from the
+ * name typed is *what it reads*. One entity, because that is what a flag can
+ * carry; a report over three injects three stores the same way, and the
+ * generated file says so.
+ */
+export function overVars(rawName: string): Record<string, string> {
+  const entity = entityVars(rawName);
+
+  return {
+    overName: entity.entityName,
+    overCamel: entity.entityCamel,
+    overKebab: entity.entityKebab,
+    overUpper: entity.entityUpper,
+    overPlural: entity.entityPlural,
+    overPluralCamel: entity.entityPluralCamel,
+    overPluralUpper: entity.entityPluralUpper,
+    overPkProperty: entity.pkProperty,
+  };
+}
+
 export interface RenderSchematicOptions {
   schematic: Schematic;
   name: string;
+  /** The entity a query reads; required for the schematics in `NEEDS_OVER`. */
+  over?: string;
   /** Project-level variables and flags; the entity names are merged on top. */
   project: RenderContext;
   writer: FileWriter;
@@ -88,13 +120,18 @@ export interface RenderSchematicOptions {
 export function renderSchematic({
   schematic,
   name,
+  over,
   project,
   writer,
   sourceRoot,
 }: RenderSchematicOptions): void {
+  if (NEEDS_OVER.includes(schematic) && !over) {
+    throw new Error(`the "${schematic}" schematic needs the entity it reads: --over <entity>`);
+  }
+
   const context: RenderContext = {
     flags: project.flags,
-    vars: { ...project.vars, ...entityVars(name) },
+    vars: { ...project.vars, ...entityVars(name), ...(over ? overVars(over) : {}) },
   };
 
   for (const part of PARTS[schematic]) {
