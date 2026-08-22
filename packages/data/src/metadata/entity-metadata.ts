@@ -19,6 +19,60 @@ export interface ColumnMetadata {
   insertable?: boolean;
   /** `false` for immutable columns (e.g. CREATED_AT). */
   updatable?: boolean;
+
+  // ---------------------------------------------------------------------------
+  // Everything below is read by the DDL generator and by nothing else. The
+  // repository has never needed to know how wide a column is — it binds values
+  // and the engine checks them — which is why these arrived late and are all
+  // optional. An entity that does not set them still maps, still queries and
+  // still writes exactly as before; it only generates a schema with the
+  // defaults documented on each one.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Width of a string column. Defaults to 255; `"max"` asks the engine for its
+   * unbounded text type.
+   */
+  length?: number | "max";
+  /** Total digits of a numeric column. Without it a number is an integer. */
+  precision?: number;
+  /** Digits after the point. Only meaningful next to `precision`. */
+  scale?: number;
+  /**
+   * Whether the column accepts `NULL`. Defaults to `true` for every column
+   * except the primary key.
+   *
+   * The default is the permissive one on purpose: it is the only choice that
+   * cannot break an existing table when the generated DDL is first compared
+   * against one written by hand.
+   */
+  nullable?: boolean;
+  /** A single-column `UNIQUE` constraint. For more than one, see `indexes`. */
+  unique?: boolean;
+  /**
+   * Literal SQL for the column's default, emitted verbatim.
+   *
+   * SQL rather than a JavaScript value because a default is engine text —
+   * `CURRENT_TIMESTAMP`, `0`, `'pending'` — and translating a value into it
+   * would mean guessing at quoting for a string that might be a function call.
+   * Quote your own strings.
+   */
+  default?: string;
+}
+
+/**
+ * An index over one or more columns.
+ *
+ * Read by the DDL generator only. Single-column uniqueness is better said with
+ * `unique` on the column itself; this is for the composite case and for plain
+ * lookup indexes.
+ */
+export interface IndexMetadata<T> {
+  /** Properties, in index order — which is the order that decides what it serves. */
+  columns: Extract<keyof T, string>[];
+  unique?: boolean;
+  /** Overrides the generated `IX_<table>_<columns>` / `UQ_...` name. */
+  name?: string;
 }
 
 /** Shorthand: if only the name is given, everything else takes its default. */
@@ -111,6 +165,8 @@ export interface EntityMetadata<T> {
    * repository. See `RelationMetadata`.
    */
   relations?: Record<string, RelationMetadata<T>>;
+  /** Composite and lookup indexes. Read by the DDL generator only. */
+  indexes?: IndexMetadata<T>[];
 }
 
 /**
@@ -210,6 +266,24 @@ export class EntitySchema<T> {
 
   kindOf(property: string): ColumnKind {
     return this.byProperty.get(property)?.kind ?? "string";
+  }
+
+  /**
+   * The column as declared, with the shorthands already resolved.
+   *
+   * The DDL generator wants the whole thing — width, nullability, default — and
+   * without this every caller would re-normalize `ColumnDefinition` for itself,
+   * which is how two readers of one mapping start disagreeing about it.
+   */
+  columnMetadataOf(property: string): ColumnMetadata {
+    const column = this.byProperty.get(property);
+    if (!column) {
+      throw new Error(
+        `[EntitySchema] The property "${property}" is not mapped in ${this.table}. ` +
+          `Valid properties: ${this.properties.join(", ")}.`
+      );
+    }
+    return column;
   }
 
   isInsertable(property: string): boolean {

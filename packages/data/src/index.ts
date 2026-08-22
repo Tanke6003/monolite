@@ -51,6 +51,7 @@ export type { ITransactionContext } from "./contracts/transaction-context.js";
 // -------------------------------------------------------------- metadata ---
 
 export { defineEntity, EntitySchema } from "./metadata/entity-metadata.js";
+export type { IndexMetadata } from "./metadata/entity-metadata.js";
 export type {
   AuditMetadata,
   ColumnDefinition,
@@ -164,6 +165,21 @@ export { transactionAware } from "./transaction-aware.js";
 // ------------------------------------------------------------------  raw  ---
 export { asRawQueryable } from "./contracts/raw-queryable.js";
 export type { IRawQueryable } from "./contracts/raw-queryable.js";
+
+// -------------------------------------------------------------------  ddl  ---
+export { DDL_DIALECTS, ddlDialectFor, mysqlDdl, oracleDdl, postgresDdl, sqlServerDdl } from "./ddl/ddl-dialect.js";
+export type { DdlDialect } from "./ddl/ddl-dialect.js";
+export { emitSchema, emitTable } from "./ddl/emit-schema.js";
+export type { AnyEntityMetadata, EmitOptions, TableDdl } from "./ddl/emit-schema.js";
+export { diffSnapshots, emptySnapshot, snapshotOf } from "./ddl/snapshot.js";
+export type {
+  ColumnSnapshot,
+  DiffOptions,
+  ForeignKeySnapshot,
+  IndexSnapshot,
+  SchemaSnapshot,
+  TableSnapshot,
+} from "./ddl/snapshot.js";
 
 // --------------------------------------------------------------- testing ---
 
