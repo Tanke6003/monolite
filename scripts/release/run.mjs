@@ -165,7 +165,15 @@ for (const name of publishOrder()) {
     continue;
   }
 
-  npm("publish", "-w", name, "--access", "public");
+  // `--provenance` attaches a signed statement linking this tarball to the
+  // commit and the workflow run that built it, which npm shows on the package
+  // page and anybody can verify. It needs the OIDC token the release job
+  // already has, so it costs a flag.
+  //
+  // For a toolkit asking people to install seven packages from one publisher,
+  // "built from this commit, by this workflow" is worth more than any wording
+  // in a README.
+  npm("publish", "-w", name, "--access", "public", "--provenance");
 }
 
 log(`released v${decision.version}`);
