@@ -16,3 +16,4 @@ coverage/
 # they can resolve its node_modules; removed when the test finishes.
 /.scaffold-tests/
 /.wizard-tests/
+
