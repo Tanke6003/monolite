@@ -342,6 +342,35 @@ describe("the projects `monolite new` writes", () => {
       expect(offenders).toEqual([]);
     });
 
+    /**
+     * No source file the scaffold writes holds a credential constant.
+     *
+     * This one is a scar. `SeedUserProvider` used to ship a
+     * `const SEED_PASSWORD = "change_me"`, and in a real project that constant
+     * ended up holding the password to the customer's actual server — in a file
+     * that had been dead for months, because the provider had been replaced
+     * early on and nobody had reason to open it again. A generator that writes
+     * a comfortable place to type a password will be taken up on the offer.
+     *
+     * Only `src/` is examined. `tests/setup/test-env.ts` does assign one, and
+     * that is a different thing: a value the suite invents for itself, which
+     * opens nothing and is meant to be read by whoever wonders what the tests
+     * log in as.
+     */
+    it("writes no credential constant into the source tree", () => {
+      const offenders: string[] = [];
+      const credential = /\b\w*(?:PASSWORD|PASSWD|SECRET|TOKEN)\w*\s*[=:]\s*["'`][^"'`\s]/gi;
+
+      for (const file of filesOf(path.join(target, "src"), ".ts")) {
+        const source = fs.readFileSync(file, "utf8");
+        for (const match of source.matchAll(credential)) {
+          offenders.push(`${path.relative(SCRATCH, file)}: ${match[0].trim()}`);
+        }
+      }
+
+      expect(offenders).toEqual([]);
+    });
+
     it("compiles", () => {
       const sources = filesOf(path.join(target, "src"), ".ts");
       expect(sources.length).toBeGreaterThan(0);

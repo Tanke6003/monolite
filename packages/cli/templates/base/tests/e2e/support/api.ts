@@ -43,10 +43,18 @@ export const API = "__apiPrefix__".replace(/\/$/, "");
 #if auth
 
 /**
- * The account `SeedUserProvider` ships. Development only, and the first thing
+ * The account `SeedUserProvider` serves. Development only, and the first thing
  * to replace along with the provider itself.
+ *
+ * The password is read rather than written down, because the provider reads it
+ * too — from `tests/setup/test-env.ts` during a run, from `.env` otherwise. Two
+ * copies of a password in two files is how a suite starts failing for a reason
+ * that has nothing to do with the code.
  */
-export const SEED_CREDENTIALS = { email: "admin@example.com", password: "change_me" };
+export const SEED_CREDENTIALS = {
+  email: "admin@example.com",
+  password: process.env.SEED_PASSWORD ?? "",
+};
 #endif
 
 /**

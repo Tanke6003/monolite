@@ -44,4 +44,11 @@ process.env.RATE_LIMIT_MAX = "0";
  * developer to set it before `npm test` will run at all.
  */
 process.env.JWT_SECRET = "test-only-secret-not-used-anywhere-else";
+
+/**
+ * And the seeded account's password, for the same reason. It is set here and
+ * not read from `.env` on purpose: a suite whose credentials come from a
+ * git-ignored file is a suite that only passes on one machine.
+ */
+process.env.SEED_PASSWORD = "test-only-seed-password";
 #endif

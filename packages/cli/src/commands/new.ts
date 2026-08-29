@@ -584,7 +584,11 @@ function nextSteps(answers: ProjectAnswers, targetDirectory: string): void {
   }
 
   if (answers.auth) {
-    line(color.dim("  # set JWT_SECRET in .env: the app refuses to start without it"));
+    line(
+      color.dim(
+        "  # set JWT_SECRET and SEED_PASSWORD in .env: the app refuses to start without them"
+      )
+    );
   }
 
   line(`  ${runScript} dev`);

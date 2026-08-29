@@ -23,6 +23,13 @@ import { envs, readEnv, requireEnv, toInt } from "../config/env";
  * The classes are built here rather than resolved, because two of them take
  * arguments a container cannot invent: the secret and the token lifetime are
  * configuration, read once at startup.
+ *
+ * If the passwords belong to a directory rather than to this database, the line
+ * that changes is the `AuthBLL` at the bottom: `ExternalAuthBLL` takes an
+ * `IIdentityProvider` you write against the service, keeps everything else —
+ * the token, the single error, the timing defence — and can be chosen from an
+ * environment variable so that a copy without access to the directory still
+ * signs in against this table. The authentication guide has the wiring.
  */
 export function registerAuth(container: DependencyContainer): void {
   const hasher: IPasswordHasher = new ScryptPasswordHasher();

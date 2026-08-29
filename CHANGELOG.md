@@ -9,8 +9,58 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Added
+
+- **Authentication against an identity somebody else holds the password for.**
+  `monolite-auth` said its user provider was what let identities live "in an
+  LDAP directory or behind another service", and that was structurally
+  impossible: `IUserProvider` hands back a `passwordHash` and `AuthBLL` compares
+  it locally, while LDAP, Nextcloud and every OIDC provider check the password
+  themselves and answer yes or no. Nobody can implement a seam that asks for a
+  hash nothing will produce, so connecting one meant replacing the whole
+  `IAuthBLL` — and rewriting the token, the single error, the soft-deleted
+  account and the timing defence in every project that did it.
+
+  The seam is now where the comparison actually happens. `IIdentityProvider`
+  confirms a credential; `IExternalUserProvider` (which extends `IUserProvider`,
+  so one class still serves both flows) says where the local account lives; and
+  `ExternalAuthBLL` keeps everything around them. It provisions on first
+  sign-in, reconciles what the provider says on every later one, finds an
+  account by external key so a rename over there does not create a second one
+  here, and takes the roles from the local account and never from the provider's
+  groups — that last one being a privilege escalation waiting for somebody to be
+  added to a group called `admin` for an unrelated reason.
+
+  Two of its answers are worth stating on their own. A provider that **rejects**
+  a credential and one that **does not answer** are different failures:
+  `verify` returns `null` for the first and throws for the second, and the BLL
+  answers 401 and 503 respectively, because collapsing them tells everybody in
+  an organisation that they mistyped their password on the day the directory
+  went down. And an account suspended locally reports `disabled` rather than
+  hiding as `null`, because hiding it sends the next sign-in — which the
+  directory still accepts — down the provisioning path, where a brand new
+  account quietly undoes the suspension.
+
+  Nothing about the existing flow changed. An application authenticating against
+  its own table keeps the same `AuthBLL`, the same `IUserProvider` and the same
+  registrations.
+
 ### Fixed
 
+- **The scaffold shipped a place to type a password, and it got used.**
+  `monolite new --auth` wrote `src/auth/seed-user.provider.ts` with a
+  `SEED_PASSWORD` constant in it. In a real project that constant ended up
+  holding the password to the customer's own server — in a tracked file, in the
+  history, in a file that had been dead for months because the provider had been
+  replaced early on and nobody had reason to open it again. A generator that
+  offers a comfortable place to put a password will be taken up on the offer.
+
+  The template now reads `SEED_PASSWORD` from the environment with no default,
+  refuses to start without it the way `JWT_SECRET` already does, and refuses to
+  run under `NODE_ENV=production` at all — a seeded administrator is a fixture
+  for a project's first afternoon, and the way it becomes an incident is by
+  surviving into a deployment nobody thought it was part of. `scaffold.test.ts`
+  now fails on any credential-shaped constant anywhere in a generated `src/`.
 - **The seven packages declared MIT and shipped no licence.** npm only picks a
   `LICENSE` up from the package's own folder, and the repository's was at the
   root — so every tarball on the registry carried a licence field pointing at a
