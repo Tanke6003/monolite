@@ -22,7 +22,7 @@ Every package works on its own. Install the one you need and ignore the rest.
 | [`monolite-data`](./packages/data) | One `IGenericRepository<T>` over in-memory, Oracle, SQL Server, PostgreSQL, MySQL and MongoDB. Unit of work, SQL dialects, filter compilers, and the DDL and migrations generated from the same mapping. | `core` |
 | [`monolite-http`](./packages/http) | `@ApiController` / `@Get` / `@Post` decorators, router builder, Zod validation, error handler, security defaults, OpenAPI 3.1 generation. | `core` |
 | [`monolite-crud`](./packages/crud) | Generic `CrudBLL` / `CrudController` and a `@Crud()` decorator: five endpoints per entity, each one overridable. Ambient transactions via `@Transactional()`. | `core`, `data`, `http` |
-| [`monolite-auth`](./packages/auth) | Optional authentication: login, JWT issuing and verification, password hashing, `requireAuth` / `requireRoles` guards. | `core`, `http` |
+| [`monolite-auth`](./packages/auth) | Optional authentication: login against your own table or against an external identity provider, JWT issuing and verification, password hashing, `requireAuth` / `requireRoles` guards. | `core`, `http` |
 | [`monolite-di`](./packages/di) | The tsyringe composition root, kept separate so nothing else depends on a container. | `core`, `data` |
 | [`monolite-cli`](./packages/cli) | `monolite new` — scaffolds a project and asks which database you want. `monolite generate` writes a module, an entity, a BLL, a controller, a query or a repository into it. Zero runtime dependencies. | — |
 

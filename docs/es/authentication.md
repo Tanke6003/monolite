@@ -15,7 +15,7 @@ otro lado puede llevarse sólo `requireAuth`, o nada en absoluto.
 
 | Contrato | Quién lo implementa | Por qué es una interfaz |
 | --- | --- | --- |
-| `IUserProvider` | **Tú** | Dónde viven los usuarios es decisión tuya: una tabla, un directorio LDAP, un arreglo. El paquete no debe imponer un esquema. |
+| `IUserProvider` | **Tú** | Dónde viven los usuarios es decisión tuya: una tabla, un almacén de documentos, un arreglo. El paquete no debe imponer un esquema. |
 | `IPasswordHasher` | Incluido (`ScryptPasswordHasher`), intercambiable | Lo que hoy es suficiente no lo será en cinco años. Cambiar a argon2 no debe tocar nada más. |
 | `ITokenBLL` | Incluido (`JwtTokenBLL`), intercambiable | Una aplicación con tokens opacos respaldados por un almacén implementa los mismos dos métodos. |
 
@@ -29,6 +29,11 @@ export interface IUserProvider {
 Esa es toda la superficie de integración. `AuthUserWithSecret` es `{ id, name,
 email, roles, passwordHash }`, y `passwordHash` es el único campo que nunca sale
 de la BLL.
+
+Y es también el límite de lo que este contrato puede hacer: entrega un hash, así
+que la contraseña tiene que poder comprobarse aquí. Un directorio que comprueba
+la suya —LDAP, Nextcloud, OIDC— jamás produce uno, y ese caso tiene una costura
+propia, más abajo.
 
 ---
 
@@ -79,6 +84,93 @@ reloj.
 
 Ninguna de las dos es teórica: así se enumera en la práctica, y acertar la segunda
 es la parte que la mayoría de implementaciones se salta.
+
+---
+
+## Cuando la contraseña no es tuya para comprobarla
+
+`IUserProvider` entrega un hash y `AuthBLL` lo compara aquí. Eso está bien para
+una tabla de usuarios y es imposible para un directorio: LDAP, Nextcloud y
+cualquier proveedor OIDC comprueban la contraseña de su lado y contestan sí o
+no; ninguno va a entregar nunca un hash que comparar. Así que la costura para
+ellos no es el proveedor de usuarios, por natural que suene. Tiene que estar
+donde ocurre la comparación, que es la BLL.
+
+`ExternalAuthBLL` es esa BLL. Conserva todo lo que rodea a la comparación —el
+token, el error único, la defensa de temporización, la cuenta suspendida— para
+que conectar un directorio sean dos clases pequeñas y no un flujo de inicio de
+sesión reescrito desde cero.
+
+| Contrato | Quién lo implementa | Qué contesta |
+| --- | --- | --- |
+| `IIdentityProvider` | **Tú** | Una `ExternalIdentity` si la credencial se confirmó, `null` si se rechazó, y **lanza** cuando el proveedor no contestó en absoluto. |
+| `IExternalUserProvider` | **Tú** | Dónde vive la cuenta local detrás de esa identidad. Extiende `IUserProvider`, así que una sola clase sirve a los dos flujos. |
+
+```ts
+export interface IIdentityProvider {
+  verify(login: string, password: string): Promise<ExternalIdentity | null>;
+}
+
+export interface ExternalIdentity {
+  /** Su llave allá: un `uid`, un nombre de cuenta, el `sub` de un OIDC. */
+  key: string;
+  name: string;
+  email: string | null;
+  /** Se traen para poder registrarlos. Nunca se leen como rol: ver abajo. */
+  groups: string[];
+}
+```
+
+**`null` y lanzar son respuestas distintas, y ese es el punto del contrato.**
+`null` significa que la credencial se rechazó; lanzar significa que el proveedor
+no contestó. Si se confunden, una caída le dice al despacho entero que se
+equivocó al teclear —lo cual es falso, y además es la forma más rápida de
+enterrar el único dato que un operador necesitaba—. `ExternalAuthBLL` contesta
+401 para lo primero y 503 `IDENTITY_PROVIDER_UNAVAILABLE` para lo segundo.
+
+### Elegir un flujo u otro al arrancar
+
+```ts
+const auth = directoryUrl
+  ? new ExternalAuthBLL(new DirectoryIdentityProvider(directoryUrl), users, hasher, tokens, {
+      logger,
+    })
+  : new AuthBLL(users, hasher, tokens);
+```
+
+`IExternalUserProvider` extiende `IUserProvider`, así que `users` es la misma
+clase en los dos casos y la elección es una línea en la raíz de composición. Eso
+es lo que permite que una copia de la aplicación sin acceso al directorio siga
+iniciando sesión contra su propia tabla: así corren las pruebas, y así se trabaja
+desde una laptop.
+
+### Qué decide, y por qué
+
+- **Los roles son tuyos, nunca del proveedor.** `identity.groups` se transporta
+  y no se lee. Mapear grupos del directorio a roles suena a comodidad justo
+  hasta el día en que alguien entra a un grupo llamado `admin` por una razón
+  ajena y se lleva tu aplicación de paso.
+- **El `sub` del token sigue siendo el id local.** Ese claim llena las columnas
+  de auditoría y es contra lo que se resuelve cualquier regla sobre *quién*
+  pregunta. La llave externa identifica a la persona ante el proveedor, no ante
+  ti; se guarda al lado de la cuenta, y se mantiene actualizable, porque en
+  algunos proveedores renombrar una cuenta es borrarla y crear otra.
+- **Una caída es un 503, no un 401.** No filtra nada: que el directorio no
+  conteste es un hecho del despliegue, idéntico para una dirección que existe y
+  para una que no.
+- **La contraseña local sigue sirviendo.** `localPasswordFallback` viene
+  encendida, así que la cuenta de emergencia entra mientras el directorio está
+  caído. Apágala para que el proveedor sea la única autoridad; entonces nada
+  llama nunca al hasheador.
+- **Una cuenta suspendida lo dice en voz alta.** `ExternalAuthUser.disabled`, en
+  lugar de un `null` desde `findByEmail`. Ocultarla manda el siguiente inicio de
+  sesión —que el directorio sigue aceptando— por el camino del alta automática,
+  y una cuenta nueva deshace en silencio la suspensión. La respuesta a la
+  petición sigue siendo el 401 de siempre.
+- **El primer inicio de sesión crea la cuenta**, con el privilegio mínimo que le
+  dé tu `provision`. `autoProvision: false` lo apaga, y entonces una identidad
+  verificada sin cuenta local recibe el mismo 401: contestar otra cosa le
+  confirma la contraseña a quien la estaba adivinando.
 
 ---
 
@@ -170,8 +262,12 @@ Explícitamente, porque los huecos importan más que las funcionalidades:
 - **Ni almacén de sesiones ni logout.** Un JWT vale hasta que caduca; "cerrar
   sesión" es que el cliente lo tire. La revocación de verdad necesita una lista de
   bloqueo, que es la misma decisión de almacenamiento de arriba.
-- **Ni OAuth ni OIDC.** Si los necesitas, verifica el token del proveedor con tu
-  propia implementación de `ITokenBLL` y deja el resto del paquete como está.
+- **Ni el baile de redirección de OAuth ni el de OIDC.** No hay flujo de código
+  de autorización, ni parámetro `state`, ni ruta de retorno. Lo que sí hay, para
+  un proveedor dispuesto a comprobar una contraseña directamente, es el
+  `IIdentityProvider` de arriba; y para uno que emite sus propios tokens,
+  verifícalos con tu propia implementación de `ITokenBLL` y deja el resto del
+  paquete como está.
 
 Cada una de esas es una omisión deliberada, no una funcionalidad que falta. Un
 framework que las adivina te entrega algo que luego tienes que deshacer.

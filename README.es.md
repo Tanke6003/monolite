@@ -22,7 +22,7 @@ Cada paquete funciona por su cuenta. Instala el que necesites e ignora el resto.
 | [`monolite-data`](./packages/data) | Un `IGenericRepository<T>` sobre memoria, Oracle, SQL Server, PostgreSQL, MySQL y MongoDB. Unidad de trabajo, dialectos SQL, compiladores de filtros, y el DDL y las migraciones generados desde el mismo mapeo. | `core` |
 | [`monolite-http`](./packages/http) | Decoradores `@ApiController` / `@Get` / `@Post`, constructor de rutas, validación con Zod, manejador de errores, valores de seguridad por defecto, generación de OpenAPI 3.1. | `core` |
 | [`monolite-crud`](./packages/crud) | `CrudBLL` / `CrudController` genéricos y un decorador `@Crud()`: cinco endpoints por entidad, cada uno sobreescribible. Transacciones ambientales con `@Transactional()`. | `core`, `data`, `http` |
-| [`monolite-auth`](./packages/auth) | Autenticación opcional: login, emisión y verificación de JWT, hasheo de contraseñas, guardas `requireAuth` / `requireRoles`. | `core`, `http` |
+| [`monolite-auth`](./packages/auth) | Autenticación opcional: login contra tu propia tabla o contra un proveedor de identidad externo, emisión y verificación de JWT, hasheo de contraseñas, guardas `requireAuth` / `requireRoles`. | `core`, `http` |
 | [`monolite-di`](./packages/di) | La raíz de composición con tsyringe, separada para que nada más dependa de un contenedor. | `core`, `data` |
 | [`monolite-cli`](./packages/cli) | `monolite new` — genera un proyecto y te pregunta qué base de datos quieres. `monolite generate` escribe dentro un módulo, una entidad, una BLL, un controlador, una consulta o un repositorio. Cero dependencias de ejecución. | — |
 

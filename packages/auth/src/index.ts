@@ -11,6 +11,12 @@
  * Nothing here is mandatory. An application that already authenticates
  * elsewhere can take `requireAuth` alone, or nothing at all: no other package
  * in the toolkit depends on this one.
+ *
+ * Where the password itself belongs to somebody else — a corporate directory, a
+ * Nextcloud, an OIDC provider — the seam is `IIdentityProvider` and the login
+ * flow is `ExternalAuthBLL`. It cannot be `IUserProvider`: that contract hands
+ * back a hash to compare locally, and no external service will ever produce
+ * one.
  */
 
 // -----------------------------------------------------------  contracts  ---
@@ -19,7 +25,11 @@ export type {
   AuthUser,
   AuthUserWithSecret,
   Credentials,
+  ExternalAuthUser,
+  ExternalIdentity,
   IAuthBLL,
+  IExternalUserProvider,
+  IIdentityProvider,
   IPasswordHasher,
   ITokenBLL,
   IUserProvider,
@@ -42,6 +52,13 @@ export type { ScryptPasswordHasherOptions } from "./password.hasher.js";
 // ---------------------------------------------------------------  login  ---
 export { AuthBLL } from "./auth.bll.js";
 export type { AuthBLLOptions } from "./auth.bll.js";
+
+// The second login flow, for identities this application does not hold the
+// password for. It is a sibling of `AuthBLL` and not a mode of it: the two
+// share the error and the timing defence and nothing else, and folding them
+// together would put an `if` around the security-critical part of both.
+export { ExternalAuthBLL } from "./external-auth.bll.js";
+export type { ExternalAuthBLLOptions } from "./external-auth.bll.js";
 
 // ----------------------------------------------------------  middleware  ---
 // The claim-to-identity mapping is not re-exported: it is `toCurrentUser` in

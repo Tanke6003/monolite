@@ -21,8 +21,18 @@ export const AUTH_TOKENS = {
    */
   ITokenBLL: "ITokenBLL",
   IPasswordHasher: "IPasswordHasher",
-  /** Where the login looks users up. Always the application's own class. */
+  /**
+   * Where the login looks users up. Always the application's own class — and
+   * the same string whether that class implements `IUserProvider` or the wider
+   * `IExternalUserProvider`, since one extends the other and a composition root
+   * that picks its BLL from configuration registers it once either way.
+   */
   IUserProvider: "IUserProvider",
+  /**
+   * Who confirms a password this application does not store. Registered only by
+   * an application that authenticates against a directory or another service.
+   */
+  IIdentityProvider: "IIdentityProvider",
   IAuthBLL: "IAuthBLL",
   /** Token `AuthController` declares, and the one the router resolves it by. */
   IAuthController: "IAuthController",

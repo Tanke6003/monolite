@@ -7,7 +7,9 @@ flow, a token BLL, a password hasher, the middleware that guards a route —
 and deliberately refuses to know the parts that are not. **Where your users
 live** is `IUserProvider`, which you implement. **How passwords are hashed** is
 `IPasswordHasher`, with a dependency-free implementation included. **What a
-token is made of** is `ITokenBLL`, with JWT as the default.
+token is made of** is `ITokenBLL`, with JWT as the default. And when the
+password is not yours to check at all — a corporate directory, a Nextcloud, an
+OIDC provider — that is `IIdentityProvider` and `ExternalAuthBLL`.
 
 Nothing here is mandatory: no other package in the toolkit depends on this one,
 and an application that already authenticates somewhere else can take
@@ -86,6 +88,134 @@ export class SqlUserProvider implements IUserProvider {
 
 `AuthBLL` lower-cases and trims the address before handing it over, so store
 and query your emails lower-cased.
+
+## When the password is not yours to check
+
+`IUserProvider` hands back a hash, and `AuthBLL` compares it here. That works
+for a users table. It cannot work for a directory: LDAP, Nextcloud and every
+OIDC provider check the password on their side and answer yes or no — none of
+them will ever give you a hash to compare. So the seam for those is not the user
+provider, it is the BLL.
+
+`ExternalAuthBLL` is that BLL. You write the piece that talks to the service:
+
+```ts
+import type { ExternalIdentity, IIdentityProvider } from "monolite-auth";
+
+export class DirectoryIdentityProvider implements IIdentityProvider {
+  constructor(private readonly baseUrl: string) {}
+
+  async verify(login: string, password: string): Promise<ExternalIdentity | null> {
+    const response = await fetch(`${this.baseUrl}/whoami`, {
+      headers: { Authorization: `Basic ${Buffer.from(`${login}:${password}`).toString("base64")}` },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    // A rejection is `null`. Anything else — a timeout, a 500, a socket that
+    // never opened — has to throw: see below.
+    if (response.status === 401 || response.status === 403) return null;
+    if (!response.ok) throw new Error(`[directory] answered ${response.status}`);
+
+    const account = (await response.json()) as {
+      id: string;
+      displayName: string;
+      email: string | null;
+      groups: string[];
+    };
+
+    return {
+      key: account.id,
+      name: account.displayName,
+      email: account.email,
+      groups: account.groups,
+    };
+  }
+}
+```
+
+**`null` and a throw are different answers, and getting that wrong is the bug
+this contract exists to prevent.** `null` means the credentials were refused;
+throwing means the provider did not answer. Collapse the two and an outage tells
+every person in the organisation that they mistyped their password. `ExternalAuthBLL`
+answers a 401 for the first and a **503 `IDENTITY_PROVIDER_UNAVAILABLE`** for the
+second.
+
+The other half is where the local account lives, which is still yours.
+`IExternalUserProvider` extends `IUserProvider` with three methods:
+
+```ts
+import type { ExternalAuthUser, ExternalIdentity, IExternalUserProvider } from "monolite-auth";
+
+export class SqlUserProvider implements IExternalUserProvider {
+  constructor(private readonly users: IGenericRepository<IUser>) {}
+
+  findByEmail(email: string): Promise<ExternalAuthUser | null> {
+    return this.first({ email });
+  }
+
+  // The lookup that survives a rename over there.
+  findByExternalKey(key: string): Promise<ExternalAuthUser | null> {
+    return this.first({ externalKey: key });
+  }
+
+  // First sign-in. Give it the least privilege you have.
+  async provision(identity: ExternalIdentity, fallbackEmail: string): Promise<ExternalAuthUser> {
+    return toAuthUser(
+      await this.users.insert({
+        name: identity.name,
+        email: identity.email ?? fallbackEmail,
+        externalKey: identity.key,
+        role: "reader",
+      })
+    );
+  }
+
+  // What the provider just said. Not the roles, and not the disabled flag.
+  async link(user: ExternalAuthUser, identity: ExternalIdentity): Promise<ExternalAuthUser> {
+    return toAuthUser(
+      // `AuthUser.id` is a string, because a token claim is; the key of this
+      // table is not. The conversion belongs here and nowhere else.
+      await this.users.update(Number(user.id), { externalKey: identity.key, name: identity.name })
+    );
+  }
+
+  private async first(where: object): Promise<ExternalAuthUser | null> {
+    const row = await this.users.firstOrDefault({ where });
+    // `passwordHash` is `""` for an account that has never had a local one, and
+    // `disabled` is reported rather than hidden — see below.
+    return row ? toAuthUser(row) : null;
+  }
+}
+```
+
+Because it extends `IUserProvider`, one class serves both flows — which is what
+lets the composition root choose from configuration:
+
+```ts
+const auth = directoryUrl
+  ? new ExternalAuthBLL(new DirectoryIdentityProvider(directoryUrl), users, hasher, tokens, {
+      logger,
+    })
+  : new AuthBLL(users, hasher, tokens);
+```
+
+A copy of the application without access to the directory then still signs in
+against its own table, which is how the tests run and how a developer works on a
+laptop.
+
+### What it decides, and why
+
+| | |
+| --- | --- |
+| **The roles are yours, never the provider's** | `identity.groups` is carried and never read. Mapping directory groups onto roles is a convenience until somebody is added to a group called `admin` for an unrelated reason and inherits your application with it. |
+| **The token's `sub` is the local id** | That claim fills the audit columns and is what every rule about *who* is asking resolves against. The external key identifies the person to the provider, not to you. |
+| **An outage is a 503, not a 401** | It leaks nothing — the directory being unreachable is a fact about the deployment, identical for an address that exists and one that does not — and it is the difference between one incident and an organisation resetting passwords that were fine. |
+| **A local password is still accepted** | `localPasswordFallback` is on by default, so the emergency account works while the directory does not. Turn it off to make the provider the only authority. |
+| **A disabled account says so** | `ExternalAuthUser.disabled` rather than a `null` from `findByEmail`: hiding a suspended account sends the next sign-in — which the directory still accepts — down the provisioning path, and a brand new account quietly undoes the suspension. |
+
+`autoProvision: false` turns off first-sign-in account creation; a verified
+identity with no local account then gets the ordinary 401, because answering
+anything else confirms the password to whoever was guessing it.
 
 ## Plugging in your own hasher
 
@@ -192,7 +322,9 @@ whose id you keep in your own table.
 | --- | --- |
 | `AuthUser`, `AuthUserWithSecret`, `Credentials`, `AuthResult`, `TokenClaims`, `SignedToken` | The vocabulary |
 | `IUserProvider`, `IPasswordHasher`, `ITokenBLL`, `IAuthBLL` | The four seams |
+| `ExternalIdentity`, `ExternalAuthUser`, `IIdentityProvider`, `IExternalUserProvider` | The two more, for an identity kept elsewhere |
 | `AuthBLL`, `AuthBLLOptions` | The login flow |
+| `ExternalAuthBLL`, `ExternalAuthBLLOptions` | The same, against a provider that checks the password itself |
 | `JwtTokenBLL`, `JwtTokenBLLOptions` | Signing and verifying JWTs |
 | `ScryptPasswordHasher`, `ScryptPasswordHasherOptions` | The dependency-free hasher |
 | `requireAuth`, `requireRoles`, `authenticatedUser`, `RequireAuthOptions` | Route guards |
