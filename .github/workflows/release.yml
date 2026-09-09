@@ -4,6 +4,19 @@ on:
   push:
     branches: [master]
 
+  # The recovery hatch. A run can fail after the tag is pushed and before the
+  # registry has anything — a rejected npm credential does exactly that — and
+  # from there no push can help: master's head is the release commit, which the
+  # guard below skips, and a re-run of the failed one reads an empty commit
+  # range and rightly decides there is nothing to release. Dispatch this from
+  # the tag with "publish only" on and it finishes the release that stalled.
+  workflow_dispatch:
+    inputs:
+      publish_only:
+        description: "Publish the version the newest tag names, without bumping"
+        type: boolean
+        default: false
+
 # One release at a time. Two runs racing would read the same last tag, decide
 # the same version, and the loser would die halfway through publishing — with
 # some of the seven packages already on the registry and immutable.
@@ -62,7 +75,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Decide the version, publish it, and tag it
-        run: npm run release
+        run: npm run release ${{ inputs.publish_only && '-- --publish-only' || '' }}
         env:
           # Falls back to a token until trusted publishing is configured for
           # each package. With trusted publishing on, npm uses OIDC and ignores
