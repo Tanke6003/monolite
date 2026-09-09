@@ -9,6 +9,49 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Added
+
+- **A column kind for money, and the arithmetic that goes with it.**
+  `kind: "decimal"` in `monolite-data`, `roundTo` and `allocate` in
+  `monolite-core`.
+
+  An amount was `kind: "number"`, which is a double, and the engines do not agree
+  about what becomes of one. PostgreSQL and Oracle hand a `NUMERIC` back **as a
+  string** — exactly because a double cannot always hold it — so a mapping that
+  turns it into a number without rounding reads `19.99` as `19.989999999999998`.
+  A column with two decimals drops a third in silence on one engine and refuses
+  it on another. And the in-memory driver, which stores the object it was handed,
+  kept `0.1 + 0.2` as `0.30000000000000004` while every real engine wrote `0.30`.
+
+  That last one is the one worth stating plainly: the generated test suite runs
+  on the in-memory driver and the application runs on PostgreSQL, so the one
+  place the two could disagree about a value was money. A suite that disagrees
+  with production about a cent is not evidence about production.
+
+  A `decimal` column is rounded to its `scale` on the way in and on the way out,
+  half away from zero, on every driver — including the in-memory one, which is
+  the point. `scale` defaults to 2, and the generated DDL emits the engine's
+  fixed-point type with the same width, so the schema and the mapping cannot
+  drift apart. `kind: "number"` is untouched and stays what an id, a count and a
+  foreign key are.
+
+  Alongside it, in the kernel because they are arithmetic and not persistence:
+
+  - `roundTo(value, scale)` — half away from zero, through the number's decimal
+    text rather than a multiplication. `Math.round(1.005 * 100) / 100` is `1`,
+    because `1.005 * 100` is `100.49999999999999` in a double. Every project
+    writes that line, and one project in production had it copied verbatim into
+    nine files.
+  - `allocate(total, weights, options)` — splits a total in the given
+    proportions without losing a unit, working in minor units so the shares add
+    back up to the total. The cent that does not divide goes to the last share by
+    default; `residue: "first" | "largest"` picks the other conventions. That
+    decision — who absorbs the leftover cent — is the one every hand-written
+    split makes silently, and differently each time it is written.
+
+  Money is what motivates both and not the limit of them: hours, units and days
+  divide the same way and lose the same remainder.
+
 ### Fixed
 
 - **The seven packages declared MIT and shipped no licence.** npm only picks a

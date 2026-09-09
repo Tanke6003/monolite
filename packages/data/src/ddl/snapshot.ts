@@ -1,4 +1,4 @@
-import { EntitySchema } from "../metadata/entity-metadata.js";
+import { EntitySchema, type ColumnKind } from "../metadata/entity-metadata.js";
 import type { DdlDialect, OnDeleteRule } from "./ddl-dialect.js";
 import { emitTable, type AnyEntityMetadata, type EmitOptions } from "./emit-schema.js";
 
@@ -314,7 +314,7 @@ function diffForeignKeys(
 function asColumnMetadata(name: string, snapshot: ColumnSnapshot) {
   return {
     name,
-    kind: snapshot.kind as "number" | "string" | "boolean" | "date",
+    kind: snapshot.kind as ColumnKind,
     length: snapshot.length,
     precision: snapshot.precision,
     scale: snapshot.scale,

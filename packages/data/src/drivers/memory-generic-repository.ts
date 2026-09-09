@@ -219,7 +219,11 @@ export class MemoryGenericRepository<T extends object, TKey = number>
       if (property === createdBy || property === updatedBy) continue;
 
       const value = (entity as Record<string, unknown>)[property];
-      if (value !== undefined) record[property] = value;
+      // Quantized, and nothing else converted: this driver stores the objects
+      // it is handed, which is what makes it fast and what made it the one
+      // engine where a decimal kept every digit a double has. See
+      // `EntitySchema.quantize`.
+      if (value !== undefined) record[property] = this.schema.quantize(property, value);
     }
 
     // Same criterion as in SQL: the check happens before adding the PK, the
@@ -289,7 +293,7 @@ export class MemoryGenericRepository<T extends object, TKey = number>
       const value = (changes as Record<string, unknown>)[property];
       if (value === undefined) continue;
 
-      record[property] = value;
+      record[property] = this.schema.quantize(property, value);
       touched = true;
     }
 

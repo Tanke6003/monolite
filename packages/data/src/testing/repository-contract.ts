@@ -25,6 +25,8 @@ export interface ContractItem {
   pkItem: number;
   name: string;
   qty: number;
+  /** A `decimal`, which is the one kind the engines disagree about on their own. */
+  price?: number | null;
   tag?: string | null;
   active?: boolean;
 }
@@ -42,6 +44,7 @@ export const CONTRACT_ENTITY = defineEntity<ContractItem>({
     pkItem: { name: "PK_ITEM", kind: "number", insertable: false, updatable: false },
     name: { name: "NAME", kind: "string" },
     qty: { name: "QTY", kind: "number" },
+    price: { name: "PRICE", kind: "decimal", precision: 12, scale: 2 },
     tag: { name: "TAG", kind: "string" },
     active: { name: "ACTIVE", kind: "boolean" },
   },
@@ -99,6 +102,60 @@ export function runGenericRepositoryContract(driver: string, setup: ContractSetu
       it("the bulk insert returns how many rows went in", async () => {
         expect(await repository.insertMany([{ name: "a" }, { name: "b" }])).toBe(2);
         expect(await repository.count()).toBe(2);
+      });
+    });
+
+    // A `decimal` is the one kind where the engines answer differently left to
+    // themselves: PostgreSQL and Oracle hand a NUMERIC back as a string because
+    // a double cannot always hold it, the in-memory driver hands back whatever
+    // double it was given, and a column with two decimals quietly drops the
+    // third on one engine and refuses it on another. The mapping is supposed to
+    // settle all of that, and this is where it is held to it.
+    describe("decimal columns", () => {
+      it("comes back a number, whatever the engine hands over", async () => {
+        const { pkItem } = await repository.insert({ name: "a", price: 19.99 });
+        const read = await repository.getById(pkItem);
+
+        expect(typeof read?.price).toBe("number");
+        expect(read?.price).toBe(19.99);
+      });
+
+      it("rounds to the declared scale on the way in", async () => {
+        const { pkItem } = await repository.insert({ name: "a", price: 10.005 });
+
+        expect((await repository.getById(pkItem))?.price).toBe(10.01);
+      });
+
+      it("does not store the dust a float sum leaves behind", async () => {
+        const { pkItem } = await repository.insert({ name: "a", price: 0.1 + 0.2 });
+
+        expect((await repository.getById(pkItem))?.price).toBe(0.3);
+      });
+
+      it("rounds an update the same way it rounds an insert", async () => {
+        const { pkItem } = await repository.insert({ name: "a", price: 1 });
+        await repository.update(pkItem, { price: 2.345 });
+
+        expect((await repository.getById(pkItem))?.price).toBe(2.35);
+      });
+
+      it("keeps null a null rather than a zero", async () => {
+        const { pkItem } = await repository.insert({ name: "a", price: null });
+
+        expect((await repository.getById(pkItem))?.price ?? null).toBeNull();
+      });
+
+      it("filters and sorts on it like any other number", async () => {
+        await repository.insert({ name: "cheap", price: 5.5 });
+        await repository.insert({ name: "dear", price: 100.25 });
+
+        const found = await repository.find({
+          where: { price: { gte: 10 } },
+          orderBy: { field: "price", direction: "desc" },
+        });
+
+        expect(found.map((item) => item.name)).toEqual(["dear"]);
+        expect(await repository.count({ price: { lt: 10 } })).toBe(1);
       });
     });
 
