@@ -97,7 +97,7 @@ Renaming a physical column is a one-line change.
 | --- | --- |
 | `identity` | `true` (default): the database generates the PK. `false`: the caller must supply it, and an insert without it throws. |
 | `insertable` / `updatable` | `false` for columns the database owns (identity PKs, `CREATED_AT`). Default `true`. |
-| `kind` | Drives conversion in both directions: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `string`. Defaults to `string`. |
+| `kind` | Drives conversion in both directions: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `decimal`, `string`. Defaults to `string`. See [Money and other decimals](#money-and-other-decimals). |
 | `softDelete` | The column marking a row logically deleted. Omit it and the entity simply has no logical delete. `activeValue`/`deletedValue` default to `1`/`0`. |
 | `timestamps` | `createdAt` / `updatedAt`. Never taken from the request body. |
 | `audit` | `createdBy` / `updatedBy`, filled from the request context — the identity in the token, never the body, so a client cannot claim to be someone else. Outside a request the value is `System`. |
@@ -111,6 +111,66 @@ shortcuts, indexes columns case-insensitively (Oracle returns identifiers
 uppercased, PostgreSQL lowercased — the same mapping resolves both) and centralises
 the conversions. Its `columnOf()` **throws when a property is not mapped**, and that
 is the barrier keeping an arbitrary name out of a generated query.
+
+---
+
+## Money and other decimals
+
+A price, a balance, a rate and a percentage are not `kind: "number"`. Declare them
+`kind: "decimal"` and give the scale:
+
+```ts
+amount: { name: "AMOUNT", kind: "decimal", precision: 12, scale: 2 }
+```
+
+The kind exists because a `number` is a double and the engines do not agree about
+what happens to one:
+
+- PostgreSQL and Oracle hand a `NUMERIC` back **as a string**, precisely because a
+  double cannot always hold it. Read as a number without care, `19.99` becomes
+  `19.989999999999998` — a value somebody can be charged.
+- A column with two decimals silently drops a third on one engine and rejects it on
+  another.
+- The in-memory driver stores the object it was handed, so `0.1 + 0.2` stays
+  `0.30000000000000004` there while every real engine writes `0.30`. That one is
+  the worst of the three: it is the difference between a test suite that is
+  evidence about production and one that is not.
+
+A `decimal` column is **rounded to its `scale` on the way in and on the way out**,
+half away from zero, on every driver. `scale` defaults to `2`; the generated DDL
+emits the engine's fixed-point type (`NUMERIC`, `DECIMAL`, `NUMBER`) with the same
+width, so the schema and the mapping cannot disagree.
+
+`kind: "number"` is unchanged and stays what an id, a count or a foreign key is.
+
+### Splitting an amount
+
+`monolite-core` carries the two operations that go with the kind, because they are
+arithmetic rather than persistence and an application that never stores an amount
+can still need to split one:
+
+```ts
+import { allocate, roundTo } from "monolite-core";
+
+roundTo(1.005);              // 1.01  — `Math.round(v * 100) / 100` answers 1
+roundTo(-1.005);             // -1.01 — a credit note rounds like its invoice
+
+allocate(100, [1, 1, 1]);    // [33.33, 33.33, 33.34]
+allocate(1000, [50, 30, 20]); // [500, 300, 200]
+```
+
+`allocate` splits a total in the given proportions **without losing a unit**: it
+works in minor units and the shares add back up to the total at that scale. The
+cent that does not divide goes to the last share by default, and
+`{ residue: "first" | "largest" }` picks the other two conventions — which is the
+decision every hand-written split makes silently and differently each time.
+
+Weights are proportions, not amounts, so `[1, 1, 1]` and `[50, 50, 50]` split the
+same way. A negative total divides exactly as the positive one does, with the signs
+flipped, so a credit note matches the invoice it reverses.
+
+Money is the case that motivates both, not the limit of them: hours, units and days
+divide the same way and lose the same remainder.
 
 ---
 

@@ -100,6 +100,24 @@ function decimalOf(column: ColumnMetadata): string {
     : `${column.precision}, ${column.scale}`;
 }
 
+/** Width of a `decimal` column when its mapping does not give one. */
+const DECIMAL_DEFAULT_PRECISION = 18;
+const DECIMAL_DEFAULT_SCALE = 2;
+
+/**
+ * The width of a `kind: "decimal"` column, both halves always present.
+ *
+ * Unlike a `number` that got a `precision`, the scale is never left off here.
+ * The kind exists to pin the scale — the mapping rounds every value to it — and
+ * a column that let the engine choose would be storing six decimals against a
+ * mapping that rounds to two. The generated schema and the mapping have to say
+ * the same thing, which is the whole reason this generator is worth having.
+ */
+function fixedOf(column: ColumnMetadata): string {
+  const precision = column.precision ?? DECIMAL_DEFAULT_PRECISION;
+  return `${precision}, ${column.scale ?? DECIMAL_DEFAULT_SCALE}`;
+}
+
 /** 255 is the default width; see `ColumnMetadata.length`. */
 function widthOf(column: ColumnMetadata): number | "max" {
   return column.length ?? 255;
@@ -124,6 +142,8 @@ export const oracleDdl: DdlDialect = {
     switch (column.kind ?? "string") {
       case "number":
         return isDecimal(column) ? `NUMBER(${decimalOf(column)})` : "NUMBER(10)";
+      case "decimal":
+        return `NUMBER(${fixedOf(column)})`;
       case "boolean":
         return "NUMBER(1)";
       case "date":
@@ -154,6 +174,8 @@ export const sqlServerDdl: DdlDialect = {
     switch (column.kind ?? "string") {
       case "number":
         return isDecimal(column) ? `DECIMAL(${decimalOf(column)})` : "INT";
+      case "decimal":
+        return `DECIMAL(${fixedOf(column)})`;
       case "boolean":
         return "SMALLINT";
       // `DATETIME2` and not `DATETIME`: the older type rounds to 3.33 ms, and
@@ -200,6 +222,8 @@ export const postgresDdl: DdlDialect = {
     switch (column.kind ?? "string") {
       case "number":
         return isDecimal(column) ? `NUMERIC(${decimalOf(column)})` : "INTEGER";
+      case "decimal":
+        return `NUMERIC(${fixedOf(column)})`;
       case "boolean":
         return "SMALLINT";
       case "date":
@@ -229,6 +253,8 @@ export const mysqlDdl: DdlDialect = {
     switch (column.kind ?? "string") {
       case "number":
         return isDecimal(column) ? `DECIMAL(${decimalOf(column)})` : "INT";
+      case "decimal":
+        return `DECIMAL(${fixedOf(column)})`;
       case "boolean":
         return "TINYINT(1)";
       // Three decimals, matching `CURRENT_TIMESTAMP(3)` in the query dialect: a

@@ -99,7 +99,7 @@ Renombrar una columna física es un cambio de una línea.
 | --- | --- |
 | `identity` | `true` (por defecto): la base de datos genera la PK. `false`: quien llama tiene que darla, y un insert sin ella lanza. |
 | `insertable` / `updatable` | `false` para las columnas que son de la base de datos (PKs identity, `CREATED_AT`). Por defecto `true`. |
-| `kind` | Dirige la conversión en ambos sentidos: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `string`. Por defecto `string`. |
+| `kind` | Dirige la conversión en ambos sentidos: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `decimal`, `string`. Por defecto `string`. Ver [Dinero y otros decimales](#dinero-y-otros-decimales). |
 | `softDelete` | La columna que marca una fila como borrada lógicamente. Omítelo y la entidad simplemente no tiene borrado lógico. `activeValue`/`deletedValue` valen `1`/`0` por defecto. |
 | `timestamps` | `createdAt` / `updatedAt`. Nunca se toman del cuerpo de la petición. |
 | `audit` | `createdBy` / `updatedBy`, rellenados desde el contexto de la petición — la identidad del token, nunca el cuerpo, para que un cliente no pueda decir que es otro. Fuera de una petición el valor es `System`. |
@@ -114,6 +114,67 @@ devuelve los identificadores en mayúsculas y PostgreSQL en minúsculas — el m
 mapeo resuelve los dos) y centraliza las conversiones. Su `columnOf()` **lanza
 cuando una propiedad no está mapeada**, y esa es la barrera que impide que un
 nombre arbitrario entre en una consulta generada.
+
+---
+
+## Dinero y otros decimales
+
+Un precio, un saldo, una tasa y un porcentaje no son `kind: "number"`. Decláralos
+`kind: "decimal"` y dales la escala:
+
+```ts
+amount: { name: "AMOUNT", kind: "decimal", precision: 12, scale: 2 }
+```
+
+El tipo existe porque un `number` es un double y los motores no se ponen de acuerdo
+sobre qué pasa con uno:
+
+- PostgreSQL y Oracle devuelven un `NUMERIC` **como cadena**, precisamente porque un
+  double no siempre lo aguanta. Leído como número sin cuidado, `19.99` se vuelve
+  `19.989999999999998` — un valor que alguien puede acabar pagando.
+- Una columna de dos decimales descarta el tercero en silencio en un motor y lo
+  rechaza en otro.
+- El driver en memoria guarda el objeto que le dieron, así que `0.1 + 0.2` se queda
+  en `0.30000000000000004` ahí mientras cualquier motor real escribe `0.30`. Ese es
+  el peor de los tres: es la diferencia entre una suite que dice algo de producción
+  y una que no.
+
+Una columna `decimal` se **redondea a su `scale` al entrar y al salir**, al alza
+alejándose del cero, en todos los drivers. `scale` vale `2` por defecto; el DDL
+generado emite el tipo de punto fijo del motor (`NUMERIC`, `DECIMAL`, `NUMBER`) con
+el mismo ancho, para que el esquema y el mapeo no puedan discrepar.
+
+`kind: "number"` no cambia y sigue siendo lo que es un id, un conteo o una llave
+foránea.
+
+### Repartir un importe
+
+`monolite-core` trae las dos operaciones que acompañan al tipo, porque son
+aritmética y no persistencia, y una aplicación que nunca guarda un importe puede
+igualmente necesitar repartirlo:
+
+```ts
+import { allocate, roundTo } from "monolite-core";
+
+roundTo(1.005);              // 1.01  — `Math.round(v * 100) / 100` contesta 1
+roundTo(-1.005);             // -1.01 — una nota de crédito redondea como su factura
+
+allocate(100, [1, 1, 1]);    // [33.33, 33.33, 33.34]
+allocate(1000, [50, 30, 20]); // [500, 300, 200]
+```
+
+`allocate` reparte un total en las proporciones dadas **sin perder una unidad**:
+trabaja en unidades menores y las partes vuelven a sumar el total en esa escala. El
+centavo que no divide va a la última parte por omisión, y
+`{ residue: "first" | "largest" }` elige las otras dos convenciones — que es la
+decisión que cada reparto escrito a mano toma en silencio y distinta cada vez.
+
+Los pesos son proporciones, no importes, así que `[1, 1, 1]` y `[50, 50, 50]`
+reparten igual. Un total negativo se divide exactamente como el positivo, con los
+signos cambiados, para que una nota de crédito cuadre con la factura que revierte.
+
+El dinero es el caso que las motiva, no su límite: horas, unidades y días se
+reparten igual y pierden el mismo residuo.
 
 ---
 

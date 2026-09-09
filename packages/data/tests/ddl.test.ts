@@ -494,3 +494,73 @@ describe("the soft-delete column", () => {
     expect(diffSnapshots(snapshot, snapshot, postgresDdl, { entities: [soft] })).toEqual([]);
   });
 });
+
+describe("a decimal column", () => {
+  const money = defineEntity<{ pk: number; amount: number; rate: number; count: number }>({
+    table: "MONEY",
+    primaryKey: "pk",
+    identity: true,
+    columns: {
+      pk: { name: "PK", kind: "number", insertable: false, updatable: false },
+      amount: { name: "AMOUNT", kind: "decimal", precision: 12, scale: 2 },
+      // No width at all: the kind alone has to be enough to emit a column that
+      // matches what the mapping rounds to.
+      rate: { name: "RATE", kind: "decimal" },
+      count: { name: "COUNT", kind: "number" },
+    },
+  });
+
+  it("emits the engine's fixed-point type, not its integer one", () => {
+    expect(emitTable(money, postgresDdl).create).toContain("AMOUNT NUMERIC(12, 2)");
+    expect(emitTable(money, mysqlDdl).create).toContain("AMOUNT DECIMAL(12, 2)");
+    expect(emitTable(money, sqlServerDdl).create).toContain("AMOUNT DECIMAL(12, 2)");
+    expect(emitTable(money, oracleDdl).create).toContain("AMOUNT NUMBER(12, 2)");
+  });
+
+  it("defaults to a width that keeps two decimals", () => {
+    // Left to the engine, PostgreSQL would store every digit it is given while
+    // the mapping rounds to two, and the column and the entity would disagree.
+    expect(emitTable(money, postgresDdl).create).toContain("RATE NUMERIC(18, 2)");
+    expect(emitTable(money, oracleDdl).create).toContain("RATE NUMBER(18, 2)");
+  });
+
+  it("leaves a plain number an integer", () => {
+    expect(emitTable(money, postgresDdl).create).toContain("COUNT INTEGER");
+  });
+
+  it("survives the snapshot round trip", () => {
+    const snapshot = snapshotOf([money]);
+
+    expect(snapshot.tables.MONEY?.columns.AMOUNT).toMatchObject({
+      kind: "decimal",
+      precision: 12,
+      scale: 2,
+    });
+    expect(diffSnapshots(snapshot, snapshot, postgresDdl, { entities: [money] })).toEqual([]);
+  });
+
+  it("is a change when a plain number becomes one", () => {
+    const asInteger = defineEntity<{ pk: number; amount: number }>({
+      table: "MONEY",
+      primaryKey: "pk",
+      columns: {
+        pk: { name: "PK", kind: "number" },
+        amount: { name: "AMOUNT", kind: "number" },
+      },
+    });
+    const asDecimal = defineEntity<{ pk: number; amount: number }>({
+      table: "MONEY",
+      primaryKey: "pk",
+      columns: {
+        pk: { name: "PK", kind: "number" },
+        amount: { name: "AMOUNT", kind: "decimal", precision: 12, scale: 2 },
+      },
+    });
+
+    const migration = diffSnapshots(snapshotOf([asInteger]), snapshotOf([asDecimal]), postgresDdl, {
+      entities: [asDecimal],
+    });
+
+    expect(migration.join("\n")).toContain("NUMERIC(12, 2)");
+  });
+});

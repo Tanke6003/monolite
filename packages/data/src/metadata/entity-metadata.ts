@@ -7,8 +7,24 @@
  * `MemoryGenericRepository` know how to generate the whole CRUD without a
  * single hand-written line of SQL.
  */
+import { roundTo } from "monolite-core";
 
-export type ColumnKind = "number" | "string" | "boolean" | "date";
+/** Decimals a `decimal` column keeps when its mapping does not say. */
+const DEFAULT_DECIMAL_SCALE = 2;
+
+/**
+ * The logical type of a column.
+ *
+ * `decimal` is a number the engine stores exactly and JavaScript does not: a
+ * price, a balance, a percentage. It exists as its own kind because a `number`
+ * arrives as whatever a double can hold, and money read back as
+ * `19.989999999999998` is money that will eventually be shown to somebody. A
+ * decimal column is rounded to its `scale` on the way in and on the way out, so
+ * every driver agrees on the value and the in-memory one agrees with the engine
+ * it stands in for — which is what makes a test written against memory mean
+ * anything about production.
+ */
+export type ColumnKind = "number" | "decimal" | "string" | "boolean" | "date";
 
 export interface ColumnMetadata {
   /** Physical column name. */
@@ -21,12 +37,12 @@ export interface ColumnMetadata {
   updatable?: boolean;
 
   // ---------------------------------------------------------------------------
-  // Everything below is read by the DDL generator and by nothing else. The
-  // repository has never needed to know how wide a column is — it binds values
-  // and the engine checks them — which is why these arrived late and are all
-  // optional. An entity that does not set them still maps, still queries and
-  // still writes exactly as before; it only generates a schema with the
-  // defaults documented on each one.
+  // Everything below is read by the DDL generator, and — for `scale` on a
+  // `decimal` column — by the mapping too. The repository has never needed to
+  // know how wide a column is, it binds values and the engine checks them,
+  // which is why these arrived late and are all optional. An entity that does
+  // not set them still maps, still queries and still writes exactly as before;
+  // it only generates a schema with the defaults documented on each one.
   // ---------------------------------------------------------------------------
 
   /**
@@ -34,9 +50,24 @@ export interface ColumnMetadata {
    * unbounded text type.
    */
   length?: number | "max";
-  /** Total digits of a numeric column. Without it a number is an integer. */
+  /**
+   * Total digits of a numeric column. Without it a `number` is an integer and a
+   * `decimal` takes the generator's default width.
+   */
   precision?: number;
-  /** Digits after the point. Only meaningful next to `precision`. */
+  /**
+   * Digits after the point.
+   *
+   * On a `decimal` column the mapping reads this as well as the DDL generator:
+   * it is the scale every value is rounded to, going in and coming back. That
+   * is the one place a width stops being only a schema concern — a column
+   * declared with two decimals and an entity holding three of them disagree
+   * about what was stored, and the disagreement surfaces as a cent.
+   *
+   * Defaults to 2 for `decimal`. On a plain `number` it is DDL-only and has no
+   * default: `precision` without `scale` is a decimal column of whole digits,
+   * which is what the engines mean by it.
+   */
   scale?: number;
   /**
    * Whether the column accepts `NULL`. Defaults to `true` for every column
@@ -269,6 +300,36 @@ export class EntitySchema<T> {
   }
 
   /**
+   * Decimals a `decimal` property is rounded to. Two by default, which is what
+   * a currency is; on any other kind the question does not arise and the answer
+   * is not used.
+   */
+  scaleOf(property: string): number {
+    return this.byProperty.get(property)?.scale ?? DEFAULT_DECIMAL_SCALE;
+  }
+
+  /**
+   * Rounds a `decimal` property to its scale, and returns anything else exactly
+   * as it came.
+   *
+   * It is public because the in-memory driver needs it and cannot get it any
+   * other way. The SQL and document drivers pass every value through
+   * `toColumnValue` on the way in and `toEntity` on the way out, so they are
+   * quantized already; the memory driver stores the object it was handed, which
+   * is the whole reason it is fast — and the reason it was the one driver where
+   * `0.1 + 0.2` stayed `0.30000000000000004` while every real engine wrote
+   * `0.30`. A suite that runs on memory and a deployment that runs on
+   * PostgreSQL have to agree about that, or the suite is not evidence.
+   */
+  quantize(property: string, value: unknown): unknown {
+    if (this.kindOf(property) !== "decimal") return value;
+    if (value === undefined || value === null) return value;
+
+    const numeric = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(numeric) ? roundTo(numeric, this.scaleOf(property)) : value;
+  }
+
+  /**
    * The column as declared, with the shorthands already resolved.
    *
    * The DDL generator wants the whole thing — width, nullability, default — and
@@ -314,6 +375,11 @@ export class EntitySchema<T> {
         return value ? 1 : 0;
       case "number":
         return typeof value === "number" ? value : Number(value);
+      // Rounded on the way in as well as on the way out, so that what the
+      // column holds is what the entity said. Left to the engine, a third
+      // decimal is silently dropped by one and rejected by another.
+      case "decimal":
+        return this.quantize(property, typeof value === "number" ? value : Number(value));
       case "date":
         return value instanceof Date ? value : new Date(String(value));
       default:
@@ -330,6 +396,12 @@ export class EntitySchema<T> {
         return value === 1 || value === "1" || value === true;
       case "number":
         return typeof value === "number" ? value : Number(value);
+      // PostgreSQL and Oracle hand a NUMERIC back as a string precisely because
+      // a double cannot always hold it. Turning it into one is what the entity
+      // asked for; rounding it to the declared scale is what keeps the double's
+      // approximation from being read as a value somebody can be charged.
+      case "decimal":
+        return this.quantize(property, typeof value === "number" ? value : Number(value));
       case "date":
         return value instanceof Date ? value : new Date(String(value));
       case "string":
