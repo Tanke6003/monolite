@@ -1,5 +1,12 @@
-import type { ITransactionContext, ITransactionScope, IUnitOfWork } from "monolite-data";
-import { Transactional, TransactionalBLL, lockRow } from "monolite-crud";
+import type { IGenericRepository, ITransactionContext, ITransactionScope, IUnitOfWork } from "monolite-data";
+import {
+  CrudBLL,
+  Transactional,
+  TransactionalBLL,
+  lockRow,
+  type EntityMapper,
+  type TransactionalHost,
+} from "monolite-crud";
 
 /**
  * A fake unit of work and transaction context, chained the way the real ones
@@ -122,6 +129,116 @@ describe("@Transactional", () => {
     // synchronous error escaping something that looks asynchronous slips past
     // the caller's try/catch.
     await expect(new Loose().something()).rejects.toThrow(/Extend TransactionalBLL/i);
+  });
+
+  it("names the member that is missing, and both ways of supplying it", async () => {
+    class HalfWay {
+      constructor(readonly transactions: ITransactionContext) {}
+
+      @Transactional()
+      async something(): Promise<void> {}
+    }
+
+    const rejection = new HalfWay(harness().transactions).something();
+
+    // Naming only the base class is what sent people away from the decorator:
+    // the class that needs it already extends CrudBLL, so "extend
+    // TransactionalBLL" reads as "you cannot have this".
+    await expect(rejection).rejects.toThrow(/exposes no unitOfWork\./);
+    await expect(rejection).rejects.toThrow(/already extends CrudBLL can/);
+  });
+
+  it("refuses a host with a unit of work but no transaction context", async () => {
+    // Without the context the join check below cannot see the open transaction,
+    // so a decorated method calling another one would open a second and
+    // deadlock against the rows the first holds. Named error over lock wait.
+    class NoContext {
+      constructor(readonly unitOfWork: IUnitOfWork) {}
+
+      @Transactional()
+      async something(): Promise<void> {}
+    }
+
+    await expect(new NoContext(harness().unitOfWork).something()).rejects.toThrow(
+      /exposes no transactions\./
+    );
+  });
+});
+
+/**
+ * The shape `docs/en/crud.md` documents: a service that already extends
+ * `CrudBLL` and takes the transaction dependencies as constructor arguments.
+ * It used to reject at the first call — the guide showed the context injected
+ * and not the unit of work, and the decorator needs both (#32).
+ */
+describe("@Transactional on a service that already extends CrudBLL", () => {
+  interface Appointment {
+    pk: number;
+    slot: string;
+  }
+
+  interface AppointmentDto {
+    id: number;
+    slot: string;
+  }
+
+  const mapper: EntityMapper<Appointment, AppointmentDto> = {
+    toDTO: (entity) => ({ id: entity.pk, slot: entity.slot }),
+    toDTOList: (entities) => entities.map((entity) => ({ id: entity.pk, slot: entity.slot })),
+    toEntity: (dto) => ({ slot: dto.slot }),
+    toPartialEntity: (dto) => (dto.slot === undefined ? {} : { slot: dto.slot }),
+  };
+
+  class AppointmentsBLL extends CrudBLL<Appointment, AppointmentDto> implements TransactionalHost {
+    constructor(
+      repository: IGenericRepository<Appointment>,
+      readonly unitOfWork: IUnitOfWork,
+      readonly transactions: ITransactionContext
+    ) {
+      super(repository, mapper);
+    }
+
+    @Transactional()
+    async book(slot: string): Promise<AppointmentDto> {
+      await lockRow(this.transactions, "BRANCHES", 1);
+      return this.mapper.toDTO(await this.repository.insert({ slot }));
+    }
+  }
+
+  function serviceWith(fake: ReturnType<typeof harness>): AppointmentsBLL {
+    const repository = {
+      insert: jest.fn(async (entity: Partial<Appointment>) => ({ pk: 1, slot: entity.slot })),
+    } as unknown as IGenericRepository<Appointment>;
+
+    return new AppointmentsBLL(repository, fake.unitOfWork, fake.transactions);
+  }
+
+  it("runs inside a transaction with no second base class", async () => {
+    const fake = harness();
+
+    await expect(serviceWith(fake).book("09:00")).resolves.toEqual({ id: 1, slot: "09:00" });
+
+    expect(fake.execute).toHaveBeenCalledTimes(1);
+    // The lock found the scope through the ambient context, which is the whole
+    // reason the decorator exists: nothing was threaded through the signature.
+    expect(fake.rowLock).toHaveBeenCalledWith("BRANCHES", 1);
+  });
+
+  it("rejects when only the transaction context was injected", async () => {
+    const fake = harness();
+    const repository = { insert: jest.fn() } as unknown as IGenericRepository<Appointment>;
+
+    // The constructor the guide used to show: `transactions` and no unit of
+    // work. It is the case reported in #32, kept so the guide cannot drift back
+    // to it without a red test.
+    const halfWired = new AppointmentsBLL(
+      repository,
+      undefined as unknown as IUnitOfWork,
+      fake.transactions
+    );
+
+    await expect(halfWired.book("09:00")).rejects.toThrow(/exposes no unitOfWork\./);
+    expect(repository.insert).not.toHaveBeenCalled();
   });
 });
 
