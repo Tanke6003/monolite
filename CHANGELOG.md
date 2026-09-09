@@ -9,6 +9,28 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A release could stall with the tag pushed and the registry empty, and
+  nothing could finish it.** npm rejected the publish credential on v0.10.0 and
+  v0.10.1: both are tagged, both moved every manifest, and neither reached the
+  registry — which stayed on 0.9.1 while the repository said 0.10.1.
+
+  From that state the workflow had no way forward. Master's head is the release
+  commit, which the job's own guard skips; a re-run of the failed run reads an
+  empty commit range and correctly decides there is nothing to release; and a
+  fresh bump would burn a version number to work around an expired token.
+
+  `npm run release -- --publish-only` is the second half of the run that already
+  happened: no plan, no version written, no commit, no tag, no push — build what
+  the newest tag names and publish it, skipping whatever the registry already
+  has. It refuses unless HEAD *is* the tagged commit and the manifests agree
+  with the tag, because provenance links each tarball to the commit that is
+  checked out and publishing from anywhere else would sign a statement pointing
+  at code nobody released. `release.yml` exposes it as a `workflow_dispatch`
+  input, so recovering is a button rather than a local publish without
+  provenance.
+
 ### Added
 
 - **A column kind for money, and the arithmetic that goes with it.**

@@ -33,6 +33,23 @@ import { baseVersion, plan } from "./plan.mjs";
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
 const dryRun = process.argv.includes("--dry-run");
 
+/**
+ * Publish the version that is already decided, tagged and pushed.
+ *
+ * The ordering above means a run can fail *after* the tag is on the remote and
+ * before the registry has anything — which is what a rejected npm credential
+ * does, and what happened to v0.10.0 and v0.10.1. From that state no push can
+ * fix it: the release commit is the head of master, so the next run is skipped
+ * by the workflow's own guard, and a re-run of the failed one reads an empty
+ * commit range and correctly decides there is nothing to release.
+ *
+ * So the recovery is not another bump. It is the second half of the run that
+ * already happened, which is what this flag is: no plan, no version written, no
+ * commit, no tag, no push — build what the tag names and publish it, skipping
+ * whatever the registry already has.
+ */
+const publishOnly = process.argv.includes("--publish-only");
+
 function log(message) {
   process.stdout.write(`${message}\n`);
 }
@@ -96,6 +113,27 @@ function isPublished(name, version) {
   }
 }
 
+/**
+ * Every package at `version`, in dependency order, skipping what is already up.
+ *
+ * `--provenance` attaches a signed statement linking the tarball to the commit
+ * and the workflow run that built it, which npm shows on the package page and
+ * anybody can verify. It needs the OIDC token the release job already has, so
+ * it costs a flag. For a toolkit asking people to install seven packages from
+ * one publisher, "built from this commit, by this workflow" is worth more than
+ * any wording in a README.
+ */
+function publish(version) {
+  for (const name of publishOrder()) {
+    if (isPublished(name, version)) {
+      log(`  skip ${name}@${version}, already on the registry`);
+      continue;
+    }
+
+    npm("publish", "-w", name, "--access", "public", "--provenance");
+  }
+}
+
 const tag = lastTag();
 const manifestVersion = currentVersion();
 
@@ -113,6 +151,42 @@ const version = baseVersion(manifestVersion, tag);
 if (version !== manifestVersion) {
   log(`! the manifest says ${manifestVersion} but ${tag} is tagged, so ${version} is the base`);
   log("  a previous run published and tagged without pushing its version commit");
+}
+
+if (publishOnly) {
+  if (!tag) {
+    log("! --publish-only needs a tag to name the version, and this repository has none");
+    process.exit(1);
+  }
+
+  // Provenance links the tarball to the commit that is checked out, so
+  // publishing from anywhere but the tagged commit would attach a statement
+  // that points at code nobody released.
+  const tagged = git("rev-list", "-n", "1", tag);
+  const head = git("rev-parse", "HEAD");
+
+  if (tagged !== head) {
+    log(`! ${tag} names ${tagged.slice(0, 7)} and HEAD is ${head.slice(0, 7)}`);
+    log(`  check out the tag before publishing it —git checkout ${tag}`);
+    process.exit(1);
+  }
+
+  if (manifestVersion !== version) {
+    log(`! the manifests say ${manifestVersion} and ${tag} names ${version}`);
+    log("  --publish-only republishes a finished release; it does not write a version");
+    process.exit(1);
+  }
+
+  if (dryRun) {
+    log(`dry run, so ${version} was not built or published`);
+    process.exit(0);
+  }
+
+  npm("run", "build");
+  publish(version);
+
+  log(`published v${version}`);
+  process.exit(0);
 }
 
 const messages = commitsSince(tag);
@@ -159,21 +233,6 @@ try {
   process.exit(0);
 }
 
-for (const name of publishOrder()) {
-  if (isPublished(name, decision.version)) {
-    log(`  skip ${name}@${decision.version}, already on the registry`);
-    continue;
-  }
-
-  // `--provenance` attaches a signed statement linking this tarball to the
-  // commit and the workflow run that built it, which npm shows on the package
-  // page and anybody can verify. It needs the OIDC token the release job
-  // already has, so it costs a flag.
-  //
-  // For a toolkit asking people to install seven packages from one publisher,
-  // "built from this commit, by this workflow" is worth more than any wording
-  // in a README.
-  npm("publish", "-w", name, "--access", "public", "--provenance");
-}
+publish(decision.version);
 
 log(`released v${decision.version}`);
