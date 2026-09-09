@@ -8,12 +8,39 @@
 import type { ITransactionContext, IUnitOfWork } from "monolite-data";
 
 /**
- * What the decorator needs to find on the service. Extending
- * `TransactionalBLL` satisfies it.
+ * What the decorator needs to find on the service: both members, not one.
+ *
+ * There are two ways to satisfy it, and neither imposes an inheritance chain on
+ * a service that did not ask for one. Extending `TransactionalBLL` supplies
+ * them; a BLL that already extends `CrudBLL` — which TypeScript will not let
+ * extend a second base class — declares them itself and injects the two
+ * dependencies, which is one constructor argument more and nothing else.
+ *
+ * It is exported so that `implements TransactionalHost` turns a missing member
+ * into a compile error at the class that forgot it, instead of a rejected
+ * promise the first time the method is called in production.
  */
-interface TransactionalHost {
+export interface TransactionalHost {
   readonly unitOfWork: IUnitOfWork;
   readonly transactions: ITransactionContext;
+}
+
+/**
+ * The members of the contract the host does not actually supply.
+ *
+ * `transactions` counts as much as `unitOfWork`: it is what the decorator reads
+ * to tell "already inside a transaction" from "not", and a host without it
+ * would open a second transaction from a method called by another decorated
+ * one — deadlocking against the rows the first already holds. Answering that
+ * with a named error beats answering it with a lock wait.
+ */
+function missingMembersOf(host: Partial<TransactionalHost> | undefined): string[] {
+  const missing: string[] = [];
+
+  if (typeof host?.unitOfWork?.execute !== "function") missing.push("unitOfWork");
+  if (typeof host?.transactions?.current !== "function") missing.push("transactions");
+
+  return missing;
 }
 
 /**
@@ -87,20 +114,29 @@ export function Transactional() {
     const original = descriptor.value as (...args: unknown[]) => Promise<unknown>;
 
     descriptor.value = function (this: TransactionalHost, ...args: unknown[]): Promise<unknown> {
-      if (typeof this?.unitOfWork?.execute !== "function") {
+      const missing = missingMembersOf(this);
+
+      if (missing.length > 0) {
         // It rejects instead of throwing: the decorated method is awaited, and
         // a synchronous error coming out of something that looks asynchronous
         // escapes the caller's try/catch.
+        //
+        // The message names both routes on purpose. It used to name only the
+        // base class, which contradicted the guide it was meant to serve: a BLL
+        // extending CrudBLL cannot extend TransactionalBLL as well, and reading
+        // that it had to was enough to give up on the transaction entirely.
         return Promise.reject(
           new Error(
-            `[Transactional] ${propertyKey} is decorated but its class exposes no unit of ` +
-              "work. Extend TransactionalBLL."
+            `[Transactional] ${propertyKey} is decorated but its class exposes no ` +
+              `${missing.join(" and no ")}. Inject IUnitOfWork and ITransactionContext and ` +
+              "keep them as `unitOfWork` and `transactions` — a service that already extends " +
+              "CrudBLL can, with no second base class — or extend TransactionalBLL."
           )
         );
       }
 
       // Already inside a transaction: join it, do not open another.
-      if (this.transactions?.current()) return original.apply(this, args);
+      if (this.transactions.current()) return original.apply(this, args);
 
       return this.unitOfWork.execute(() => original.apply(this, args));
     };

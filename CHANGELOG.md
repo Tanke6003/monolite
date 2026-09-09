@@ -54,6 +54,26 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **The documented `@Transactional()` example could not run.** `docs/en/crud.md`
+  showed a BLL extending `CrudBLL` with an `ITransactionContext` injected and
+  nothing else, and the decorator needs a unit of work as well — so the method
+  rejected with a message naming the one route the same page said you were not
+  forced into: "Extend TransactionalBLL", which a class already extending
+  `CrudBLL` cannot do.
+
+  The example now injects both members, which is what the decorator has always
+  looked for and costs one constructor argument rather than a second base class.
+  `TransactionalHost` is exported so `implements TransactionalHost` turns a
+  missing member into a compile error at the class that forgot it, and the
+  rejection names the member that is absent and both ways of supplying it.
+  A host with a unit of work but no context is refused too: without the context
+  the decorator cannot see an open transaction, so a decorated method called
+  from another one would open a second and deadlock against the rows the first
+  holds.
+
+  `CrudBLL` still carries no transaction seam of its own — that is #33, and the
+  reason this entry is about the documented shape working rather than about the
+  default path being atomic.
 - **The seven packages declared MIT and shipped no licence.** npm only picks a
   `LICENSE` up from the package's own folder, and the repository's was at the
   root — so every tarball on the registry carried a licence field pointing at a

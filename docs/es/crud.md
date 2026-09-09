@@ -226,13 +226,18 @@ firmas en beneficio de los pocos métodos que lo usan, así que la transacción 
 **ambiental**:
 
 ```ts
-export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
+export class AppointmentsBLL
+  extends CrudBLL<IAppointment, AppointmentDto>
+  implements TransactionalHost
+{
   constructor(
-    repository: IGenericRepository<IAppointment>,
-    // Inyectado, no heredado: `lockRow` es una función suelta precisamente para
-    // que una BLL que ya extiende `CrudBLL` no tenga que meterse en una
-    // segunda clase base. Ver la nota de abajo.
-    private readonly transactions: ITransactionContext
+    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>,
+    // Los dos miembros que el decorador busca en `this`. Inyectados, no
+    // heredados: una BLL que ya extiende `CrudBLL` no puede extender además
+    // `TransactionalBLL`, e `implements TransactionalHost` es lo que convierte
+    // el que falte uno en un error de compilación y no en una promesa rechazada.
+    @inject(TOKENS.IUnitOfWork) readonly unitOfWork: IUnitOfWork,
+    @inject(TOKENS.ITransactionContext) readonly transactions: ITransactionContext
   ) {
     super(repository, appointmentMapper);
   }
@@ -261,6 +266,15 @@ export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
 están varias capas más abajo y a los que nunca se les dijo nada— resuelve su
 almacén a través de ese contexto y se suma a la misma transacción. No se pasa nada.
 
+**Los dos miembros, no uno.** El decorador lee `this.unitOfWork` para abrir la
+transacción y `this.transactions` para saber si ya hay una abierta; una clase que
+aporte uno de los dos se rechaza en la primera llamada, diciendo cuál falta.
+Extender `TransactionalBLL` los aporta, y un servicio que ya extiende `CrudBLL`
+—que TypeScript no deja extender una segunda clase base— los declara él mismo,
+como arriba. `CrudBLL` todavía no trae una costura de transacción propia, así que
+hoy esa declaración es la forma para una BLL que la necesita (la
+[#33](https://github.com/Tanke6003/monolite/issues/33) propone dársela).
+
 Esa resolución es lo que cablea `registerPersistence` cuando recibe un contexto
 `transactions`: cada almacén que registra se suma a la transacción que esté
 abierta y usa el pool cuando no hay ninguna. Los proyectos generados lo pasan, así
@@ -275,10 +289,10 @@ Tres cosas al respecto que son decisiones y no accidentes:
 otro reutiliza la transacción abierta. Anidar una segunda provocaría un interbloqueo
 contra la primera por las filas que ya retiene.
 
-**Rechaza en vez de lanzar cuando no hay unidad de trabajo.** Una configuración con
-el driver de memoria y sin unidad de trabajo registrada recibe una promesa
-rechazada con un mensaje claro, no un throw síncrono desde dentro de un decorador,
-que es mucho más difícil de rastrear.
+**Rechaza en vez de lanzar cuando falta un miembro.** Una configuración con el
+driver de memoria y sin unidad de trabajo registrada recibe una promesa rechazada
+que nombra el miembro y las dos maneras de aportarlo, no un throw síncrono desde
+dentro de un decorador, que es mucho más difícil de rastrear.
 
 **`lockRow` es una función suelta, no un método de la clase base.** Una BLL que
 necesite un bloqueo de fila puede ya estar extendiendo `CrudBLL`, y TypeScript

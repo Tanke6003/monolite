@@ -33,6 +33,7 @@ export type { CrudOptions, CrudVerb } from "./crud.decorator.js";
 
 // ------------------------------------------------------  transactions  ---
 export { lockRow, Transactional, TransactionalBLL } from "./transactional.js";
+export type { TransactionalHost } from "./transactional.js";
 
 // --------------------------------------------------------------  mapping  ---
 export { createMapper, hydrated, hydratedFields, isHydratedField } from "./mapper.js";

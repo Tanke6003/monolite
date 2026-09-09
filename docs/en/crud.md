@@ -223,13 +223,18 @@ through controller → BLL → repository would put a parameter in every signatu
 for the benefit of the few methods that use it, so the transaction is **ambient**:
 
 ```ts
-export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
+export class AppointmentsBLL
+  extends CrudBLL<IAppointment, AppointmentDto>
+  implements TransactionalHost
+{
   constructor(
-    repository: IGenericRepository<IAppointment>,
-    // Injected rather than inherited: `lockRow` is a standalone function exactly
-    // so that a BLL already extending `CrudBLL` is not forced into a
-    // second base class. See the note below.
-    private readonly transactions: ITransactionContext
+    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>,
+    // The two members the decorator looks for on `this`. Injected rather than
+    // inherited: a BLL already extending `CrudBLL` cannot extend
+    // `TransactionalBLL` as well, and `implements TransactionalHost` is what
+    // makes a missing one a compile error instead of a rejected promise.
+    @inject(TOKENS.IUnitOfWork) readonly unitOfWork: IUnitOfWork,
+    @inject(TOKENS.ITransactionContext) readonly transactions: ITransactionContext
   ) {
     super(repository, appointmentMapper);
   }
@@ -258,6 +263,15 @@ export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
 layers down that were never told about it — resolves its store through that
 context and joins the same transaction. Nothing is passed.
 
+**Both members, not one.** The decorator reads `this.unitOfWork` to open the
+transaction and `this.transactions` to tell whether one is already open; a class
+that supplies one of the two is rejected at the first call, naming which is
+missing. Extending `TransactionalBLL` supplies them, and a service that already
+extends `CrudBLL` — which TypeScript will not let extend a second base class —
+declares them itself, as above. `CrudBLL` carries no transaction seam of its
+own yet, so today that declaration is the shape for a BLL that needs one
+([#33](https://github.com/Tanke6003/monolite/issues/33) proposes giving it one).
+
 That resolution is what `registerPersistence` wires when it is given a
 `transactions` context — every store it binds joins whatever transaction is open
 and falls back to the pool when there is none. Generated projects pass it, so it
@@ -272,10 +286,10 @@ Three things about it that are decisions rather than accidents:
 another one reuses the open transaction. Nesting a second one would deadlock
 against the first on the rows it already holds.
 
-**It rejects rather than throws when there is no unit of work.** A configuration
-with the in-memory driver and no unit of work registered gets a rejected promise
-with a clear message, not a synchronous throw from inside a decorator, which is
-much harder to trace back.
+**It rejects rather than throws when a member is missing.** A configuration with
+the in-memory driver and no unit of work registered gets a rejected promise
+naming the member and both ways of supplying it, not a synchronous throw from
+inside a decorator, which is much harder to trace back.
 
 **`lockRow` is a standalone function, not a base-class method.** A BLL that
 needs a row lock may already extend `CrudBLL`, and TypeScript has no multiple
