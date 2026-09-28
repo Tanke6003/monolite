@@ -46,13 +46,20 @@ export function registerPersistence(options: PersistenceModuleOptions): Persiste
   // auto-commits look exactly like one transaction until something throws in
   // the middle. The wrapper is what makes the ambient behaviour the packages
   // have always documented true of the stores they actually bind.
+  //
+  // The unit of work rides along, so the store also carries the seam a service
+  // opens a transaction with: `CrudBLL` reads it off the store it was handed,
+  // which is what makes every generated module atomic by default with no
+  // constructor argument added (#33).
   for (const entity of persistence.entities) {
     const store = persistence.store(entity.name);
 
     registerInstance(
       container,
       entity.token ?? storeToken(entity.name),
-      options.transactions ? transactionAware(store, entity.name, options.transactions) : store
+      options.transactions
+        ? transactionAware(store, entity.name, options.transactions, persistence.unitOfWork)
+        : store
     );
   }
 

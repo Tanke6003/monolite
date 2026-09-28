@@ -1,5 +1,5 @@
 import { HealthProbe, type IHealthProbe } from "monolite-core";
-import { AsyncTransactionContext } from "monolite-data";
+import { AsyncTransactionContext, transactionSeamOf } from "monolite-data";
 import type { IGenericRepository, ITransactionScope } from "monolite-data";
 import {
   container as rootContainer,
@@ -275,5 +275,30 @@ describe("the store a module injects", () => {
     // Nothing to join, so nothing to wrap: an application that never opens a
     // transaction gets the driver's store with no proxy in front of it.
     expect(container.resolve(storeToken("WIDGETS"))).toBe(layer.store("WIDGETS"));
+  });
+
+  it("carries the registered unit of work and context, so CrudBLL can open a transaction", () => {
+    // `CrudBLL` reads its seam off the store it is handed (#33). This is the
+    // end of the wire that makes a generated module atomic with no constructor
+    // argument: the unit of work in the seam must be the very one registered,
+    // or the service would open a transaction its stores do not join.
+    const transactions = new AsyncTransactionContext();
+    const { container } = registerOneEntity({ transactions });
+
+    const injected = container.resolve<IGenericRepository<IWidget>>(storeToken("WIDGETS"));
+
+    expect(transactionSeamOf(injected)).toEqual({
+      unitOfWork: container.resolve(TOKENS.IUnitOfWork),
+      transactions,
+    });
+  });
+
+  it("carries no seam when the layer was built without a context", () => {
+    // No context means nothing joins a transaction, so there is nothing a
+    // service could soundly open one with — and `@Transactional()` keeps its
+    // explicit refusal rather than quietly auto-committing.
+    const { container } = registerOneEntity();
+
+    expect(transactionSeamOf(container.resolve(storeToken("WIDGETS")))).toBeUndefined();
   });
 });

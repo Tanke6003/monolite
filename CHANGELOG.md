@@ -93,6 +93,56 @@ a minor release. Pin exact versions.
   `task` script. Existing projects are unaffected; the CLI reference says which
   two files to copy to get the runner.
 
+- **`CrudBLL` has a transaction seam, and inheriting it is enough (#33).**
+  `@Transactional()` works on a `CrudBLL` subclass with no second base class
+  and no extra constructor argument, and `this.tx(() => ...)` wraps the part of
+  a method that writes. Until now the one class every generated module extends
+  was the one class the decorator could not find a unit of work on, and both
+  ways out — a second base class TypeScript refuses, or an injected
+  `IUnitOfWork` nothing in the module hinted at — went unused.
+
+  The seam comes with the store. `registerPersistence` binds every store with
+  the unit of work it joins, `transactionSeamOf(store)` in `monolite-data`
+  reads it back, and `BaseModuleRepository` hands it through, so swapping the
+  plain store for a module repository does not quietly lose it. Read off the
+  store rather than resolved from the container because it is only sound where
+  the store joins the transaction it opens; a store that carries a seam is, by
+  construction, one that does.
+
+  It is not two members on `CrudBLL`, though the issue sketched it that way:
+  members named `unitOfWork` and `transactions` on the base would have stopped
+  compiling the subclasses that already declare their own — the shape the #32
+  fix documented, under the `noImplicitOverride` the generated `tsconfig.json`
+  turns on, and any subclass keeping a `private` field of either name. Those
+  keep compiling, and their own members win. `lockRow(this, ...)` finds the
+  context through the service for a class that has no `transactions` to pass.
+
+  With no unit of work registered, `@Transactional()` still rejects with the
+  message it always had, and `tx()` refuses the same way, rather than running
+  the body on auto-commit. `monolite generate bll` writes a commented
+  `@Transactional()` example into the file, which is where people look.
+
+### Changed
+
+- **`CrudBLL`'s `create`, `update` and `softDelete` run in a transaction
+  (#33).** Whenever there is a unit of work to open one with — which is every
+  generated project, and every composition root that passes `transactions` to
+  `registerPersistence` — the default writes are atomic. Each is one call and
+  several statements underneath: the row, its change-log entry, the read back.
+
+  The measured reason is an application of 31 modules built with the toolkit and
+  not one use of `IUnitOfWork` or `@Transactional()` in it, while a repayment
+  run, a settlement and an undo all ran as loops of independent auto-commits.
+  None of that was careless; it was the default. The cost of the new one is a
+  transaction around a single insert, and a decorated override that calls
+  `super.create(...)` joins it instead of opening a second.
+
+  Relations are hydrated after the write, outside the transaction, so it lasts
+  as long as the write and not as long as the response takes to build. A store
+  with no unit of work — every module's unit tests — writes exactly as before. A
+  module that wants auto-commit back (a hot insert path, MongoDB without a
+  replica set) overrides `tx()` to `return fn()`.
+
 ### Fixed
 
 - **A release checks that npm accepts its credential before it spends a version.**

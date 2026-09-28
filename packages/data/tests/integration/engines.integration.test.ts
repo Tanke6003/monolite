@@ -1,9 +1,16 @@
 import { CONTRACT_ENTITY, runGenericRepositoryContract, type ContractItem } from "monolite-data";
 import type { IGenericRepository, IRawQueryable } from "monolite-data";
 import { asRawQueryable } from "monolite-data";
+import { CrudBLL, Transactional } from "monolite-crud";
 import { storeToken } from "monolite-di";
 
-import { ENTITY, selectedEngines, type IOrder, type IProduct } from "./support/engines";
+import {
+  ENTITY,
+  selectedEngines,
+  type ICategory,
+  type IOrder,
+  type IProduct,
+} from "./support/engines";
 import { bringUp, seed, type Harness, type Seeded } from "./support/harness";
 
 /**
@@ -294,6 +301,42 @@ describe.each(ENGINES.map((engine) => [engine.id, engine] as const))("%s", (_id,
       await expect(
         harness.products.getById(rows.widget.pkProduct).then((one) => one?.stock)
       ).resolves.toBe(5);
+    });
+
+    /**
+     * `CrudBLL`'s seam (#33), over the store a generated module is handed.
+     *
+     * The override is the shape the issue asks for — a rule, a decorator, no
+     * extra constructor argument — and the rule fails after `super.create`.
+     * Without the seam the decorator had nothing to open a transaction with; on
+     * a real engine the proof is that the row is gone, not that a spy was
+     * called.
+     */
+    it("leaves no row behind when a CrudBLL override throws after super.create", async () => {
+      class CategoriesBLL extends CrudBLL<ICategory, ICategory> {
+        constructor(store: IGenericRepository<ICategory>) {
+          super(store, {
+            toDTO: (entity) => entity,
+            toDTOList: (entities) => entities,
+            toEntity: (dto) => ({ name: dto.name }),
+            toPartialEntity: (dto) => ({ name: dto.name }),
+          });
+        }
+
+        @Transactional()
+        override async create(dto: Partial<ICategory>): Promise<ICategory> {
+          await super.create(dto);
+          throw new Error("a rule that fails after the insert");
+        }
+      }
+
+      const before = await harness.categories.count();
+
+      await expect(new CategoriesBLL(harness.categories).create({ name: "Doomed" })).rejects.toThrow(
+        "a rule that fails after the insert"
+      );
+
+      await expect(harness.categories.count()).resolves.toBe(before);
     });
   });
 

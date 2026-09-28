@@ -418,6 +418,10 @@ almacenes que resuelve del contenedor — ver
 
 **No todo va envuelto en una transacción.** Una sola sentencia ya es atómica y
 viaja con auto-commit; envolverla sólo añadiría un viaje de ida y vuelta.
+(`create`, `update` y `softDelete` por defecto de `CrudBLL` son la excepción, y
+no una contradicción: cada una es una llamada y varias sentencias —la fila, su
+entrada en el registro de cambios, la relectura—, así que sí abren una cuando hay
+unidad de trabajo. Ver [CRUD](./crud.md#transacciones).)
 
 Se abre una transacción en dos casos, y la frontera es la BLL, no el
 repositorio:
