@@ -1,3 +1,5 @@
+import { tokensFor } from "monolite-di";
+
 import {
   entityVars,
   isSchematic,
@@ -79,6 +81,41 @@ describe("overVars", () => {
       overPluralCamel: "products",
       overPluralUpper: "PRODUCTS",
       overPkProperty: "pkProduct",
+    });
+  });
+});
+
+/**
+ * A generated tokens file is now `tokensFor("<Entity>")`, so the names the
+ * container registers come from `monolite-di` while the names the generator
+ * reasons with come from `entityVars`. The CLI depends on no package of this
+ * repository, so the rule is written twice — and this is what stops the two
+ * copies from drifting into a module that fails to resolve at start-up.
+ */
+describe("the tokens a generated module registers", () => {
+  const NAMES = [
+    "product",
+    "invoice-line",
+    "category",
+    "day",
+    "address",
+    "box",
+    "buzz",
+    "branch",
+    "wish",
+    "InvoiceLine",
+    "user_role",
+    "status",
+  ];
+
+  it.each(NAMES)("agree with the generator for %s", (name) => {
+    const vars = entityVars(name);
+
+    expect(tokensFor(vars.entityName)).toEqual({
+      store: vars.storeToken,
+      bll: vars.bllToken,
+      repository: vars.repositoryToken,
+      controller: vars.controllerToken,
     });
   });
 });
