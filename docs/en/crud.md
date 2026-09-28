@@ -287,18 +287,11 @@ through controller → BLL → repository would put a parameter in every signatu
 for the benefit of the few methods that use it, so the transaction is **ambient**:
 
 ```ts
-export class AppointmentsBLL
-  extends CrudBLL<IAppointment, AppointmentDto>
-  implements TransactionalHost
-{
+export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
   constructor(
-    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>,
-    // The two members the decorator looks for on `this`. Injected rather than
-    // inherited: a BLL already extending `CrudBLL` cannot extend
-    // `TransactionalBLL` as well, and `implements TransactionalHost` is what
-    // makes a missing one a compile error instead of a rejected promise.
-    @inject(TOKENS.IUnitOfWork) readonly unitOfWork: IUnitOfWork,
-    @inject(TOKENS.ITransactionContext) readonly transactions: ITransactionContext
+    // The store carries the unit of work it joins, so this is the whole
+    // constructor: no second base class, nothing else to inject.
+    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>
   ) {
     super(repository, appointmentMapper);
   }
@@ -306,7 +299,7 @@ export class AppointmentsBLL
   @Transactional()
   public async book(input: BookInput): Promise<AppointmentDto> {
     // Locking the branch row is the first statement on purpose — see below.
-    await lockRow(this.transactions, ENTITY.BRANCHES, input.fkBranch);
+    await lockRow(this, ENTITY.BRANCHES, input.fkBranch);
 
     const clash = await this.repository.firstOrDefault({
       where: { fkBranch: input.fkBranch, startsAt: input.startsAt },
@@ -327,22 +320,65 @@ export class AppointmentsBLL
 layers down that were never told about it — resolves its store through that
 context and joins the same transaction. Nothing is passed.
 
-**Both members, not one.** The decorator reads `this.unitOfWork` to open the
-transaction and `this.transactions` to tell whether one is already open; a class
-that supplies one of the two is rejected at the first call, naming which is
-missing. Extending `TransactionalBLL` supplies them, and a service that already
-extends `CrudBLL` — which TypeScript will not let extend a second base class —
-declares them itself, as above. `CrudBLL` carries no transaction seam of its
-own yet, so today that declaration is the shape for a BLL that needs one
-([#33](https://github.com/Tanke6003/monolite/issues/33) proposes giving it one).
+**`CrudBLL` carries the seam.** The decorator needs a unit of work to open the
+transaction and a transaction context to tell whether one is already open, and a
+`CrudBLL` subclass has both without asking: they come with the store it was
+handed. That resolution is what `registerPersistence` wires when it is given a
+`transactions` context — every store it binds joins whatever transaction is open,
+falls back to the pool when there is none, and carries the unit of work it joins.
+Generated projects pass it, so it is already true of yours.
 
-That resolution is what `registerPersistence` wires when it is given a
-`transactions` context — every store it binds joins whatever transaction is open
-and falls back to the pool when there is none. Generated projects pass it, so it
-is already true of yours. A composition root written by hand that omits it gets
-stores that write on their own connection regardless of the decorator, which is
-the quiet kind of wrong: three auto-commits look exactly like one transaction
-until something in the middle throws.
+A composition root written by hand that omits the context gets stores that write
+on their own connection, and no seam: `@Transactional()` then rejects at the
+first call, naming what is missing, rather than running the method on
+auto-commit — three auto-commits look exactly like one transaction until
+something in the middle throws. The same goes for the in-memory driver in a unit
+test built over a bare store.
+
+A class can still supply the two members itself — extend `TransactionalBLL`, or
+inject `IUnitOfWork` and `ITransactionContext` and keep them as `unitOfWork` and
+`transactions`, with `implements TransactionalHost` to make a missing one a
+compile error. When it does, its own members are the ones used. That was the
+only shape for a `CrudBLL` subclass before
+[#33](https://github.com/Tanke6003/monolite/issues/33), and it keeps compiling
+unchanged.
+
+**The default writes are atomic.** `create`, `update` and `softDelete` in
+`CrudBLL` run in a transaction whenever there is a unit of work to open one with.
+Each is one call and several statements underneath — the row, its change-log
+entry, the read back — and the cost of the default is a transaction around a
+single insert, where the cost of the opposite default was every generated module
+being silently non-atomic. Called from inside a `@Transactional()` override,
+`super.create(...)` joins the override's transaction, so this is enough to keep a
+check and the insert together:
+
+```ts
+export class PaymentsBLL extends CrudBLL<IPayment, PaymentDto> {
+  @Transactional()
+  override async create(dto: Partial<PaymentDto>): Promise<PaymentDto> {
+    await this.assertConsistent(dto);
+    return super.create(dto);
+  }
+
+  private async assertConsistent(dto: Partial<PaymentDto>): Promise<void> {
+    // The reads against the other tables; a throw here rolls the insert back.
+  }
+}
+```
+
+For the part of a method rather than all of it — a method that reads first and
+only then decides what to write — `this.tx(() => ...)` runs the callback in a
+transaction, joining one already open, and refuses without a unit of work just
+as the decorator does. It is also the one place the default writes go through,
+so a module that wants them on auto-commit after all (a hot insert path, or
+MongoDB without a replica set, where there is no transaction to open) overrides
+it:
+
+```ts
+protected override tx<R>(fn: () => Promise<R>): Promise<R> {
+  return fn();
+}
+```
 
 Three things about it that are decisions rather than accidents:
 
@@ -357,8 +393,9 @@ inside a decorator, which is much harder to trace back.
 
 **`lockRow` is a standalone function, not a base-class method.** A BLL that
 needs a row lock may already extend `CrudBLL`, and TypeScript has no multiple
-inheritance. Passing the transaction context explicitly costs one argument and
-avoids forcing an inheritance chain on anyone.
+inheritance. It takes the service itself — `lockRow(this, ...)` finds the context
+the way the decorator did — or the transaction context explicitly, which costs
+one argument and avoids forcing an inheritance chain on anyone.
 
 ### Why the lock goes first
 
@@ -380,14 +417,15 @@ Generated projects ship that index in every engine's schema.
 | --- | --- |
 | `list(options)` | Paginated read; `options.withDeleted` includes soft-deleted rows, `options.query` feeds `buildWhere` |
 | `getOne(id)` | `null` when absent — the controller turns that into a 404, so the BLL stays HTTP-free |
-| `create(input)` | Insert, then map to the DTO |
-| `update(id, input)` | |
-| `softDelete(id)` | |
+| `create(input)` | Insert — in a transaction when there is a unit of work — then map to the DTO |
+| `update(id, input)` | In a transaction when there is a unit of work |
+| `softDelete(id)` | In a transaction when there is a unit of work |
 | `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>`; by default, the declared `filters` |
 | `filters` | The listing's filters, declared at construction with `filtersFor()` |
 | `resolveQuery(query)` | Protected hook, async: completes the query before `buildWhere` reads it |
 | `includes` | Relations resolved on every verb, declared at construction with `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |
+| `tx(fn)` | Protected: runs `fn` in a transaction, joining one already open; overridden to `return fn()`, it puts the default writes back on auto-commit |
 
 The BLL knows nothing about HTTP: it returns `null`, not a 404, and throws
 `AppError`, not a response. That is what lets the same BLL back a CLI command,

@@ -295,18 +295,11 @@ firmas en beneficio de los pocos métodos que lo usan, así que la transacción 
 **ambiental**:
 
 ```ts
-export class AppointmentsBLL
-  extends CrudBLL<IAppointment, AppointmentDto>
-  implements TransactionalHost
-{
+export class AppointmentsBLL extends CrudBLL<IAppointment, AppointmentDto> {
   constructor(
-    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>,
-    // Los dos miembros que el decorador busca en `this`. Inyectados, no
-    // heredados: una BLL que ya extiende `CrudBLL` no puede extender además
-    // `TransactionalBLL`, e `implements TransactionalHost` es lo que convierte
-    // el que falte uno en un error de compilación y no en una promesa rechazada.
-    @inject(TOKENS.IUnitOfWork) readonly unitOfWork: IUnitOfWork,
-    @inject(TOKENS.ITransactionContext) readonly transactions: ITransactionContext
+    // El almacén trae la unidad de trabajo a la que se suma, así que este es
+    // todo el constructor: sin segunda clase base, sin nada más que inyectar.
+    @inject(APPOINTMENT_TOKENS.store) repository: IGenericRepository<IAppointment>
   ) {
     super(repository, appointmentMapper);
   }
@@ -314,7 +307,7 @@ export class AppointmentsBLL
   @Transactional()
   public async book(input: BookInput): Promise<AppointmentDto> {
     // Bloquear la fila de la sucursal es la primera sentencia a propósito — ver abajo.
-    await lockRow(this.transactions, ENTITY.BRANCHES, input.fkBranch);
+    await lockRow(this, ENTITY.BRANCHES, input.fkBranch);
 
     const clash = await this.repository.firstOrDefault({
       where: { fkBranch: input.fkBranch, startsAt: input.startsAt },
@@ -335,22 +328,67 @@ export class AppointmentsBLL
 están varias capas más abajo y a los que nunca se les dijo nada— resuelve su
 almacén a través de ese contexto y se suma a la misma transacción. No se pasa nada.
 
-**Los dos miembros, no uno.** El decorador lee `this.unitOfWork` para abrir la
-transacción y `this.transactions` para saber si ya hay una abierta; una clase que
-aporte uno de los dos se rechaza en la primera llamada, diciendo cuál falta.
-Extender `TransactionalBLL` los aporta, y un servicio que ya extiende `CrudBLL`
-—que TypeScript no deja extender una segunda clase base— los declara él mismo,
-como arriba. `CrudBLL` todavía no trae una costura de transacción propia, así que
-hoy esa declaración es la forma para una BLL que la necesita (la
-[#33](https://github.com/Tanke6003/monolite/issues/33) propone dársela).
+**`CrudBLL` trae la costura.** El decorador necesita una unidad de trabajo para
+abrir la transacción y un contexto de transacción para saber si ya hay una
+abierta, y una subclase de `CrudBLL` tiene las dos sin pedirlas: vienen con el
+almacén que recibió. Esa resolución es lo que cablea `registerPersistence` cuando
+recibe un contexto `transactions`: cada almacén que registra se suma a la
+transacción que esté abierta, usa el pool cuando no hay ninguna y lleva consigo la
+unidad de trabajo a la que se suma. Los proyectos generados lo pasan, así que en
+el tuyo ya es cierto.
 
-Esa resolución es lo que cablea `registerPersistence` cuando recibe un contexto
-`transactions`: cada almacén que registra se suma a la transacción que esté
-abierta y usa el pool cuando no hay ninguna. Los proyectos generados lo pasan, así
-que en el tuyo ya es cierto. Una raíz de composición escrita a mano que lo omita
-obtiene almacenes que escriben por su propia conexión pase lo que pase con el
-decorador, que es la forma silenciosa de estar mal: tres auto-commits se ven
-exactamente igual que una transacción hasta que algo falla en medio.
+Una raíz de composición escrita a mano que omita el contexto obtiene almacenes que
+escriben por su propia conexión, y ninguna costura: `@Transactional()` rechaza
+entonces en la primera llamada, diciendo qué falta, en vez de ejecutar el método
+con auto-commit — tres auto-commits se ven exactamente igual que una transacción
+hasta que algo falla en medio. Lo mismo vale para el driver de memoria en una
+prueba unitaria construida sobre un almacén pelado.
+
+Una clase puede seguir aportando los dos miembros ella misma —extender
+`TransactionalBLL`, o inyectar `IUnitOfWork` e `ITransactionContext` y guardarlos
+como `unitOfWork` y `transactions`, con `implements TransactionalHost` para que el
+que falte sea un error de compilación—. Si lo hace, se usan sus propios miembros.
+Esa era la única forma para una subclase de `CrudBLL` antes de la
+[#33](https://github.com/Tanke6003/monolite/issues/33), y sigue compilando sin
+cambios.
+
+**Las escrituras por defecto son atómicas.** `create`, `update` y `softDelete` de
+`CrudBLL` se ejecutan en una transacción siempre que haya una unidad de trabajo
+con la que abrirla. Cada una es una llamada y varias sentencias por debajo —la
+fila, su entrada en el registro de cambios, la relectura—, y el coste del defecto
+es una transacción alrededor de un solo insert, cuando el coste del defecto
+contrario era que todo módulo generado fuera no atómico sin que nadie lo notara.
+Llamado desde dentro de una sobrescritura `@Transactional()`, `super.create(...)`
+se suma a su transacción, así que esto basta para mantener juntos una
+comprobación y el insert:
+
+```ts
+export class PaymentsBLL extends CrudBLL<IPayment, PaymentDto> {
+  @Transactional()
+  override async create(dto: Partial<PaymentDto>): Promise<PaymentDto> {
+    await this.assertConsistent(dto);
+    return super.create(dto);
+  }
+
+  private async assertConsistent(dto: Partial<PaymentDto>): Promise<void> {
+    // Las lecturas contra las otras tablas; un throw aquí deshace el insert.
+  }
+}
+```
+
+Para una parte del método y no todo —un método que primero lee y sólo después
+decide qué escribir—, `this.tx(() => ...)` ejecuta el callback en una transacción,
+sumándose a una ya abierta, y se niega sin unidad de trabajo igual que el
+decorador. Es también el único punto por el que pasan las escrituras por defecto,
+así que un módulo que las quiera con auto-commit después de todo (una ruta de
+inserción caliente, o MongoDB sin replica set, donde no hay transacción que abrir)
+lo sobrescribe:
+
+```ts
+protected override tx<R>(fn: () => Promise<R>): Promise<R> {
+  return fn();
+}
+```
 
 Tres cosas al respecto que son decisiones y no accidentes:
 
@@ -365,8 +403,10 @@ dentro de un decorador, que es mucho más difícil de rastrear.
 
 **`lockRow` es una función suelta, no un método de la clase base.** Una BLL que
 necesite un bloqueo de fila puede ya estar extendiendo `CrudBLL`, y TypeScript
-no tiene herencia múltiple. Pasar el contexto de transacción explícitamente cuesta
-un argumento y evita imponerle una cadena de herencia a nadie.
+no tiene herencia múltiple. Recibe el propio servicio —`lockRow(this, ...)`
+encuentra el contexto igual que lo encontró el decorador— o el contexto de
+transacción explícitamente, que cuesta un argumento y evita imponerle una cadena
+de herencia a nadie.
 
 ### Por qué el bloqueo va primero
 
@@ -390,14 +430,15 @@ los motores.
 | --- | --- |
 | `list(options)` | Lectura paginada; `options.withDeleted` incluye las filas borradas lógicamente, `options.query` alimenta `buildWhere` |
 | `getOne(id)` | `null` si no está — el controlador lo convierte en un 404, así la BLL se mantiene ajena a HTTP |
-| `create(input)` | Inserta y mapea al DTO |
-| `update(id, input)` | |
-| `softDelete(id)` | |
+| `create(input)` | Inserta —en una transacción si hay unidad de trabajo— y mapea al DTO |
+| `update(id, input)` | En una transacción si hay unidad de trabajo |
+| `softDelete(id)` | En una transacción si hay unidad de trabajo |
 | `buildWhere(query)` | Hook protegido: parámetros de consulta → `WhereFilter<T>`; por defecto, los `filters` declarados |
 | `filters` | Los filtros del listado, declarados al construir con `filtersFor()` |
 | `resolveQuery(query)` | Hook protegido, asíncrono: completa la consulta antes de que `buildWhere` la lea |
 | `includes` | Relaciones resueltas en todos los verbos, declaradas al construir con `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entidad ↔ DTO en un solo sitio |
+| `tx(fn)` | Protegido: ejecuta `fn` en una transacción, sumándose a una ya abierta; sobrescrito a `return fn()`, devuelve las escrituras por defecto al auto-commit |
 
 La BLL no sabe nada de HTTP: devuelve `null`, no un 404, y lanza `AppError`,
 no una respuesta. Eso es lo que permite que la misma BLL respalde un comando

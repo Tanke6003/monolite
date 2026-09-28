@@ -160,7 +160,8 @@ export { MongoConnector } from "./connectors/mongo-connector.js";
 export type { MongoConnectionConfig } from "./connectors/mongo-connector.js";
 
 // ----------------------------------------------------------  transactions  ---
-export { transactionAware } from "./transaction-aware.js";
+export { TRANSACTION_SEAM, transactionAware, transactionSeamOf } from "./transaction-aware.js";
+export type { TransactionSeam } from "./transaction-aware.js";
 
 // ------------------------------------------------------------------  raw  ---
 export { asRawQueryable } from "./contracts/raw-queryable.js";

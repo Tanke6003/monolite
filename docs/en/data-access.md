@@ -407,6 +407,10 @@ resolves from the container — see [`generate task`](cli.md#generate-task).
 
 **Not everything is wrapped in a transaction.** A single statement is already
 atomic and travels with auto-commit; wrapping it would only add a round trip.
+(`CrudBLL`'s default `create`, `update` and `softDelete` are the exception, and
+not a contradiction: each is one call and several statements — the row, its
+change-log entry, the read back — so they do open one when there is a unit of
+work. See [CRUD](./crud.md#transactions).)
 
 A transaction is opened in two cases, and the boundary is the BLL, not the
 repository:
