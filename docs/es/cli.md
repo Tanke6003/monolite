@@ -127,7 +127,8 @@ mi-api/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   el cableado propio del motor
 │   ├── composition/modules.ts        la única lista a la que se añade un módulo
-│   ├── scripts/              db:sql y db:migration, sobre esa misma lista
+│   ├── scripts/              db:sql, db:migration y el runner de tareas
+│   ├── tasks/index.ts        la única lista a la que se añade una tarea
 │   └── presentation/routes.ts           monta todos los controladores decorados
 └── tests/smoke.test.ts       pasa a la primera
 ```
@@ -147,6 +148,7 @@ ya no te diga que te escribas el esquema tú.
 | --- | --- |
 | `npm run db:sql` | `CREATE TABLE` de cada entidad registrada, por dialecto |
 | `npm run db:migration -- <nombre>` | Lo que cambió desde la anterior, como un `.sql` con marca de tiempo |
+| `npm run task <nombre>` | Ejecuta una tarea de `src/tasks/` — ver [`generate task`](#generate-task) |
 
 ```bash
 npm run db:sql -- --out db/schema.sql
@@ -179,6 +181,7 @@ monolite g query revenue --over invoice
 | `controller` | Una subclase de `CrudController` para una BLL existente |
 | `query` | Repositorio + BLL + DTO + controlador, para lo que la API genérica no expresa |
 | `repository` | El almacén de una entidad existente más sus propias consultas, sobre `executeRaw` |
+| `task` | Un trabajo que se ejecuta por nombre — lo que invoca un timer, cron o un CronJob |
 
 ### `generate query`
 
@@ -282,6 +285,109 @@ Lo que queda para ti es una línea en la BLL: inyectar
 `<ENTIDAD>_TOKENS.repository` donde hoy inyecta `<ENTIDAD>_TOKENS.store`, y
 ensanchar su tipo a la interfaz nueva. Esa sí es una decisión —puede que la BLL
 quiera el almacén pelado— así que se imprime en vez de hacerse.
+
+### `generate task`
+
+Un backend no es sólo un servidor. Tiene el trabajo que adelanta los cargos
+vencidos a las 3 de la mañana, el que manda los recordatorios, el que revisa un
+buzón — y cada uno solía ser un script que construía el contenedor por su
+cuenta, resolvía lo que necesitaba, se ejecutaba y salía. Esa parte es idéntica
+en todos y fácil de hacer mal, así que se escribe una vez:
+
+```bash
+monolite g task advance-charges
+```
+
+```
+src/tasks/advance-charges.task.ts    la tarea
+src/tasks/index.ts                   listada aquí, encima de // monolite:tasks
+```
+
+```ts
+export default defineTask({
+  name: "advance-charges",
+  async run({ container, logger }) {
+    const charges = container.resolve<ChargeBLL>(CHARGE_TOKENS.bll);
+    const advanced = await charges.advanceDue();
+    logger.info(`${advanced} charges advanced`);
+  },
+});
+```
+
+```bash
+npm run task advance-charges                 # en desarrollo, con tsx
+node dist/scripts/task.js advance-charges    # tras un build: lo que ejecuta un timer
+```
+
+Todas las tareas pasan por un único runner, `src/scripts/task.ts`, sobre
+`runTaskByName` de `monolite-di`. Lo que añade es lo que un script escrito a mano
+olvida:
+
+| Salida | Cuándo |
+| --- | --- |
+| `0` | El cuerpo terminó y las conexiones se cerraron limpiamente |
+| `1` | El cuerpo lanzó o rechazó, no se pudo llegar a la base de datos, o el pool no se cerró |
+| `64` | No hay tarea con ese nombre; se listan las que hay |
+| `75` | Una ejecución anterior aún tiene el candado, así que ésta no arrancó |
+
+- **Una salida distinta de cero al fallar.** El cuerpo se espera con `await`, así
+  que una promesa rechazada es una ejecución fallida y no un rechazo sin manejar
+  que puede salir con `0`.
+- **Una guarda contra solapamientos.** Una ejecución que encuentra la anterior
+  aún en marcha registra quién tiene el candado y desde cuándo, y sale con `75`
+  — `EX_TEMPFAIL`, distinto de un fallo, para que `systemctl status` distinga
+  "se rompió" de "seguía ejecutándose". El candado es un fichero con el pid de la
+  ejecución: una ejecución matada con `SIGKILL` lo deja atrás, y la siguiente ve
+  que el proceso ya no existe y se lo queda — igual que cuando el pid es el suyo
+  pero nunca tomó el candado, que es lo que encuentra un contenedor reiniciado
+  como PID 1.
+- **Una línea de log en cada extremo**, con el nombre de la tarea y cuánto tardó,
+  por el mismo logger en el que escribe el servidor.
+- **Las conexiones**, comprobadas antes de ejecutar el cuerpo y cerradas después,
+  terminara como terminara.
+
+El candado vive en el directorio temporal del sistema, con el nombre de
+`SERVICE_NAME` y de la tarea; `TASK_LOCK_DIR` lo mueve. Protege **un host**: dos
+réplicas en dos máquinas tienen cada una el suyo. Un CronJob de Kubernetes
+quiere además `concurrencyPolicy: Forbid`, y un trabajo que no deba ejecutarse
+dos veces en ningún sitio necesita su candado en la base de datos en la que
+escribe.
+
+**La planificación se queda fuera, a propósito.** Un timer de systemd, una
+entrada de cron o un CronJob ya saben ejecutar un comando a las 3 de la mañana,
+ponerse al día tras una caída e informar de una salida distinta de cero; tener
+un planificador propio significaría tener un proceso que debe seguir vivo. Lo que
+el toolkit asume es lo que se planifica — una tarea que es seguro invocar. Un
+timer para la tarea de arriba:
+
+```ini
+# /etc/systemd/system/advance-charges.service
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/billing-api
+EnvironmentFile=/srv/billing-api/.env
+ExecStart=/usr/bin/node dist/scripts/task.js advance-charges
+
+# /etc/systemd/system/advance-charges.timer
+[Timer]
+OnCalendar=*-*-* 03:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Una tarea que siembra datos de referencia es la candidata natural para ejecutar
+tras cada despliegue; ver [`seed`](data-access.md#sembrar-datos-de-referencia).
+
+Como con los módulos, la entrada va encima de un marcador — `// monolite:tasks`
+en `src/tasks/index.ts` — y sin él, o con `--no-wire`, se imprimen las dos líneas
+en su lugar. Un fichero de tarea que nada lista es una tarea que nadie puede
+invocar.
+
+Los proyectos generados antes de esta versión no tienen runner. Basta con copiar
+`src/scripts/task.ts` y `src/tasks/index.ts` de un proyecto recién generado y
+añadir `"task": "tsx src/scripts/task.ts"` al `package.json`.
 
 ### Cableado
 

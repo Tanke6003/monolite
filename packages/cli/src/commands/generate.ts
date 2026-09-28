@@ -17,7 +17,8 @@ import { color } from "../util/colors.js";
 import { FileWriter } from "../util/files.js";
 import { created, fail, hint, info, line, title, warn } from "../util/log.js";
 import type { RenderContext } from "../util/render.js";
-import { wireBinding, wireModule } from "../util/wiring.js";
+import { toKebabCase } from "../util/naming.js";
+import { taskLines, wireBinding, wireModule, wireTask } from "../util/wiring.js";
 
 const OPTIONS = {
   force: { type: "boolean" },
@@ -95,6 +96,15 @@ export function generateCommand(argv: string[]): number {
     return 1;
   }
 
+  // The same rule `defineTask` enforces when the file is imported, checked here
+  // so the mistake is reported by the command that made it rather than by the
+  // first run of a task that can never load.
+  if (schematic === "task" && !TASK_NAME.test(toKebabCase(entityName))) {
+    fail(`"${entityName}" cannot name a task`);
+    hint("a task is invoked by name from a shell: letters, digits and dashes, starting with a letter");
+    return 1;
+  }
+
   const over = parsed.values.over;
 
   if (NEEDS_OVER.includes(schematic) && !over) {
@@ -110,6 +120,9 @@ export function generateCommand(argv: string[]): number {
     over,
   });
 }
+
+/** Mirrors the check in `monolite-di`'s `defineTask`, which this package cannot import. */
+const TASK_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 interface EmitOptions {
   force: boolean;
@@ -165,7 +178,35 @@ function emit(
     reportBinding(project.root, project.sourceRoot, name, options.wire);
   }
 
+  if (schematic === "task") {
+    reportTask(project.root, project.sourceRoot, name, options.wire);
+  }
+
   return 0;
+}
+
+/**
+ * Puts the task in the list the runner looks names up in, and says how to run
+ * it — which is the question anybody who just generated one asks next.
+ */
+function reportTask(root: string, sourceRoot: string, name: string, wire: boolean): void {
+  const kebab = toKebabCase(name);
+  const wiring = wire ? wireTask(root, sourceRoot, name) : null;
+
+  if (wiring?.wired) {
+    info(`Listed in ${color.bold(wiring.file)}:`);
+    for (const inserted of wiring.lines) line(`    ${inserted}`);
+  } else {
+    const reason = wiring?.reason ? ` (${wiring.reason})` : "";
+    const file = wiring?.file ?? path.join(sourceRoot, "tasks", "index.ts");
+
+    info(`Two lines left, in ${color.bold(file)}${reason}:`);
+    for (const inserted of wiring?.lines ?? taskLines(name)) line(`    ${inserted}`);
+  }
+
+  line();
+  hint(`run it with \`npm run task ${kebab}\`, or \`node dist/scripts/task.js ${kebab}\` after a build`);
+  hint("schedule it outside — a systemd timer, cron or a CronJob; it exits non-zero when it fails");
 }
 
 /**

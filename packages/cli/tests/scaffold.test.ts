@@ -387,6 +387,18 @@ describe("the projects `monolite new` writes", () => {
         // half of the escape hatch: a query the generic API does not express,
         // on an entity this project owns.
         generateInto(target, "repository", "invoice");
+        // Two tasks: one exactly as generated, and one whose body is made to
+        // throw — the only hand edit in this block, because "fails when its
+        // body throws" cannot be checked on a body that does not.
+        generateInto(target, "task", "advance-charges");
+        generateInto(target, "task", "explode");
+        const explode = path.join(target, "src", "tasks", "explode.task.ts");
+        fs.writeFileSync(
+          explode,
+          fs
+            .readFileSync(explode, "utf8")
+            .replace('logger.info("explode: nothing to do yet");', 'throw new Error("boom");')
+        );
         emitJavaScript(target);
 
         // The generated logger writes a JSON line per request, to stdout and to
@@ -663,6 +675,102 @@ describe("the projects `monolite new` writes", () => {
         // Two rows are seeded in memory, and the fallback path is the one this
         // driver takes — which is the branch a generated suite actually runs.
         await expect(repository.countAll()).resolves.toBe(2);
+      });
+
+      /**
+       * The "compiles" check above ran before any generator did, and emitting
+       * does not stop on a type error. So the tasks as the generator left them
+       * —and the list it wired them into— are checked again here: a generated
+       * task that does not type-check would otherwise reach the assertions below
+       * as working JavaScript.
+       */
+      it("compiles the tasks the generator wrote and listed", () => {
+        const tasks = filesOf(path.join(target, "src", "tasks"), ".ts");
+        expect(tasks.map((file) => path.basename(file)).sort()).toEqual([
+          "advance-charges.task.ts",
+          "explode.task.ts",
+          "index.ts",
+        ]);
+
+        const runner = path.join(target, "src", "scripts", "task.ts");
+        const own = [...tasks, runner].map((file) => path.relative(SCRATCH, file));
+
+        // Only what the task generator is answerable for. The runner imports the
+        // container and with it every module, and a complaint about one of
+        // those belongs to that generator's own check, not to this one.
+        expect(
+          typeErrors([...tasks, runner]).filter((error) => own.some((file) => error.startsWith(file)))
+        ).toEqual([]);
+      });
+
+      describe("the task runner", () => {
+        type Main = (argv: string[]) => Promise<number>;
+        let main: Main;
+        const lockDir = path.join(SCRATCH, "task-locks");
+        const saved = { lockDir: process.env.TASK_LOCK_DIR, service: process.env.SERVICE_NAME };
+
+        beforeAll(() => {
+          // A lock directory of this run's own, so a developer's real `task`
+          // run on the same machine can neither block this one nor be blocked.
+          process.env.TASK_LOCK_DIR = lockDir;
+          process.env.SERVICE_NAME = "scaffold-test";
+
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          ({ main } = require(path.join(target, "dist", "scripts", "task.js")) as { main: Main });
+        });
+
+        afterAll(() => {
+          for (const [name, value] of [
+            ["TASK_LOCK_DIR", saved.lockDir],
+            ["SERVICE_NAME", saved.service],
+          ] as const) {
+            if (value === undefined) delete process.env[name];
+            else process.env[name] = value;
+          }
+        });
+
+        /**
+         * The first check of the issue, on the file the generator wrote with
+         * nothing edited: listed by the generator, found by name, run against
+         * the in-memory driver, and a clean exit.
+         */
+        it("runs a generated task against the in-memory driver and answers 0", async () => {
+          await expect(main(["advance-charges"])).resolves.toBe(0);
+        });
+
+        /**
+         * And the half a hand-written script most often gets wrong: a body
+         * that throws is a non-zero exit, not an unhandled rejection that may
+         * leave with 0.
+         */
+        it("answers non-zero when the task's body throws", async () => {
+          await expect(main(["explode"])).resolves.toBe(1);
+        });
+
+        /**
+         * The overlap guard, end to end: a lock naming a live process is a
+         * previous run still going, and the new one does not start. The parent
+         * process, not this one: a lock naming this process's own pid that it
+         * never took is the stale lock of a container restarted as PID 1.
+         */
+        it("refuses to start while a previous run holds the lock, with a code of its own", async () => {
+          fs.mkdirSync(lockDir, { recursive: true });
+          const lock = path.join(lockDir, "scaffold-test.advance-charges.task.lock");
+          fs.writeFileSync(
+            lock,
+            JSON.stringify({ pid: process.ppid, startedAt: new Date().toISOString(), token: "held" })
+          );
+
+          try {
+            await expect(main(["advance-charges"])).resolves.toBe(75);
+          } finally {
+            fs.rmSync(lock, { force: true });
+          }
+        });
+
+        it("answers the usage code for a task that does not exist", async () => {
+          await expect(main(["no-such-task"])).resolves.toBe(64);
+        });
       });
 
       it("serves the example module, seeded", async () => {

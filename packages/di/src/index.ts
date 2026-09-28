@@ -70,3 +70,13 @@ export type { Plugins, PluginsOptions } from "./modules/plugins.module.js";
 
 export { registerPersistence } from "./modules/persistence.module.js";
 export type { PersistenceModuleOptions } from "./modules/persistence.module.js";
+
+// ----------------------------------------------------------------  tasks  ---
+export { defineTask, runTask, runTaskByName, TASK_EXIT } from "./task.js";
+export type {
+  RunTaskByNameOptions,
+  RunTaskOptions,
+  TaskContext,
+  TaskDefinition,
+  TaskExitCode,
+} from "./task.js";

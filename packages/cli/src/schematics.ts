@@ -11,6 +11,7 @@ export const SCHEMATICS = [
   "controller",
   "query",
   "repository",
+  "task",
 ] as const;
 
 /**
@@ -48,6 +49,9 @@ const PARTS: Record<Schematic, string[]> = {
   // nothing is a layer for the sake of having one. This is generated the day a
   // module needs a query the generic API does not express.
   repository: ["repository"],
+  // Not a module at all: a task has no table, no route and no bindings of its
+  // own. It is one file under `tasks/` and one line in the list there.
+  task: ["task"],
 };
 
 /** The schematics that need `--over`; see `overVars`. */

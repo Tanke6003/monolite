@@ -133,6 +133,7 @@ monolite g entity payment-method
 monolite g bll invoice --force
 monolite g query revenue --over invoice
 monolite g repository invoice
+monolite g task advance-charges
 ```
 
 | Schematic | Files written (under the project's `sourceRoot`) |
@@ -143,6 +144,7 @@ monolite g repository invoice
 | `module` | all of the above, plus `composition/modules/<name>.module.ts` |
 | `query` | the four above under one name, for an answer the generic API cannot express: `infrastructure/persistence/<name>.repository.ts`, `application/dtos/<name>.dto.ts`, `application/bll/<name>.bll.ts`, `presentation/controllers/<name>.controller.ts`, plus its tokens and a module descriptor with **no** entity registration. Needs `--over <entity>` |
 | `repository` | `infrastructure/persistence/<name>.repository.ts` — an existing entity's store plus its own queries, on `executeRaw` |
+| `task` | `tasks/<name>.task.ts`, listed in `tasks/index.ts` — a job run by name with `npm run task <name>`, for a timer or cron to invoke. The runner gives it the container, a non-zero exit on failure and a refusal to start while the previous run is still going |
 
 `module` is a composition of the other three rather than a fourth copy of them, which is
 what guarantees that `generate module invoice` and `generate entity invoice` produce the

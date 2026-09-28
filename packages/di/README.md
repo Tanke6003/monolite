@@ -88,6 +88,14 @@ dependency.
 | `MonoliteModule<T>`, `AnyMonoliteModule` | A feature module as one value: its entity registration, its bindings and its controller. One line in one list instead of three edits in three files, which is also what makes it something a generator can insert. |
 | `entitiesOf` | The registrations the persistence layer wants, in the order they were listed. |
 
+### Tasks
+
+| Export | What it is |
+| --- | --- |
+| `defineTask`, `TaskDefinition`, `TaskContext` | A job a timer, cron or a CronJob invokes by name. The body receives the container and the logger; throwing is failing. |
+| `runTask`, `runTaskByName`, `RunTaskOptions`, `RunTaskByNameOptions` | Run one: take the lock, warm the root up, run and time the body, shut the root down, release the lock — and answer the exit code instead of calling `process.exit`. A run that finds the previous one still holding the lock does not start. |
+| `TASK_EXIT`, `TaskExitCode` | `0` done, `1` failed, `64` no such task, `75` already running. A generated project runs them through `npm run task <name>`; see [the CLI reference](../../docs/en/cli.md#generate-task). |
+
 `registration` is optional. A module that owns no table — a report reading
 entities that already exist, a search across several, a dashboard, a webhook
 receiver — leaves it off and joins the same list, instead of needing a second

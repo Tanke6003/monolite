@@ -126,7 +126,8 @@ my-api/
 │   │   ├── logger.ts
 │   │   └── persistence/data-source.ts   the engine-specific wiring
 │   ├── composition/modules.ts        the one list a module is added to
-│   ├── scripts/              db:sql and db:migration, over that same list
+│   ├── scripts/              db:sql, db:migration and the task runner
+│   ├── tasks/index.ts        the one list a task is added to
 │   └── presentation/routes.ts           mounts every decorated controller
 └── tests/smoke.test.ts       passes on the first run
 ```
@@ -146,6 +147,7 @@ scaffold no longer tells you to go and write the schema yourself.
 | --- | --- |
 | `npm run db:sql` | `CREATE TABLE` for every registered entity, per dialect |
 | `npm run db:migration -- <name>` | What changed since the last one, as a timestamped `.sql` |
+| `npm run task <name>` | Runs one task from `src/tasks/` — see [`generate task`](#generate-task) |
 
 ```bash
 npm run db:sql -- --out db/schema.sql
@@ -178,6 +180,7 @@ monolite g query revenue --over invoice
 | `controller` | A `CrudController` subclass for an existing BLL |
 | `query` | Repository + BLL + DTO + controller, for what the generic API cannot express |
 | `repository` | An existing entity's store plus its own queries, on `executeRaw` |
+| `task` | A job run by name — the thing a timer, cron or a CronJob invokes |
 
 ### `generate query`
 
@@ -280,6 +283,104 @@ What is left to you is one line in the BLL: inject
 `<ENTITY>_TOKENS.repository` where it injects `<ENTITY>_TOKENS.store` today,
 and widen its type to the new interface. That one is a decision — the BLL may
 well want the plain store — so it is printed rather than made.
+
+### `generate task`
+
+A backend is not only a server. It has the job that advances overdue charges at
+3am, the one that sends the reminders, the one that checks a mailbox — and each
+of them used to be a script that built the container itself, resolved what it
+needed, ran and exited. That part is identical in all of them and easy to get
+wrong, so it is written once:
+
+```bash
+monolite g task advance-charges
+```
+
+```
+src/tasks/advance-charges.task.ts    the task
+src/tasks/index.ts                   listed here, above // monolite:tasks
+```
+
+```ts
+export default defineTask({
+  name: "advance-charges",
+  async run({ container, logger }) {
+    const charges = container.resolve<ChargeBLL>(CHARGE_TOKENS.bll);
+    const advanced = await charges.advanceDue();
+    logger.info(`${advanced} charges advanced`);
+  },
+});
+```
+
+```bash
+npm run task advance-charges                 # in development, through tsx
+node dist/scripts/task.js advance-charges    # after a build: what a timer runs
+```
+
+Every task goes through one runner, `src/scripts/task.ts`, on `runTaskByName`
+from `monolite-di`. What it adds is what a hand-written script forgets:
+
+| Exit | When |
+| --- | --- |
+| `0` | The body resolved and the connections closed cleanly |
+| `1` | The body threw or rejected, the database could not be reached, or the pool would not close |
+| `64` | No task by that name; the tasks there are are listed |
+| `75` | A previous run still holds the lock, so this one did not start |
+
+- **A non-zero exit on failure.** The body is awaited, so a rejected promise is
+  a failed run and not an unhandled rejection that may leave with `0`.
+- **An overlap guard.** A run that finds the previous one still going logs who
+  holds the lock and since when, and exits `75` — `EX_TEMPFAIL`, distinct from a
+  failure, so `systemctl status` tells "it broke" from "it was still running".
+  The lock is a file holding the run's pid: a run killed by `SIGKILL` leaves it
+  behind, and the next run sees the process is gone and takes it over — as it
+  does when the pid is its own but it never took the lock, which is what a
+  container restarted as PID 1 finds.
+- **One log line at each end**, with the task's name and how long it took,
+  through the same logger the server writes to.
+- **The connections**, checked before the body runs and closed after it,
+  whichever way it ended.
+
+The lock lives in the system's temporary directory, named after `SERVICE_NAME`
+and the task; `TASK_LOCK_DIR` moves it. It guards **one host**: two replicas on
+two machines each hold their own. A Kubernetes CronJob wants
+`concurrencyPolicy: Forbid` on top, and a job that must never run twice anywhere
+needs its lock in the database it writes to.
+
+**Scheduling stays outside, on purpose.** A systemd timer, a cron entry or a
+CronJob already knows how to run a command at 3am, catch up after downtime and
+report a non-zero exit; owning a scheduler would mean owning a process that has
+to stay up. What the toolkit owns is the thing being scheduled — a task that is
+safe to invoke. A timer for the task above:
+
+```ini
+# /etc/systemd/system/advance-charges.service
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/billing-api
+EnvironmentFile=/srv/billing-api/.env
+ExecStart=/usr/bin/node dist/scripts/task.js advance-charges
+
+# /etc/systemd/system/advance-charges.timer
+[Timer]
+OnCalendar=*-*-* 03:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+A task that seeds reference data is the natural one to run after every deploy;
+see [`seed`](data-access.md#seeding-reference-data).
+
+Like modules, the entry goes above a marker — `// monolite:tasks` in
+`src/tasks/index.ts` — and without it, or with `--no-wire`, the two lines are
+printed instead. A task file nothing lists is a task nobody can invoke.
+
+Projects generated before this version have no runner. Copying
+`src/scripts/task.ts` and `src/tasks/index.ts` from a freshly generated project
+and adding `"task": "tsx src/scripts/task.ts"` to `package.json` is all there
+is to it.
 
 ### Wiring
 
