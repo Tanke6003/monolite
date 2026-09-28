@@ -70,6 +70,7 @@ on outside production.
 | `__pmRun__ test` | Jest |
 | `__pmRun__ lint` | ESLint over `src` and `tests` |
 | `__pmRun__ typecheck` | `tsc --noEmit` |
+| `__pmRun__ task <name>` | Runs one task from `src/tasks/`: exits non-zero on failure, and refuses to start while the previous run is still going |
 | `__pmRun__ check` | Typecheck, lint and test — what CI should run |
 
 ## Tests
@@ -105,7 +106,8 @@ src/
   infrastructure/
     logger.ts                 ILogger over stdout, dependency free
     persistence/entities/     Entity to table mapping
-  scripts/                    db:sql and db:migration, over that same list
+  scripts/                    db:sql and db:migration over that same list, and the task runner
+  tasks/index.ts              Every task, in one list. `monolite generate task <name>` adds one
   presentation/
     routes.ts                 Mounts every decorated controller
     controllers/              One controller per module

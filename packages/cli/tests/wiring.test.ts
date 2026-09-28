@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { MODULES_MARKER, wireModule } from "../src/util/wiring";
+import { MODULES_MARKER, TASKS_MARKER, wireModule, wireTask } from "../src/util/wiring";
 
 /**
  * The generator editing a file somebody else owns.
@@ -134,5 +134,78 @@ export const MODULES: readonly AnyMonoliteModule[] = [
       'import { PAYMENT_METHOD_MODULE } from "./modules/payment-method.module";',
       "PAYMENT_METHOD_MODULE,",
     ]);
+  });
+});
+
+/**
+ * The same licence, for the list the task runner reads. A task file that is
+ * not in it is a task nobody can invoke, found out from a timer that fails
+ * every night — so the generator lists it, under the same rule: only above its
+ * own marker, and never twice.
+ */
+describe("wireTask", () => {
+  let root: string;
+  let sourceRoot: string;
+
+  const LIST = `import type { TaskDefinition } from "monolite-di";
+
+export const TASKS: readonly TaskDefinition[] = [
+  ${TASKS_MARKER}
+];
+`;
+
+  const file = (): string => path.join(sourceRoot, "tasks", "index.ts");
+
+  const write = (contents: string): void => {
+    fs.mkdirSync(path.dirname(file()), { recursive: true });
+    fs.writeFileSync(file(), contents);
+  };
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "monolite-wiring-"));
+    sourceRoot = path.join(root, "src");
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("imports the task's default export and lists it above the marker", () => {
+    write(LIST);
+
+    const result = wireTask(root, sourceRoot, "advance-charges");
+
+    expect(result.wired).toBe(true);
+    expect(fs.readFileSync(file(), "utf8")).toBe(`import type { TaskDefinition } from "monolite-di";
+import advanceChargesTask from "./advance-charges.task";
+
+export const TASKS: readonly TaskDefinition[] = [
+  advanceChargesTask,
+  ${TASKS_MARKER}
+];
+`);
+  });
+
+  it("is idempotent", () => {
+    write(LIST);
+    wireTask(root, sourceRoot, "notify");
+    const once = fs.readFileSync(file(), "utf8");
+
+    const again = wireTask(root, sourceRoot, "notify");
+
+    expect(again).toMatchObject({ wired: false, reason: "it is already listed" });
+    expect(fs.readFileSync(file(), "utf8")).toBe(once);
+  });
+
+  it("touches nothing when the marker is gone, and still says what to add", () => {
+    const withoutMarker = LIST.replace(`  ${TASKS_MARKER}\n`, "");
+    write(withoutMarker);
+
+    const result = wireTask(root, sourceRoot, "mail check");
+
+    expect(result.wired).toBe(false);
+    expect(result.reason).toContain(TASKS_MARKER);
+    expect(result.lines).toEqual(['import mailCheckTask from "./mail-check.task";', "mailCheckTask,"]);
+    expect(fs.readFileSync(file(), "utf8")).toBe(withoutMarker);
   });
 });

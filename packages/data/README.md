@@ -84,6 +84,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | `AsyncTransactionContext` | `ITransactionContext` on `AsyncLocalStorage`. |
 | `MemoryAuditTrail`, `SqlAuditTrail`, `MongoAuditTrail` | The change log, written through the same scope as the audited operation, so it lands in the same commit. |
 | `BaseModuleRepository` | Optional base class for a per-module repository: forwards the whole contract to the store and logs failures without a try/catch in every method. `monolite generate repository` writes one. |
+| `seed`, `SeedReport`, `SeedChange`, `SeedKey`, `SeedOptions` | Reference data declared once and applied as often as you like: insert what is missing, update what changed, leave what matches, report the counts — matched by a key of your choosing, on any store. A second run writes nothing. See [data access](../../docs/en/data-access.md#seeding-reference-data). |
 | `transactionAware` | Wraps a store so it resolves through `ITransactionContext` on every call — the transaction's when one is open, the pool's otherwise. `registerPersistence` applies it to every store it binds, which is what makes `@Transactional()` true of the repositories a module actually injects. |
 
 ### Schema generation
