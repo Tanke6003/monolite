@@ -1,5 +1,6 @@
 import type { IGenericRepository, OrderByClause, QueryOptions } from "monolite-data";
 import { AppError } from "monolite-core";
+import type { QueryFilters } from "./filter.query.js";
 import type { Include } from "./include.query.js";
 import type { MappingProfile } from "./mapper.js";
 import { hydratedFields } from "./mapper.js";
@@ -56,6 +57,14 @@ export interface CrudBLLOptions<T, TDto> {
    * is refused at construction time.
    */
   includes?: Include<TDto>[];
+  /**
+   * The listing's filters, declared with `filtersFor` next to the query schema.
+   *
+   * They are what the default `buildWhere` answers with, so a module whose
+   * filters are a mapping writes no `buildWhere` at all, and one with a genuine
+   * rule overrides it and reaches these through `super.buildWhere(query)`.
+   */
+  filters?: QueryFilters<T>;
 }
 
 /**
@@ -89,6 +98,8 @@ export abstract class CrudBLL<T extends object, TDto> implements ICrudBLL<TDto> 
 
   private readonly includes: Include<TDto>[];
 
+  private readonly filters?: QueryFilters<T>;
+
   protected constructor(
     protected readonly repository: IGenericRepository<T>,
     protected readonly mapper: EntityMapper<T, TDto>,
@@ -98,6 +109,7 @@ export abstract class CrudBLL<T extends object, TDto> implements ICrudBLL<TDto> 
 
     this.defaultOrderBy = settings.orderBy;
     this.includes = settings.includes ?? [];
+    this.filters = settings.filters;
 
     this.assertEveryHydratedFieldIsFilled();
   }
@@ -150,12 +162,14 @@ export abstract class CrudBLL<T extends object, TDto> implements ICrudBLL<TDto> 
   /**
    * The listing filter, built from the route's query.
    *
-   * By default it does not filter: a flat CRUD is paged and that is that. A
-   * module that offers search overrides **only this** and keeps the rest of the
-   * listing.
+   * By default it applies the `filters` the module declared, and with none it
+   * does not filter: a flat CRUD is paged and that is that. A filter that is a
+   * rule rather than a mapping is the reason to override **only this** — call
+   * `super.buildWhere(query)` to keep the declared ones and combine them with
+   * `allOf` — and the rest of the listing stays the base class's.
    */
-  protected buildWhere(_query: unknown): QueryOptions<T>["where"] {
-    return undefined;
+  protected buildWhere(query: unknown): QueryOptions<T>["where"] {
+    return this.filters?.where(query);
   }
 
   /**

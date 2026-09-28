@@ -121,13 +121,15 @@ where the decorator put it.
 
 The BLL side works the same way: override `create` in your `CrudBLL`
 subclass, or override the `buildWhere` hook to change how `list` translates query
-parameters into a filter.
+parameters into a filter. Filters that are only a mapping — this parameter, that
+column — are better [declared](#filtering-the-listing); the hook is for the ones
+that are a rule. `super.buildWhere(query)` hands back the declared ones, and
+`allOf` combines them with yours:
 
 ```ts
-protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
-  const where = super.buildWhere(query);
+protected override buildWhere(query: ListQuery): WhereFilter<IBranch> | undefined {
   // Only the caller's own branches, whatever else they asked for.
-  return { $and: [where, { fkOwner: Number(this.context.getCurrentUserId()) }] };
+  return allOf(super.buildWhere(query), { fkOwner: Number(this.context.getCurrentUserId()) });
 }
 ```
 
@@ -155,6 +157,68 @@ protected override async resolveQuery(query: unknown): Promise<unknown> {
 The point of the seam is what you keep: paging, the default ordering and
 `withDeleted` all still come from the base class. Overriding `list` to make room
 for the lookup means copying all three, and each copy is a place to drop one.
+
+---
+
+## Filtering the listing
+
+Most of a listing's filters are a mapping: `clientId` is equality on `clientId`,
+`q` searches `reference`, `from` and `to` bound `paymentDate`. Declare the mapping
+next to the query schema instead of coding it in the BLL:
+
+```ts
+import { contains, eq, filtersFor, gte, lte } from "monolite-crud";
+
+export const paymentFilters = filtersFor<IPayment, z.infer<typeof paymentQuerySchema>>({
+  q:        contains(["reference", "notes"]),
+  clientId: eq("clientId"),
+  methodId: eq("methodId"),
+  from:     gte("paymentDate", { boundary: "startOfDay" }),
+  to:       lte("paymentDate", { boundary: "endOfDay" }),
+});
+```
+
+and tell the BLL which one it uses:
+
+```ts
+constructor(@inject(PAYMENT_TOKENS.store) store: IGenericRepository<IPayment>) {
+  super(store, paymentMapper, {
+    orderBy: { field: "paymentDate", direction: "desc" },
+    filters: paymentFilters,
+  });
+}
+```
+
+The default `buildWhere` answers with them, so the module writes no `buildWhere` at
+all. What you get for free:
+
+- **The assembly.** No parameter present is `undefined` — no filter, not an empty
+  `$and`. One is the bare clause, not a one-element `$and`, so the SQL does not
+  change when a module migrates from a hand-written `buildWhere`. Several are an
+  `$and`, in the order the rules are declared. Absent means `undefined`, `null` or
+  the empty string a blank search box submits; `0` and `false` are values.
+- **Several columns in one search.** `contains(["reference", "notes"])` is an `$or`
+  of one case-insensitive `contains` per column — the reason so many modules used
+  to search only the first column somebody thought of.
+- **The date-range convention, named.** `startOfDay` is `T00:00:00.000Z`,
+  `endOfDay` is `T23:59:59.999Z`: the same decision in every module, and the one
+  that changes in one place if the application ever gets a timezone. The parameter
+  must be a calendar date (`YYYY-MM-DD`, or a `Date` read by its UTC day);
+  anything else — a timestamp, `2026-02-30` — is refused with a 400 naming the
+  parameter rather than becoming a filter that silently matches nothing.
+- **Compile-time checks.** A rule naming a property `IPayment` does not have fails
+  the build. Pass the query's type as the second type argument and a parameter the
+  schema does not have fails it too — the drift a hand-written cast used to hide.
+
+The builders are `eq`, `contains`, `gte`, `lte`, `gt` and `lt`. The map is declared
+rather than inferred from the schema on purpose: `from` and `to` do not name their
+column, `q` maps to a different one in every module, and a parameter that shares a
+name with a column is not always a filter on it.
+
+A filter that is logic — "overdue" meaning a date *and* a status *and* no payment
+against it — is not a mapping and stays an overridden `buildWhere` (see
+[Overriding](#overriding)), combining its rule with the declared filters through
+`allOf(super.buildWhere(query), rule)`.
 
 ---
 
@@ -319,7 +383,8 @@ Generated projects ship that index in every engine's schema.
 | `create(input)` | Insert, then map to the DTO |
 | `update(id, input)` | |
 | `softDelete(id)` | |
-| `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>` |
+| `buildWhere(query)` | Protected hook: query parameters → `WhereFilter<T>`; by default, the declared `filters` |
+| `filters` | The listing's filters, declared at construction with `filtersFor()` |
 | `resolveQuery(query)` | Protected hook, async: completes the query before `buildWhere` reads it |
 | `includes` | Relations resolved on every verb, declared at construction with `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entity ↔ DTO in one place |

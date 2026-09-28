@@ -22,6 +22,40 @@ a minor release. Pin exact versions.
 
   Projects generated from now on need a `monolite-di` that exports it; existing
   tokens files keep working unchanged.
+- **A listing's filters are declared, not coded (#38).** `filtersFor`, with
+  `eq`, `contains`, `gte`, `lte`, `gt`, `lt` and `allOf`, in `monolite-crud`,
+  and a `filters` option on `CrudBLL`.
+
+  `buildWhere` was overridden in almost every module of an application built
+  with the toolkit, and every override was the same function under different
+  nouns: cast the query to a hand-written type, push one clause per parameter
+  that arrived, assemble nothing / the bare clause / an `$and`. The cast could
+  drift from the zod schema the controller validates against and nothing would
+  notice; the assembly has exactly one correct shape and was written each time;
+  and the date-range convention — `T00:00:00.000Z` on the lower bound,
+  `T23:59:59.999Z` on the upper — was a decision re-taken per module, where
+  getting it wrong once is an off-by-a-day nobody finds until a report
+  disagrees with a screen.
+
+  Now the mapping sits next to the schema —
+  `filtersFor<IPayment>({ q: contains(["reference", "notes"]), clientId: eq("clientId"), from: gte("paymentDate", { boundary: "startOfDay" }) })`
+  — and the BLL passes it as `filters`. The default `buildWhere` answers with
+  it, emitting clauses in declaration order, `undefined` when no parameter is
+  present and the bare clause when one is, so a module converted from a
+  hand-written override sends the identical filter and the identical SQL. A
+  column the entity does not have fails the build, and so does a parameter the
+  query type does not have when it is given as the second type argument.
+  `contains` over several columns is an `$or` of them. The boundaries are named
+  (`startOfDay`, `endOfDay`) because they are the one decision that changes in a
+  single place the day the application gets a timezone; a value that is not a
+  calendar date is a 400 naming the parameter, not an `Invalid Date` that
+  silently matches nothing.
+
+  Nothing is inferred from the schema — `from` and `to` do not name their
+  column, and a parameter that shares a name with a column is not always a
+  filter on it. `buildWhere` stays overridable for the filters that are rules,
+  and reaches the declared ones through `super.buildWhere(query)`. A module that
+  passes no `filters` behaves exactly as before.
 
 ### Fixed
 
