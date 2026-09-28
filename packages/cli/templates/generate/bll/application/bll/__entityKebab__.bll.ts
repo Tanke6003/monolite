@@ -37,9 +37,10 @@ const __mapperName__ = createMapper<I__entityName__, __dtoName__>({
  *
  * The day it grows a rule —a unique name, a state machine, a balance that
  * cannot go negative— override that one verb; the others keep coming from the
- * base. To filter the listing, override `buildWhere` and nothing else. And if
- * the module would have to contort itself to fit here, the right answer is to
- * stop extending this class.
+ * base. To filter the listing, declare the filters with `filtersFor` and pass
+ * them as `filters`; override `buildWhere` only for a filter that is a rule
+ * rather than a mapping. And if the module would have to contort itself to fit
+ * here, the right answer is to stop extending this class.
  */
 @injectable()
 export class __entityName__BLL extends CrudBLL<I__entityName__, __dtoName__> {
