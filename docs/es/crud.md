@@ -121,13 +121,16 @@ importar dónde lo pusiera el decorador.
 
 Del lado de la BLL funciona igual: sobreescribe `create` en tu subclase de
 `CrudBLL`, o sobreescribe el hook `buildWhere` para cambiar cómo traduce `list`
-los parámetros de consulta a un filtro.
+los parámetros de consulta a un filtro. Los filtros que sólo son una
+correspondencia —este parámetro, esa columna— es mejor
+[declararlos](#filtrar-el-listado); el hook es para los que son una regla.
+`super.buildWhere(query)` devuelve los declarados, y `allOf` los combina con los
+tuyos:
 
 ```ts
-protected override buildWhere(query: ListQuery): WhereFilter<IBranch> {
-  const where = super.buildWhere(query);
+protected override buildWhere(query: ListQuery): WhereFilter<IBranch> | undefined {
   // Sólo las sucursales de quien llama, pida lo que pida además.
-  return { $and: [where, { fkOwner: Number(this.context.getCurrentUserId()) }] };
+  return allOf(super.buildWhere(query), { fkOwner: Number(this.context.getCurrentUserId()) });
 }
 ```
 
@@ -156,6 +159,72 @@ Lo que importa de la costura es lo que conservas: la paginación, el orden por
 defecto y `withDeleted` siguen viniendo de la clase base. Sobreescribir `list` para
 hacerle sitio a la búsqueda obliga a copiar los tres, y cada copia es un sitio donde
 perder uno.
+
+---
+
+## Filtrar el listado
+
+Casi todos los filtros de un listado son una correspondencia: `clientId` es
+igualdad sobre `clientId`, `q` busca en `reference`, `from` y `to` acotan
+`paymentDate`. Declara esa correspondencia junto al esquema de la consulta en vez de
+programarla en la BLL:
+
+```ts
+import { contains, eq, filtersFor, gte, lte } from "monolite-crud";
+
+export const paymentFilters = filtersFor<IPayment, z.infer<typeof paymentQuerySchema>>({
+  q:        contains(["reference", "notes"]),
+  clientId: eq("clientId"),
+  methodId: eq("methodId"),
+  from:     gte("paymentDate", { boundary: "startOfDay" }),
+  to:       lte("paymentDate", { boundary: "endOfDay" }),
+});
+```
+
+y dile a la BLL cuál usa:
+
+```ts
+constructor(@inject(PAYMENT_TOKENS.store) store: IGenericRepository<IPayment>) {
+  super(store, paymentMapper, {
+    orderBy: { field: "paymentDate", direction: "desc" },
+    filters: paymentFilters,
+  });
+}
+```
+
+El `buildWhere` por defecto contesta con ellos, así que el módulo no escribe ningún
+`buildWhere`. Lo que viene incluido:
+
+- **El ensamblado.** Sin parámetros presentes es `undefined` —ningún filtro, no un
+  `$and` vacío—. Con uno es la cláusula sola, no un `$and` de un elemento, así que
+  el SQL no cambia cuando un módulo migra desde un `buildWhere` escrito a mano. Con
+  varios es un `$and`, en el orden en que se declararon las reglas. Ausente
+  significa `undefined`, `null` o la cadena vacía que manda una caja de búsqueda en
+  blanco; `0` y `false` son valores.
+- **Varias columnas en una búsqueda.** `contains(["reference", "notes"])` es un
+  `$or` de un `contains` sin distinguir mayúsculas por columna: la razón por la que
+  tantos módulos buscaban sólo en la primera columna que se le ocurrió a alguien.
+- **La convención de rangos de fecha, con nombre.** `startOfDay` es
+  `T00:00:00.000Z` y `endOfDay` es `T23:59:59.999Z`: la misma decisión en todos los
+  módulos, y la que cambia en un solo sitio si la aplicación algún día tiene zona
+  horaria. El parámetro tiene que ser una fecha de calendario (`YYYY-MM-DD`, o un
+  `Date` que se lee por su día UTC); cualquier otra cosa —un timestamp,
+  `2026-02-30`— se rechaza con un 400 que nombra el parámetro en vez de convertirse
+  en un filtro que en silencio no encuentra nada.
+- **Comprobaciones al compilar.** Una regla que nombra una propiedad que `IPayment`
+  no tiene rompe el build. Pasa el tipo de la consulta como segundo argumento de
+  tipo y un parámetro que el esquema no tiene también lo rompe: la deriva que un
+  cast escrito a mano escondía.
+
+Los constructores son `eq`, `contains`, `gte`, `lte`, `gt` y `lt`. La
+correspondencia se declara en vez de inferirse del esquema a propósito: `from` y
+`to` no nombran su columna, `q` apunta a una distinta en cada módulo, y un
+parámetro que comparte nombre con una columna no siempre es un filtro sobre ella.
+
+Un filtro que es lógica —«vencido» como una fecha *y* un estado *y* ningún pago
+contra él— no es una correspondencia y sigue siendo un `buildWhere` sobreescrito,
+que combina su regla con los filtros declarados mediante
+`allOf(super.buildWhere(query), rule)`.
 
 ---
 
@@ -324,7 +393,8 @@ los motores.
 | `create(input)` | Inserta y mapea al DTO |
 | `update(id, input)` | |
 | `softDelete(id)` | |
-| `buildWhere(query)` | Hook protegido: parámetros de consulta → `WhereFilter<T>` |
+| `buildWhere(query)` | Hook protegido: parámetros de consulta → `WhereFilter<T>`; por defecto, los `filters` declarados |
+| `filters` | Los filtros del listado, declarados al construir con `filtersFor()` |
 | `resolveQuery(query)` | Hook protegido, asíncrono: completa la consulta antes de que `buildWhere` la lea |
 | `includes` | Relaciones resueltas en todos los verbos, declaradas al construir con `include()` |
 | `mapper` | `EntityMapper<TEntity, TDto>` — entidad ↔ DTO en un solo sitio |
