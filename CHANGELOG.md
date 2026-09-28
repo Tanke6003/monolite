@@ -57,6 +57,42 @@ a minor release. Pin exact versions.
   and reaches the declared ones through `super.buildWhere(query)`. A module that
   passes no `filters` behaves exactly as before.
 
+- **A generated entry point for tasks, and a seed primitive** (#40).
+  `monolite generate task <name>`, `npm run task <name>` in the projects it
+  scaffolds, `defineTask` / `runTask` / `runTaskByName` in `monolite-di`, and
+  `seed` in `monolite-data`.
+
+  The toolkit scaffolded an HTTP server and stopped there, and every
+  application built on it then wrote the rest by hand: a nightly job, a mailer,
+  a mailbox check — each building the container itself, resolving what it
+  needed, running and exiting — and a seed script with an existence check
+  before every insert. The parts that are easy to get wrong were got wrong a
+  slightly different way each time.
+
+  A task is now one file with `export default defineTask({ name, run })`,
+  listed by the generator in `src/tasks/index.ts`, and one runner,
+  `src/scripts/task.ts`, runs them all. It gives the body the container and the
+  logger, checks the database first and closes the pool after, logs which task
+  ran and how long it took, and ends with an exit code a supervisor can act on:
+  `0` done, `1` failed — a rejected promise included, which a hand-written
+  `async main()` can let exit 0 — `64` no such task, and `75` when the previous
+  run still holds the lock and this one refused to start. The lock is a file
+  holding the pid, so a run killed with `SIGKILL` does not block the next one.
+  Scheduling stays with systemd, cron or the orchestrator: what the toolkit owns
+  is a task that is safe to invoke.
+
+  `seed(store, { key: "code" }, rows)` inserts what is missing, updates what
+  changed, leaves what matches and reports the counts. The second run over the
+  same input writes nothing at all — not even an `UPDATE` to the same value,
+  which would still move `updatedAt` — and a value changed by hand is put back
+  with the row and field named in the report. It lives in `monolite-data`
+  because it is written entirely against `IGenericRepository`, so it covers
+  every engine and bypasses the BLL hooks that exist for user input.
+
+  Projects generated from now on ship the runner, an empty task list and a
+  `task` script. Existing projects are unaffected; the CLI reference says which
+  two files to copy to get the runner.
+
 ### Fixed
 
 - **A release checks that npm accepts its credential before it spends a version.**

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { toKebabCase, toUpperSnakeCase } from "./naming.js";
+import { toCamelCase, toKebabCase, toUpperSnakeCase } from "./naming.js";
 
 /**
  * Adding a generated module to the list the application is built from.
@@ -154,6 +154,70 @@ export function wireBinding(
     -1
   );
   rows.splice(lastImport + 1, 0, binding.importLine);
+
+  fs.writeFileSync(absolute, rows.join("\n"), "utf8");
+
+  return { wired: true, lines, file: relative };
+}
+
+export const TASKS_MARKER = "// monolite:tasks";
+
+/**
+ * The import and the list entry for a task: what `wireTask` inserts, and what
+ * `generate --no-wire` prints instead. The file exports its task as the
+ * default, so the local name is chosen here and nowhere else.
+ */
+export function taskLines(name: string): [importLine: string, entry: string] {
+  const constant = `${toCamelCase(name)}Task`;
+  return [`import ${constant} from "./${toKebabCase(name)}.task";`, `${constant},`];
+}
+
+/**
+ * Adds a generated task to `tasks/index.ts`, the list the runner looks names
+ * up in.
+ *
+ * The third use of the same marker trick, and the reason for it is the one
+ * modules have: a task file nothing references compiles perfectly and answers
+ * "there is no task called …" — found out, usually, from a timer that has been
+ * failing every night since the deploy.
+ */
+export function wireTask(root: string, sourceRoot: string, name: string): WiringResult {
+  const relative = path.join(path.relative(root, sourceRoot) || ".", "tasks", "index.ts");
+  const absolute = path.join(sourceRoot, "tasks", "index.ts");
+
+  const lines = taskLines(name);
+  const [importLine] = lines;
+  const entry = `  ${lines[1]}`;
+
+  if (!fs.existsSync(absolute)) {
+    return { wired: false, lines, file: relative, reason: "it is not there" };
+  }
+
+  const source = fs.readFileSync(absolute, "utf8");
+
+  if (source.includes(importLine)) {
+    return { wired: false, lines, file: relative, reason: "it is already listed" };
+  }
+
+  if (!source.includes(TASKS_MARKER)) {
+    return {
+      wired: false,
+      lines,
+      file: relative,
+      reason: `it no longer has its ${TASKS_MARKER} marker`,
+    };
+  }
+
+  const rows = source.split("\n");
+
+  const markerAt = rows.findIndex((row) => row.trim() === TASKS_MARKER);
+  rows.splice(markerAt, 0, entry);
+
+  const lastImport = rows.reduce(
+    (found, row, index) => (row.startsWith("import ") ? index : found),
+    -1
+  );
+  rows.splice(lastImport + 1, 0, importLine);
 
   fs.writeFileSync(absolute, rows.join("\n"), "utf8");
 

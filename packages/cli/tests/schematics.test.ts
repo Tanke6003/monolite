@@ -9,7 +9,7 @@ import {
 } from "../src/schematics";
 
 describe("the schematics on offer", () => {
-  it("are the six a project is built out of", () => {
+  it("are the seven a project is built out of", () => {
     expect([...SCHEMATICS]).toEqual([
       "module",
       "entity",
@@ -17,6 +17,7 @@ describe("the schematics on offer", () => {
       "controller",
       "query",
       "repository",
+      "task",
     ]);
   });
 

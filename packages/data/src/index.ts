@@ -181,6 +181,10 @@ export type {
   TableSnapshot,
 } from "./ddl/snapshot.js";
 
+// ------------------------------------------------------------------  seed  ---
+export { seed } from "./seed.js";
+export type { SeedChange, SeedKey, SeedOptions, SeedReport } from "./seed.js";
+
 // --------------------------------------------------------------- testing ---
 
 export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./testing/repository-contract.js";
