@@ -343,6 +343,66 @@ metadata. Silently doing nothing would be worse.
 
 ---
 
+## Seeding reference data
+
+Reference data — permission sections, configuration keys, the list of countries
+— has to exist in every database the application runs against, including the
+one somebody restored from last month's backup. The script that puts it there
+runs after every deploy, so it has to be safe to run again, and written by hand
+that means an existence check before every insert.
+
+`seed` is that check, once:
+
+```ts
+import { seed } from "monolite-data";
+
+const report = await seed(sections, { key: "code" }, [
+  { code: "payments", name: "Payments" },
+  { code: "reports",  name: "Reports"  },
+]);
+
+logger.info(report.summary); // "1 inserted, 1 updated (payments: name), 0 unchanged"
+```
+
+Insert what is missing, update what changed, leave what matches, report the
+counts. The first argument is any `IGenericRepository` — the store a module
+registers — so it works the same on every engine.
+
+- **The key is not the primary key**, as a rule. The seed has to recognise its
+  rows in a database where the identity column handed out whatever numbers it
+  liked; what identifies reference data is the code the application refers to
+  it by. Give that column a unique index. A composite key is an array:
+  `{ key: ["tenant", "code"] }`.
+- **A second run writes nothing.** Not an `UPDATE` that sets every column to the
+  value it already holds — that would still move `updatedAt` and still add a
+  line to the change log. It reports `0 inserted, 0 updated`, and the table is
+  byte-for-byte what it was.
+- **A value changed by hand is put back, and the report says so**: `updated`
+  counts it and `changes` names the row and the fields — `{ action: "updated",
+  key: { code: "payments" }, fields: ["name"] }`.
+- **Only declared properties are compared.** A column the seed does not mention
+  — a counter, a position an administrator reordered — is left alone. Declare it
+  and it is enforced.
+- **Nothing is deleted.** A row in the table and not in the list stays:
+  reference data is pointed at by foreign keys, and removing it is a migration
+  somebody reads.
+- **A soft-deleted row stays deleted**, counted as `skipped`. Somebody retired it
+  on purpose, and a deploy should not overrule them.
+- **No transaction of its own.** It joins whichever one is open, so several seeds
+  inside one `unitOfWork.execute` land together. Alone, a failure halfway leaves
+  the earlier rows applied, and the next run completes the rest.
+
+Mistakes in the list — a row without its key, two rows with the same one — are
+refused before a single statement runs. Declare a `decimal` at its column's
+scale: `1.005` against a two-decimal column is stored as `1.01`, and would read
+as changed on every run.
+
+The natural home for a seed is a task, run after every deploy:
+`monolite g task seed`, then call `seed` from its body with the stores it
+resolves from the container — see [`generate task`](cli.md#generate-task).
+
+---
+
 ## Transactions (unit of work)
 
 **Not everything is wrapped in a transaction.** A single statement is already

@@ -96,11 +96,12 @@ export function printGenerateHelp(): void {
   line(`  ${flag("controller")}   CrudController subclass for an existing BLL`);
   line(`  ${flag("query")}        Repository + BLL + controller for what the generic API cannot express`);
   line(`  ${flag("repository")}   This entity's store plus its own queries, on executeRaw`);
+  line(`  ${flag("task")}         A job run by name, for a timer or cron: npm run task <name>`);
   line();
   line(heading("Options"));
   line(`  ${flag("--force")}      Overwrite files that already exist`);
   line(`  ${flag("--over <e>")}   The entity a query reads; required by the query schematic`);
-  line(`  ${flag("--no-wire")}    Leave composition/modules.ts alone`);
+  line(`  ${flag("--no-wire")}    Leave composition/modules.ts, and tasks/index.ts, alone`);
   line(`  ${flag("-h, --help")}   Show this help`);
   line();
   line(heading("Examples"));
@@ -108,5 +109,6 @@ export function printGenerateHelp(): void {
   line(color.dim("  monolite g entity payment-method"));
   line(color.dim("  monolite g query revenue --over invoice"));
   line(color.dim("  monolite g repository invoice"));
+  line(color.dim("  monolite g task advance-charges"));
   line();
 }

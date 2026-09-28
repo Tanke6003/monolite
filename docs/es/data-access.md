@@ -351,6 +351,69 @@ los metadatos. No hacer nada en silencio sería peor.
 
 ---
 
+## Sembrar datos de referencia
+
+Los datos de referencia — secciones de permisos, claves de configuración, la
+lista de países — tienen que existir en cada base de datos contra la que corre la
+aplicación, incluida la que alguien restauró de la copia del mes pasado. El
+script que los pone ahí se ejecuta tras cada despliegue, así que tiene que ser
+seguro volver a ejecutarlo, y escrito a mano eso significa una comprobación de
+existencia antes de cada insert.
+
+`seed` es esa comprobación, una vez:
+
+```ts
+import { seed } from "monolite-data";
+
+const report = await seed(sections, { key: "code" }, [
+  { code: "payments", name: "Payments" },
+  { code: "reports",  name: "Reports"  },
+]);
+
+logger.info(report.summary); // "1 inserted, 1 updated (payments: name), 0 unchanged"
+```
+
+Inserta lo que falta, actualiza lo que cambió, deja lo que coincide e informa de
+los recuentos. El primer argumento es cualquier `IGenericRepository` — el almacén
+que registra un módulo — así que funciona igual en todos los motores.
+
+- **La clave no es la clave primaria**, por norma. La siembra tiene que reconocer
+  sus filas en una base de datos donde la columna identidad repartió los números
+  que quiso; lo que identifica un dato de referencia es el código con el que la
+  aplicación se refiere a él. Dale a esa columna un índice único. Una clave
+  compuesta es un array: `{ key: ["tenant", "code"] }`.
+- **Una segunda ejecución no escribe nada.** Ni un `UPDATE` que ponga cada columna
+  al valor que ya tiene — eso seguiría moviendo `updatedAt` y añadiendo una línea
+  al registro de cambios. Informa `0 inserted, 0 updated`, y la tabla queda byte
+  a byte como estaba.
+- **Un valor cambiado a mano se restaura, y el informe lo dice**: `updated` lo
+  cuenta y `changes` nombra la fila y los campos — `{ action: "updated",
+  key: { code: "payments" }, fields: ["name"] }`.
+- **Sólo se comparan las propiedades declaradas.** Una columna que la siembra no
+  menciona — un contador, una posición que un administrador reordenó — se deja
+  en paz. Decláralo y se hace cumplir.
+- **No se borra nada.** Una fila que está en la tabla y no en la lista se queda:
+  a los datos de referencia apuntan claves foráneas, y quitarlos es una migración
+  que alguien lee.
+- **Una fila con borrado lógico sigue borrada**, contada como `skipped`. Alguien
+  la retiró a propósito, y un despliegue no debería enmendarle la plana.
+- **Sin transacción propia.** Se une a la que esté abierta, así que varias
+  siembras dentro de un `unitOfWork.execute` llegan juntas. Sola, un fallo a
+  medias deja aplicadas las filas anteriores, y la siguiente ejecución completa
+  el resto.
+
+Los errores de la lista — una fila sin su clave, dos filas con la misma — se
+rechazan antes de ejecutar una sola sentencia. Declara un `decimal` con la escala
+de su columna: `1.005` contra una columna de dos decimales se guarda como
+`1.01`, y se leería como cambiado en cada ejecución.
+
+El sitio natural de una siembra es una tarea que se ejecuta tras cada
+despliegue: `monolite g task seed`, y llama a `seed` desde su cuerpo con los
+almacenes que resuelve del contenedor — ver
+[`generate task`](cli.md#generate-task).
+
+---
+
 ## Transacciones (unidad de trabajo)
 
 **No todo va envuelto en una transacción.** Una sola sentencia ya es atómica y
