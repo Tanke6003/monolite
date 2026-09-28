@@ -14,6 +14,7 @@ import {
   areDocsEnabled,
   buildAuthRateLimiter,
   buildCorsOptions,
+  buildCorsPolicy,
   buildHelmetOptions,
   buildRateLimiter,
   docsCspDirectives,
@@ -312,5 +313,49 @@ describe("areDocsEnabled", () => {
   it("lets DOCS_ENABLED decide in both directions", () => {
     expect(areDocsEnabled(envsOf({ NODE_ENV: "production", DOCS_ENABLED: "true" }))).toBe(true);
     expect(areDocsEnabled(envsOf({ NODE_ENV: "development", DOCS_ENABLED: "false" }))).toBe(false);
+  });
+});
+
+describe("buildCorsPolicy", () => {
+  /** Resolves the options the delegate picks for `req`, then checks `origin`. */
+  const checkFor = async (
+    envs: EnvSource,
+    req: { protocol: string; host: string },
+    origin: string | undefined
+  ) => {
+    const options = await new Promise<ReturnType<typeof buildCorsOptions>>((resolve, reject) =>
+      buildCorsPolicy(envs)(req as any, (error, picked) =>
+        error ? reject(error) : resolve(picked as ReturnType<typeof buildCorsOptions>)
+      )
+    );
+    return checkOrigin(options, origin);
+  };
+
+  const req = { protocol: "http", host: "localhost:4000" };
+
+  it("lets the server's own origin through with no list, which is what 'same origin only' promised", async () => {
+    expect(await checkFor(envsOf(), req, "http://localhost:4000")).toEqual({
+      error: null,
+      allowed: true,
+    });
+  });
+
+  it("matches the origin however it is written", async () => {
+    expect((await checkFor(envsOf(), req, "http://LOCALHOST:4000/")).allowed).toBe(true);
+  });
+
+  it("does not let through the same host on another scheme or port", async () => {
+    // `https` against an `http` server is what a wrong proxy setting produces,
+    // and it must fail closed rather than open.
+    expect((await checkFor(envsOf(), req, "https://localhost:4000")).error).toBeInstanceOf(AppError);
+    expect((await checkFor(envsOf(), req, "http://localhost:5173")).error).toBeInstanceOf(AppError);
+  });
+
+  it("still answers for the list, and for requests with no Origin", async () => {
+    const envs = envsOf({ CORS_ORIGINS: "http://localhost:5173" });
+
+    expect((await checkFor(envs, req, "http://localhost:5173")).allowed).toBe(true);
+    expect((await checkFor(envs, req, undefined)).allowed).toBe(true);
+    expect((await checkFor(envs, req, "http://evil.test")).error).toBeInstanceOf(AppError);
   });
 });

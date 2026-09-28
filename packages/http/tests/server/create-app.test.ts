@@ -220,6 +220,65 @@ describe("security policy", () => {
     }
   });
 
+  /**
+   * #47. Browsers send `Origin` on a same-origin POST, so with the allow-list
+   * empty —"same origin only"— the docs page the API serves itself could read
+   * but not write. The server's own origin has to pass without being listed.
+   */
+  it("lets the server's own origin send a POST with CORS_ORIGINS empty", async () => {
+    const app = await start();
+    const self = `http://127.0.0.1:${app.http.address!.port}`;
+
+    try {
+      const own = await app.client.post("/api/v1/users", {
+        headers: { ...authed, origin: self },
+        body: { name: "Ada" },
+      });
+      expect(own.status).toBe(201);
+      expect(own.headers["access-control-allow-origin"]).toBe(self);
+
+      // Only its own: a foreign origin is still refused.
+      const foreign = await app.client.post("/api/v1/users", {
+        headers: { ...authed, origin: "http://evil.test" },
+        body: { name: "Ada" },
+      });
+      expect(foreign.status).toBe(403);
+      expect(foreign.body).toMatchObject({ code: "CORS_ORIGIN_NOT_ALLOWED" });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("works the server's origin out through the proxy it trusts, and fails closed without one", async () => {
+    const trusting = await start({ envs: envsOf({ TRUST_PROXY_HOPS: "1" }) });
+    const port = trusting.http.address!.port;
+    const behindTls = { ...authed, origin: `https://127.0.0.1:${port}`, "x-forwarded-proto": "https" };
+
+    try {
+      const res = await trusting.client.post("/api/v1/users", {
+        headers: behindTls,
+        body: { name: "Ada" },
+      });
+      expect(res.status).toBe(201);
+    } finally {
+      await trusting.close();
+    }
+
+    // With no proxy trusted the forwarded scheme is ignored, so the page's
+    // `https` origin does not match the `http` the server sees: refused, not
+    // waved through.
+    const plain = await start();
+    try {
+      const res = await plain.client.post("/api/v1/users", {
+        headers: { ...behindTls, origin: `https://127.0.0.1:${plain.http.address!.port}` },
+        body: { name: "Ada" },
+      });
+      expect(res.status).toBe(403);
+    } finally {
+      await plain.close();
+    }
+  });
+
   it("rejects a body over the configured limit with a 413", async () => {
     const app = await start({ envs: envsOf({ BODY_LIMIT: "1kb" }) });
 

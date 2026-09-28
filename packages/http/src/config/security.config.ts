@@ -5,7 +5,8 @@
 // It lives here and not in the server because these are configuration
 // decisions, not wiring: the server only mounts what this module decides, and a
 // policy can be tested without standing up the whole of Express.
-import type { CorsOptions } from "cors";
+import type { CorsOptions, CorsOptionsDelegate } from "cors";
+import type { Request } from "express";
 import rateLimit, { type RateLimitRequestHandler } from "express-rate-limit";
 import type { HelmetOptions } from "helmet";
 import { AppError, type ILogger } from "monolite-core";
@@ -108,7 +109,12 @@ export function resolveAllowedOrigins(envs: EnvSource): string[] {
 }
 
 /**
- * CORS policy.
+ * CORS policy, as plain options.
+ *
+ * It cannot see the request, so it cannot know the server's own origin: with
+ * `CORS_ORIGINS` empty it refuses everything that carries an `Origin`, the API's
+ * own pages included. `buildCorsPolicy` is the one to mount; this stays for
+ * whoever composes the options themselves.
  *
  * A request without an `Origin` header is always accepted: it is not a
  * cross-origin browser request but curl, Postman, a local Swagger UI or the
@@ -144,6 +150,47 @@ export function buildCorsOptions(envs: EnvSource, logger?: ILogger): CorsOptions
     // So the front end can read the request id and show it on an error: without
     // exposing it, the browser hides the header from JavaScript.
     exposedHeaders: [REQUEST_ID_HEADER],
+  };
+}
+
+/**
+ * CORS policy, as the delegate `cors()` accepts: the allow-list of
+ * `buildCorsOptions`, plus the server's own origin.
+ *
+ * "Empty means same-origin only" has to hold for the documentation page the
+ * API serves itself, and it did not: browsers send `Origin` on a same-origin
+ * request whose method is not `GET` or `HEAD`, so "Try it out" worked for every
+ * `GET` and was refused for every `POST`, `PUT`, `PATCH` and `DELETE` (#47).
+ * Listing the API's own address in `CORS_ORIGINS` only works until the port,
+ * the host name or the deployment changes.
+ *
+ * The delegate sees the request, so the server's origin is worked out from it:
+ * `req.protocol` and `req.host` honour `trust proxy`, which keeps it right behind
+ * a proxy — and when the hops are set wrong it fails closed, since `http` and
+ * `https` never match. It does not widen anything cross-origin: a page on
+ * another site cannot make a browser send a `Host` other than the API's, and a
+ * preflight carries no forwarded headers of its own.
+ */
+export function buildCorsPolicy(envs: EnvSource, logger?: ILogger): CorsOptionsDelegate<Request> {
+  const options = buildCorsOptions(envs, logger);
+  const check = options.origin as (
+    origin: string | undefined,
+    callback: (error: Error | null, allowed?: boolean) => void
+  ) => void;
+
+  return (req, callback) => {
+    const self = normalizeOrigin(`${req.protocol}://${req.host}`);
+
+    callback(null, {
+      ...options,
+      origin(origin, done) {
+        if (origin && normalizeOrigin(origin) === self) {
+          done(null, true);
+          return;
+        }
+        check(origin, done);
+      },
+    });
   };
 }
 

@@ -9,7 +9,7 @@ import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 import { resolveApiPrefix, resolveLegacyPrefix } from "../config/api.config.js";
 import { processEnv, type EnvSource } from "../config/env-source.js";
 import {
-  buildCorsOptions,
+  buildCorsPolicy,
   buildHelmetOptions,
   buildRateLimiter,
   resolveBodyLimit,
@@ -135,8 +135,9 @@ export async function createApp(options: CreateAppOptions): Promise<HttpApp> {
   const limiter = buildRateLimiter(envs);
   if (limiter) app.use(limiter);
 
-  // Before the body as well: a preflight carries none.
-  app.use(cors(buildCorsOptions(envs, logger)));
+  // Before the body as well: a preflight carries none. The server's own origin
+  // always passes, so the documentation it serves can send a POST.
+  app.use(cors(buildCorsPolicy(envs, logger)));
 
   const bodyLimit = resolveBodyLimit(envs);
   app.use(express.json({ limit: bodyLimit }));
