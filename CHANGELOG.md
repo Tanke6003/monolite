@@ -157,6 +157,16 @@ a minor release. Pin exact versions.
   it through. `buildCorsOptions` is unchanged for whoever composes the options
   themselves.
 
+- **The `monolite-http` README's `createApp` example did not run** (#52). It
+  called `mountDocs(app, spec)`, which the package does not export — it is the
+  function `monolite-cli` generates, with another signature — and called
+  `probe.beginShutdown()` on a `probe` it never declared, which throws at
+  shutdown. The example now keeps the probe in a variable and serves
+  `/openapi.json` with `buildOpenApiDocument`, and says the reader is the
+  application's to mount. The export table gains the two names it was missing,
+  `controllersFromRegistry` and `registerController`, and `npm run test:scripts`
+  now fails if an export arrives without a row.
+
 - **A release checks that npm accepts its credential before it spends a version.**
   The run pushes its version commit and tag before publishing, so a rejected
   credential was only discovered after the number was gone: v0.10.0, v0.10.1
