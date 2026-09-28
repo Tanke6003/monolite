@@ -9,6 +9,20 @@ a minor release. Pin exact versions.
 
 ## [Unreleased]
 
+### Added
+
+- **`tokensFor(name)` in `monolite-di` derives a module's four DI identifiers**
+  (#41). A generated `<entity>.tokens.ts` used to transcribe `"PaymentsStore"`,
+  `"IPaymentsBLL"`, `"IPaymentsRepository"` and `"IPaymentsController"` by hand —
+  four strings that must agree, and a typo only surfaced as a resolution error
+  at start-up. The template is now `export const PAYMENT_TOKENS =
+  tokensFor("Payment")`, still one file per module and still outside the module
+  file, and the result is typed as narrowly as the literal it replaces. Renaming
+  one identifier is `{ ...tokensFor("Payment"), bll: "Other" } as const`.
+
+  Projects generated from now on need a `monolite-di` that exports it; existing
+  tokens files keep working unchanged.
+
 ### Fixed
 
 - **A release checks that npm accepts its credential before it spends a version.**
