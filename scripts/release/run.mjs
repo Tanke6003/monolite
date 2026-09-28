@@ -28,6 +28,7 @@
 import { execFileSync } from "node:child_process";
 
 import { applyVersion, currentVersion, publishOrder, ROOT } from "./apply.mjs";
+import { credentialCheck, rejectedCredentialMessage } from "./credentials.mjs";
 import { baseVersion, plan } from "./plan.mjs";
 
 const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
@@ -134,6 +135,34 @@ function publish(version) {
   }
 }
 
+/**
+ * Stop before writing anything if npm will not accept the credential.
+ *
+ * See `credentials.mjs`: a rejected publish discovered after the push spends a
+ * version number for nothing, and three releases in a row went that way.
+ */
+function assertCanPublish() {
+  const { check, reason } = credentialCheck(process.env);
+
+  if (!check) {
+    log(`  credential not checked: ${reason}`);
+    return;
+  }
+
+  try {
+    const user = execFileSync(NPM, ["whoami"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+
+    log(`  publishing as ${user} (${reason})`);
+  } catch {
+    log(rejectedCredentialMessage());
+    process.exit(1);
+  }
+}
+
 const tag = lastTag();
 const manifestVersion = currentVersion();
 
@@ -182,6 +211,7 @@ if (publishOnly) {
     process.exit(0);
   }
 
+  assertCanPublish();
   npm("run", "build");
   publish(version);
 
@@ -205,6 +235,8 @@ if (dryRun) {
   log("dry run, so nothing was written, published or pushed");
   process.exit(0);
 }
+
+assertCanPublish();
 
 for (const file of applyVersion(decision.version)) log(`  update ${file}`);
 

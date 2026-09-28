@@ -43,23 +43,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # The bump is read from the commits since the last tag, so a shallow
           # clone with no tags in it would decide the version from nothing.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs a newer npm than Node ships with. Doing it
-      # unconditionally keeps the workflow identical before and after that
-      # switch is thrown.
+      # Trusted publishing needs npm 11.5.1 or later, newer than Node 22 ships
+      # with. Doing it unconditionally keeps the workflow identical before and
+      # after that switch is thrown.
+      #
+      # Pinned to a major rather than `latest`: npm 12 narrowed the Node versions
+      # it runs on, and a release job that breaks because a new major of a tool
+      # came out overnight is the last job that should.
       - name: Use an npm that can publish over OIDC
-        run: npm install -g npm@latest
+        run: npm install -g npm@^11.5.1
 
       - run: npm ci
 

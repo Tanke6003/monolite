@@ -11,6 +11,20 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **A release checks that npm accepts its credential before it spends a version.**
+  The run pushes its version commit and tag before publishing, so a rejected
+  credential was only discovered after the number was gone: v0.10.0, v0.10.1
+  and v0.10.2 are all tagged with nothing on the registry, which is still on
+  0.9.1. `npm whoami` now runs first, and a refusal stops the run with nothing
+  written, tagged or pushed and a message saying how to fix the credential. In
+  CI with no token at all the check is skipped, since that is trusted
+  publishing and there is nothing to ask about until publish time.
+- **The workflows run on Node 24 actions and a pinned npm.** `actions/checkout`
+  and `actions/setup-node` move from v4, which GitHub forces onto Node 24 with a
+  deprecation warning on every run, to v6. The release job installs `npm@^11.5.1`
+  instead of `npm@latest`, which is now npm 12 with a narrower range of Node
+  versions it runs on. CI also tests Node 24.
+
 - **A release could stall with the tag pushed and the registry empty, and
   nothing could finish it.** npm rejected the publish credential on v0.10.0 and
   v0.10.1: both are tagged, both moved every manifest, and neither reached the
