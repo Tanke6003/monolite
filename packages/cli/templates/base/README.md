@@ -150,7 +150,7 @@ matter, with the defaults this project was generated with:
 | `PORT` | `3000` | Port the HTTP server binds |
 | `API_PREFIX` | `__apiPrefix__` | Where the API is mounted |
 | `DATA_SOURCE` | `__dataSource__` | Which driver `monolite-data` builds |
-| `CORS_ORIGINS` | `http://localhost:3000` | Comma separated. Empty = same origin only |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma separated. The server's own origin always passes; empty = same origin only |
 | `BODY_LIMIT` | `1mb` | Maximum JSON body |
 | `TRUST_PROXY_HOPS` | `0` | Trusted proxies in front of the app |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Window of the per-IP quota |

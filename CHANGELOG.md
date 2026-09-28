@@ -145,6 +145,18 @@ a minor release. Pin exact versions.
 
 ### Fixed
 
+- **An empty `CORS_ORIGINS` refused the API's own origin, so the docs reader
+  could not send a `POST`** (#47). Browsers send `Origin` on a same-origin
+  request whose method is not `GET` or `HEAD`, and the policy only let through
+  requests with no `Origin` or one on the list — so "Try it out" worked for every
+  `GET` and answered `CORS_ORIGIN_NOT_ALLOWED` for every write, whenever the
+  page was not opened at exactly the address in `CORS_ORIGINS`. The new
+  `buildCorsPolicy`, which `createApp` and generated projects now mount, works
+  the server's origin out from the request (`req.protocol` and `req.host`, so it
+  honours `TRUST_PROXY_HOPS` and fails closed when the hops are wrong) and lets
+  it through. `buildCorsOptions` is unchanged for whoever composes the options
+  themselves.
+
 - **A release checks that npm accepts its credential before it spends a version.**
   The run pushes its version commit and tag before publishing, so a rejected
   credential was only discovered after the number was gone: v0.10.0, v0.10.1

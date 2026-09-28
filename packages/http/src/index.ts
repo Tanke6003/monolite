@@ -95,6 +95,7 @@ export {
   areDocsEnabled,
   buildAuthRateLimiter,
   buildCorsOptions,
+  buildCorsPolicy,
   buildHelmetOptions,
   buildRateLimiter,
   docsCspDirectives,

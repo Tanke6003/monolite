@@ -297,7 +297,8 @@ surface of the seven. Grouped by what you would be reaching for.
 | Export | What it is |
 | --- | --- |
 | `buildHelmetOptions`, `DEFAULT_CSP_DIRECTIVES`, `SECURITY_DEFAULTS` | The headers, and the CSP that stays off until `CSP_ENABLED=true` — see the note above about a blank documentation page. |
-| `buildCorsOptions`, `resolveAllowedOrigins` | An allow-list rather than a wildcard, answering a blocked origin in the API's own error shape. |
+| `buildCorsPolicy` | The CORS policy `createApp` mounts: the `CORS_ORIGINS` allow-list plus the server's own origin, so the docs page it serves can send a `POST` with the list empty. |
+| `buildCorsOptions`, `resolveAllowedOrigins` | The allow-list alone, as plain options: a blocked origin answers in the API's own error shape. It cannot see the request, so it does not know the server's own origin. |
 | `buildRateLimiter`, `buildAuthRateLimiter` | Per-IP, with the health checks exempt and the login endpoint on a tighter budget than the rest. |
 | `resolveApiPrefix`, `resolveLegacyPrefix`, `DEFAULT_API_PREFIX`, `DEFAULT_LEGACY_PREFIX` | Where the API is mounted, and the older prefix kept alive beside it. |
 | `resolveBodyLimit`, `resolveTrustProxy` | The two that are wrong by default in every framework: an unbounded body and a blindly trusted `X-Forwarded-For`. |

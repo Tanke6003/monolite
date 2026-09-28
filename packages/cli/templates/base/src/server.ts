@@ -5,7 +5,7 @@ import express, { type Application } from "express";
 import helmet from "helmet";
 import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 import {
-  buildCorsOptions,
+  buildCorsPolicy,
   buildHelmetOptions,
   buildRateLimiter,
   docsCspDirectives,
@@ -78,9 +78,9 @@ export class Server {
     if (limiter) this.app.use(limiter);
 
     // Before the body parsers as well: a preflight carries none. The allow-list
-    // is `CORS_ORIGINS`; a request with no `Origin` —curl, a probe, the docs
-    // page itself— is never a cross-origin one and always passes.
-    this.app.use(cors(buildCorsOptions(envs, logger)));
+    // is `CORS_ORIGINS`. A request with no `Origin` —curl, a probe— and one from
+    // this server's own origin —the docs page sending a POST— always pass.
+    this.app.use(cors(buildCorsPolicy(envs, logger)));
 
     const bodyLimit = resolveBodyLimit(envs);
     this.app.use(express.json({ limit: bodyLimit }));
