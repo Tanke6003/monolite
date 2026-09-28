@@ -8,6 +8,8 @@ import type {
 } from "./contracts/generic-repository.js";
 import type { ITransactionContext } from "./contracts/transaction-context.js";
 import { QueryBuilder } from "./query/query-builder.js";
+import { TRANSACTION_SEAM, transactionSeamOf } from "./transaction-aware.js";
+import type { TransactionSeam } from "./transaction-aware.js";
 
 /**
  * Module repository: it wraps the generic repository of the active driver and
@@ -51,6 +53,19 @@ export abstract class BaseModuleRepository<T extends object, TKey = number>
 
     const scoped = this.transactions?.current()?.repository<T, TKey>(this.entity);
     return (scoped as IGenericRepository<T, TKey> | undefined) ?? this.baseStore;
+  }
+
+  /**
+   * The transaction seam of the store underneath, handed through.
+   *
+   * The generator tells people to swap the plain store for this repository in
+   * their BLL, and `CrudBLL` finds out how to open a transaction by asking what
+   * it was handed (#33). Without this, making that swap would quietly turn the
+   * module's default writes back into auto-commits — the same code, one
+   * constructor argument different, and no longer atomic.
+   */
+  get [TRANSACTION_SEAM](): TransactionSeam | undefined {
+    return transactionSeamOf(this.baseStore);
   }
 
   /**

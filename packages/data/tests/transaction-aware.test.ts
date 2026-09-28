@@ -1,5 +1,10 @@
-import type { IGenericRepository, ITransactionContext, ITransactionScope } from "monolite-data";
-import { transactionAware } from "monolite-data";
+import type {
+  IGenericRepository,
+  ITransactionContext,
+  ITransactionScope,
+  IUnitOfWork,
+} from "monolite-data";
+import { TRANSACTION_SEAM, transactionAware, transactionSeamOf } from "monolite-data";
 
 interface Widget {
   pkWidget: number;
@@ -149,5 +154,49 @@ describe("transactionAware", () => {
 
     expect("executeRaw" in transactionAware<Widget>(withRaw, "W", contextOf(null))).toBe(true);
     expect("executeRaw" in transactionAware<Widget>(plain, "W", contextOf(null))).toBe(false);
+  });
+});
+
+/**
+ * The seam a store carries (#33): how a service handed nothing but a store —
+ * `CrudBLL`, which every generated module extends — finds the unit of work to
+ * open a transaction with.
+ */
+describe("transactionSeamOf", () => {
+  const unitOfWork = { execute: jest.fn() } as unknown as IUnitOfWork;
+
+  it("answers the unit of work and the context the store was bound with", () => {
+    const transactions = contextOf(null);
+    const store = transactionAware<Widget>(recorder("pool"), "WIDGETS", transactions, unitOfWork);
+
+    expect(transactionSeamOf(store)).toEqual({ unitOfWork, transactions });
+    expect(TRANSACTION_SEAM in store).toBe(true);
+  });
+
+  it("answers the same seam inside a transaction as outside one", () => {
+    // The seam belongs to the binding, not to whichever store is live: asking
+    // mid-transaction must not lose it just because the scope's store is the
+    // one answering everything else.
+    const transactions = contextOf(scopeOf(recorder("transaction")));
+    const store = transactionAware<Widget>(recorder("pool"), "WIDGETS", transactions, unitOfWork);
+
+    expect(transactionSeamOf(store)?.unitOfWork).toBe(unitOfWork);
+  });
+
+  it("has none for a store wrapped without a unit of work, which behaves as before", () => {
+    const store = transactionAware<Widget>(recorder("pool"), "WIDGETS", contextOf(null));
+
+    expect(transactionSeamOf(store)).toBeUndefined();
+    expect(TRANSACTION_SEAM in store).toBe(false);
+  });
+
+  it("has none for a plain store, for half a seam, or for anything that is not an object", () => {
+    // A service built over a bare store — every module's unit tests — must be
+    // told "no seam", not handed half of one: a unit of work with no context
+    // cannot see its own transaction and would open a second.
+    expect(transactionSeamOf(recorder("pool"))).toBeUndefined();
+    expect(transactionSeamOf(undefined)).toBeUndefined();
+    expect(transactionSeamOf(null)).toBeUndefined();
+    expect(transactionSeamOf({ [TRANSACTION_SEAM]: { unitOfWork } })).toBeUndefined();
   });
 });

@@ -135,10 +135,14 @@ export class AppointmentsBLL extends TransactionalBLL {
 }
 ```
 
-A BLL that already extends `CrudBLL` cannot also extend
-`TransactionalBLL` — TypeScript has no multiple inheritance — so `lockRow`
-is exported as a standalone function too, taking the transaction context
-explicitly.
+A BLL that extends `CrudBLL` needs neither: the store it is handed carries
+the unit of work it joins, so `@Transactional()` works on it with no second base
+class and no extra constructor argument. Its default `create`, `update` and
+`softDelete` run in a transaction too, which a decorated override calling
+`super.create(...)` joins; `this.tx(() => ...)` wraps part of a method. Since
+TypeScript has no multiple inheritance, `lockRow` is exported as a standalone
+function as well, taking the service (`lockRow(this, ...)`) or the transaction
+context explicitly.
 
 ## Loading relations
 

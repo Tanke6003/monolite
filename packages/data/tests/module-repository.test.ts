@@ -1,4 +1,9 @@
-import { BaseModuleRepository, MemoryGenericRepository } from "monolite-data";
+import {
+  BaseModuleRepository,
+  MemoryGenericRepository,
+  transactionAware,
+  transactionSeamOf,
+} from "monolite-data";
 import { ITestItem, SEED, TEST_ENTITY } from "./support/test-entity";
 
 class ItemsRepository extends BaseModuleRepository<ITestItem> {
@@ -57,5 +62,20 @@ describe("BaseModuleRepository", () => {
 
     jest.spyOn(store, "count").mockRejectedValue(new Error("boom"));
     await expect(repository.query().count()).rejects.toThrow("ItemsRepository.count failed.");
+  });
+
+  it("hands through the transaction seam of the store it wraps", () => {
+    // The generator tells people to give their BLL this repository instead of
+    // the plain store. If the seam stopped here, that swap alone would turn the
+    // module's default writes back into auto-commits (#33).
+    const transactions = { current: () => undefined, run: jest.fn() } as never;
+    const unitOfWork = { execute: jest.fn() } as never;
+    const bound = transactionAware<ITestItem>(store, "ITEMS", transactions, unitOfWork);
+
+    expect(transactionSeamOf(new ItemsRepository(bound as never, logger as never))).toEqual({
+      unitOfWork,
+      transactions,
+    });
+    expect(transactionSeamOf(repository)).toBeUndefined();
   });
 });

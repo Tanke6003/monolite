@@ -49,4 +49,22 @@ export class __entityName__BLL extends CrudBLL<I__entityName__, __dtoName__> {
   ) {
     super(store, __mapperName__, { field: "__pkProperty__", direction: "asc" });
   }
+
+  // The day a verb writes more than once — or checks other tables before it
+  // writes — keep it in one transaction. `CrudBLL` already carries the unit of
+  // work, so the decorator is all it takes: no second base class, no extra
+  // constructor argument. `create`, `update` and `softDelete` are already atomic
+  // on their own; `super.create` below joins the transaction the decorator
+  // opens, and a throw anywhere in the method rolls all of it back.
+  //
+  // Add `Transactional` to the `monolite-crud` import, then:
+  //
+  // @Transactional()
+  // override async create(dto: Partial<__dtoName__>): Promise<__dtoName__> {
+  //   await this.assertNameIsFree(dto.name);
+  //   return super.create(dto);
+  // }
+  //
+  // For the part of a method rather than the whole of it, `this.tx(() => ...)`
+  // does the same.
 }
