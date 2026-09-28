@@ -9,8 +9,9 @@
  * used to write by hand comes for free.
  *
  * Nothing here is all-or-nothing. Any verb can be dropped from `@Crud()` and
- * declared by hand, `buildWhere` is the seam for a module's own filtering, and
- * a service with real business rules simply overrides the verb that has them.
+ * declared by hand, `filtersFor` declares a listing's filters (with `buildWhere`
+ * left as the seam for the ones that are rules), and a service with real
+ * business rules simply overrides the verb that has them.
  */
 
 // -------------------------------------------------------------  service  ---
@@ -49,3 +50,5 @@ export type {
 // --------------------------------------------------------------  queries  ---
 export { include, loadRelated } from "./include.query.js";
 export type { Include, IncludeDefinition, IncludeSpec } from "./include.query.js";
+export { allOf, contains, eq, filtersFor, gt, gte, lt, lte } from "./filter.query.js";
+export type { DayBoundary, FilterRule, QueryFilters, RangeOptions } from "./filter.query.js";
