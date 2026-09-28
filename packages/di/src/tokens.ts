@@ -66,3 +66,81 @@ export type TokenName = keyof typeof TOKENS;
 export function storeToken(entity: string): string {
   return `${entity}Store`;
 }
+
+type Vowel = "a" | "e" | "i" | "o" | "u" | "A" | "E" | "I" | "O" | "U";
+type Sibilant = "s" | "x" | "z" | "ch" | "sh" | "S" | "X" | "Z" | "Ch" | "cH" | "CH" | "Sh" | "sH" | "SH";
+
+/**
+ * The plural `tokensFor` applies, as a type.
+ *
+ * It mirrors the runtime rule letter for letter —consonant plus `y` becomes
+ * `ies`, a sibilant takes `es`, anything else takes `s`— because the point of
+ * the helper is that `PAYMENT_TOKENS.bll` stays the literal `"IPaymentsBLL"`
+ * and not `string`. A token typed as `string` still compiles in `@inject()`,
+ * which is precisely how a typo gets past the compiler.
+ */
+export type Plural<N extends string> = N extends `${infer Head}${"y" | "Y"}`
+  ? Head extends "" | `${string}${Vowel}`
+    ? `${N}s`
+    : `${Head}ies`
+  : N extends `${string}${Sibilant}`
+    ? `${N}es`
+    : `${N}s`;
+
+/** What `tokensFor` returns for an entity called `N`. */
+export interface ModuleTokens<N extends string> {
+  /** The generic repository for the entity, already bound to the active engine. */
+  readonly store: `${Plural<N>}Store`;
+  readonly bll: `I${Plural<N>}BLL`;
+  /**
+   * The module's own repository, if it has one. Nothing registers it until
+   * `monolite generate repository` has been run; the name exists anyway so the
+   * generator can add the binding without reopening the tokens file.
+   */
+  readonly repository: `I${Plural<N>}Repository`;
+  readonly controller: `I${Plural<N>}Controller`;
+}
+
+/**
+ * The four DI identifiers of a feature module, derived from its entity name.
+ *
+ * Every generated module used to transcribe them by hand —`"PaymentsStore"`,
+ * `"IPaymentsBLL"`, `"IPaymentsRepository"`, `"IPaymentsController"`— and four
+ * strings that must agree with each other are four chances to end up with
+ * `IPaymentServiceBLL` in one place and `IPaymentsBLL` in another: a mismatch
+ * nobody hears about until the container fails to resolve at start-up.
+ *
+ * `name` is the entity's singular PascalCase name, the one the generator
+ * already uses for the class (`Payment`, `InvoiceLine`). It is pluralised with
+ * the CLI's own naive English rule and otherwise taken as given, like
+ * `storeToken`: the caller's spelling is the one its modules inject.
+ *
+ * A module that wants a different name for one of them spreads and overrides:
+ *
+ * ```ts
+ * export const PAYMENT_TOKENS = { ...tokensFor("Payment"), bll: "LegacyPaymentsService" } as const;
+ * ```
+ */
+export function tokensFor<const N extends string>(name: N): ModuleTokens<N> {
+  const plural = pluralize(name);
+
+  return Object.freeze({
+    store: `${plural}Store`,
+    bll: `I${plural}BLL`,
+    repository: `I${plural}Repository`,
+    controller: `I${plural}Controller`,
+  }) as ModuleTokens<N>;
+}
+
+/**
+ * The same three rules as `pluralize` in `monolite-cli`.
+ *
+ * Duplicated rather than shared because the CLI deliberately depends on no
+ * package of this monorepo. The two are held together by a test in the CLI that
+ * compares `tokensFor` against the names the generator writes.
+ */
+function pluralize(raw: string): string {
+  if (/[^aeiou]y$/i.test(raw)) return `${raw.slice(0, -1)}ies`;
+  if (/(s|x|z|ch|sh)$/i.test(raw)) return `${raw}es`;
+  return `${raw}s`;
+}

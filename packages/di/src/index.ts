@@ -31,8 +31,8 @@ export type {
 } from "./container.js";
 
 // ---------------------------------------------------------------  tokens  ---
-export { storeToken, TOKENS } from "./tokens.js";
-export type { Token, TokenName } from "./tokens.js";
+export { storeToken, tokensFor, TOKENS } from "./tokens.js";
+export type { ModuleTokens, Plural, Token, TokenName } from "./tokens.js";
 
 // --------------------------------------------------------  configuration  ---
 export type { IEnvs } from "./env.js";
