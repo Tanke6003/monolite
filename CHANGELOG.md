@@ -143,6 +143,20 @@ a minor release. Pin exact versions.
   module that wants auto-commit back (a hot insert path, MongoDB without a
   replica set) overrides `tx()` to `return fn()`.
 
+- **`parseId` takes `req.params.id` as Express 5 types it** (#51). Express 5
+  declares a path parameter as `string | string[]`, since one can repeat, and
+  `parseId` only accepted a `string` — so every caller narrowed first, and the
+  toolkit itself did it twice: the README's controller example inline, and a
+  private `idParam` in `CrudController`. The shortcut, `req.params.id as
+  string`, compiles and hands an array to `Number()`, where `Number(["7"])` is
+  7: the one function whose job is refusing a bad id never saw it.
+
+  `parseId(raw: string | string[] | undefined, resource)` now refuses any array,
+  one element included, with the same 400 `Invalid <resource> ID` as `abc`.
+  Callers write `parseId(req.params.id, "user")`; `CrudController` drops
+  `idParam`. Every call that compiled before still compiles and behaves the
+  same.
+
 - **An error response carries its stack only when `EXPOSE_ERROR_DETAILS=true`
   asks for it** (#48). `errorHandler` used to put `stack` and `causes` in the
   body whenever `NODE_ENV` was not exactly `production`, so a container where

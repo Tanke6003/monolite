@@ -17,6 +17,19 @@ describe("parseId", () => {
     }
   );
 
+  // Express 5 types a path parameter as `string | string[]`, because one can
+  // repeat. A repeated `:id` is never an id — not even with a single element,
+  // which is the case a cast would let through: `Number(["7"])` is 7.
+  it.each([[["1", "2"]], [["7"]], [[]]])("rejects the array %p with a 400", (raw) => {
+    expect(() => parseId(raw, "user")).toThrow(/Invalid user ID/);
+  });
+
+  it("takes req.params.id as Express 5 types it, with no narrowing", () => {
+    const params: Record<string, string | string[]> = { id: "7" };
+
+    expect(parseId(params.id, "user")).toBe(7);
+  });
+
   it("names the resource in the message", () => {
     expect(() => parseId("x", "appointment")).toThrow("Invalid appointment ID");
   });

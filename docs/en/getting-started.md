@@ -117,12 +117,14 @@ npm install monolite-core monolite-http express zod
 ```
 
 ```ts
-import { ApiController, Get, buildOpenApiDocument, registerController } from "monolite-http";
+import type { Request, Response } from "express";
+import { ApiController, Get, buildOpenApiDocument, parseId, registerController } from "monolite-http";
 
 @ApiController("/reports", { tag: "Reports" })
 export class ReportsController {
-  @Get("/:id", { params: idParamSchema })
-  getOne = async (req, res) => res.json(await load(req.params.id));
+  @Get("/:id", { params: { id: "integer" } })
+  getOne = async (req: Request, res: Response) =>
+    res.json(await load(parseId(req.params.id, "report")));
 }
 ```
 
