@@ -21,6 +21,7 @@ import {
   SCALAR_CDN_ORIGIN,
   resolveAllowedOrigins,
   resolveBodyLimit,
+  resolveExposeErrorDetails,
   resolveTrustProxy,
   type EnvSource,
 } from "monolite-http";
@@ -77,6 +78,24 @@ describe("resolveTrustProxy", () => {
     expect(resolveTrustProxy(envsOf({ TRUST_PROXY_HOPS: "true" }))).toBe(0);
     expect(resolveTrustProxy(envsOf({ TRUST_PROXY_HOPS: "1.5" }))).toBe(0);
     expect(resolveTrustProxy(envsOf({ TRUST_PROXY_HOPS: "-1" }))).toBe(0);
+  });
+});
+
+describe("resolveExposeErrorDetails", () => {
+  it("keeps the details out of the response when nothing is set", () => {
+    expect(resolveExposeErrorDetails(envsOf())).toBe(false);
+  });
+
+  it("exposes them only when asked for with true", () => {
+    expect(resolveExposeErrorDetails(envsOf({ EXPOSE_ERROR_DETAILS: "true" }))).toBe(true);
+    expect(resolveExposeErrorDetails(envsOf({ EXPOSE_ERROR_DETAILS: " TRUE " }))).toBe(true);
+    expect(resolveExposeErrorDetails(envsOf({ EXPOSE_ERROR_DETAILS: "false" }))).toBe(false);
+    expect(resolveExposeErrorDetails(envsOf({ EXPOSE_ERROR_DETAILS: "yes-please" }))).toBe(false);
+  });
+
+  it("does not follow NODE_ENV", () => {
+    // The variable that decides this has to be one somebody set on purpose.
+    expect(resolveExposeErrorDetails(envsOf({ NODE_ENV: "development" }))).toBe(false);
   });
 });
 

@@ -156,42 +156,70 @@ describe("errorHandler", () => {
   });
 
   // =============================================================  filtering ===
-  it("publishes neither the internal message nor the stack in production", () => {
-    process.env.NODE_ENV = "production";
-
-    handle(new Error("connection string is postgres://user:pass@host"));
+  it("publishes neither the internal message nor the stack by default", () => {
+    handle(new Error("connection string is postgres://user:pass@host", { cause: new Error("the root") }));
 
     expect(body().message).toBe("Internal server error");
     expect(body().stack).toBeUndefined();
     expect(body().causes).toBeUndefined();
   });
 
-  it("includes the stack and the causes outside production, which is what debugging needs", () => {
-    handle(new Error("boom", { cause: new Error("the root") }));
+  it("keeps an AppError's stack out of the response by default as well", () => {
+    // An unknown route is enough to produce one, so this is the default that
+    // anyone able to send a request gets to see.
+    handle(new AppError("nope", 404, true, { cause: new Error("underneath") }));
+
+    expect(body().stack).toBeUndefined();
+    expect(body().causes).toBeUndefined();
+  });
+
+  it("does not read NODE_ENV: unset, or development, still publishes nothing", () => {
+    // A container where nobody set it, and a deployment that copied the example
+    // file, are the two that used to leak.
+    handle(new Error("boom"));
+    expect(body().stack).toBeUndefined();
+
+    res.json.mockClear();
+    process.env.NODE_ENV = "development";
+    handle(new Error("boom"));
+    expect(body().stack).toBeUndefined();
+  });
+
+  it("includes the stack and the causes when `exposeDebugInfo` asks for them", () => {
+    handle(new Error("boom", { cause: new Error("the root") }), { logger, exposeDebugInfo: true });
 
     expect(Array.isArray(body().stack)).toBe(true);
     expect(body().causes).toEqual(["Error: the root"]);
   });
 
-  it("lets `exposeDebugInfo` override the environment in both directions", () => {
-    process.env.NODE_ENV = "production";
-    handle(new Error("boom"), { logger, exposeDebugInfo: true });
-    expect(body().stack).toBeDefined();
+  it("still hides the internal message of an unexpected 5xx when details are exposed", () => {
+    // The stack is where the detail goes; the message is the answer, and it
+    // stays generic.
+    handle(new Error("connection string is postgres://user:pass@host"), { logger, exposeDebugInfo: true });
 
-    res.json.mockClear();
-    delete process.env.NODE_ENV;
-    handle(new Error("boom"), { logger, exposeDebugInfo: false });
-    expect(body().stack).toBeUndefined();
+    expect(body().message).toBe("Internal server error");
   });
 
-  it("still publishes the message of an operational 4xx in production", () => {
+  it("still publishes the message of an operational 4xx", () => {
     // Hiding those would be hiding the answer: a 404 or a 409 is information the
     // caller asked for and can act on.
-    process.env.NODE_ENV = "production";
-
     handle(new AppError("No user found with that id", 404));
 
     expect(body().message).toBe("No user found with that id");
+  });
+
+  it("keeps the stack in the log of an unexpected failure when the response has none", () => {
+    // The request id in the response is what leads from what the client saw to
+    // this line.
+    const crash = new Error("boom");
+
+    handle(crash);
+
+    expect(body().stack).toBeUndefined();
+    expect(logger.error).toHaveBeenCalledWith(
+      "Request failed",
+      expect.objectContaining({ stack: crash.stack })
+    );
   });
 
   // ===============================================================  logging ===
@@ -289,7 +317,7 @@ describe("errorHandler", () => {
   it("leaves the response body of a rejection as it was", () => {
     // Only the log got lighter: what the client sees is still governed by
     // `exposeDebugInfo`.
-    handle(new AppError("nope", 404));
+    handle(new AppError("nope", 404), { logger, exposeDebugInfo: true });
 
     expect(Array.isArray(body().stack)).toBe(true);
   });

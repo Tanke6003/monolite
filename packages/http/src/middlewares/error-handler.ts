@@ -20,8 +20,11 @@ export interface ErrorHandlerOptions {
   context?: IRequestContext;
   /**
    * Whether the stack trace and the cause chain travel in the response body.
-   * Defaults to "everywhere except production": they are the most useful
-   * information for debugging and the most dangerous to publish.
+   * Defaults to `false`: they are the most useful information for debugging
+   * and the most dangerous to publish, so they are shown only to whoever asked
+   * for them. `createApp` sets it from `EXPOSE_ERROR_DETAILS`
+   * (`resolveExposeErrorDetails`). The log is not affected by it, and the
+   * `requestId` in the response is what leads to its line.
    */
   exposeDebugInfo?: boolean;
 }
@@ -51,15 +54,14 @@ function describeCauses(error: unknown): string[] {
  *  2. Record it with all the context — request id, user, route, causes — so
  *     what happened can be reconstructed. The stack is recorded only for an
  *     unexpected failure; a rejection is logged without it.
- *  3. Leak no internal detail: in production an unexpected 5xx answers with a
- *     generic message, and the stack never reaches the client.
+ *  3. Leak no internal detail: an unexpected 5xx answers with a generic
+ *     message, and the stack reaches the client only when `exposeDebugInfo`
+ *     asks for it.
  */
 export function errorHandler(options: ErrorHandlerOptions = {}): ErrorRequestHandler {
-  const { logger, context } = options;
+  const { logger, context, exposeDebugInfo = false } = options;
 
   return (err: Error, req: Request, res: Response, _next: NextFunction): void => {
-    const exposeDebugInfo = options.exposeDebugInfo ?? process.env.NODE_ENV !== "production";
-
     const normalized = normalizeError(err);
     const requestId = resolveRequestId(req, context);
     const user = context?.getCurrentUser() ?? null;

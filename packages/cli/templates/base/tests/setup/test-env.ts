@@ -31,6 +31,12 @@ process.env.API_PREFIX = "__apiPrefix__";
 process.env.DOCS_ENABLED = "true";
 
 /**
+ * As `env.example` sets it: a failing request in a test answers with the stack
+ * that says where it failed.
+ */
+process.env.EXPOSE_ERROR_DETAILS = "true";
+
+/**
  * No quota. The limiter counts per address and every request here arrives from
  * the same one, so leaving it on would make a long suite fail at whichever test
  * happened to be the hundred-and-twenty-first.

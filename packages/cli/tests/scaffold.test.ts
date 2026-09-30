@@ -815,6 +815,18 @@ describe("the projects `monolite new` writes", () => {
         expect(response.headers.get("content-type")).toMatch(/application\/json/);
       });
 
+      /**
+       * Served here with no `EXPOSE_ERROR_DETAILS` at all — the deployment that
+       * never copied `env.example` — so a request anyone can make must not
+       * answer with the server's paths.
+       */
+      it("keeps the stack out of the response when nothing asks for it", async () => {
+        const body = (await (await fetch(`${base}/api/v1/nothing-here`)).json()) as Record<string, unknown>;
+
+        expect(body.stack).toBeUndefined();
+        expect(body.causes).toBeUndefined();
+      });
+
       it("publishes a document generated from the same decorators", async () => {
         const document = (await (await fetch(`${base}/openapi.json`)).json()) as {
           paths: Record<string, unknown>;

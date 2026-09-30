@@ -15,6 +15,7 @@ import {
   notFoundHandler,
   requestContext,
   resolveBodyLimit,
+  resolveExposeErrorDetails,
   resolveTrustProxy,
 } from "monolite-http";
 import { container, TOKENS } from "./composition/container";
@@ -135,11 +136,14 @@ export class Server {
     //
     // The logger and the context are what make a failure traceable: the log
     // line carries the same request id the client was given, and the user it
-    // happened to.
+    // happened to. The stack only travels in the response when
+    // `EXPOSE_ERROR_DETAILS=true` asks for it — `env.example` does, a
+    // deployment where it was never set does not.
     this.app.use(
       errorHandler({
         logger: container.resolve<ILogger>(TOKENS.ILogger),
         context: container.resolve<IRequestContext>(TOKENS.IRequestContext),
+        exposeDebugInfo: resolveExposeErrorDetails(envs),
       })
     );
   }

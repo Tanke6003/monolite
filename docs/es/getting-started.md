@@ -145,7 +145,7 @@ importan:
 
 | Variable | Por defecto | Notas |
 | --- | --- | --- |
-| `NODE_ENV` | `development` | `production` oculta los stack traces y apaga el log de SQL |
+| `NODE_ENV` | `development` | `production` apaga el log de SQL y, por defecto, la documentación |
 | `PORT` | `3000` | |
 | `API_PREFIX` | `/api/v1` | Dónde se montan los controladores |
 | `API_LEGACY_PREFIX` | — | Un segundo punto de montaje durante una migración de versión; `off` lo desactiva |
@@ -158,6 +158,7 @@ importan:
 | `TRUST_PROXY` | `0` | Un **número** de saltos. `true` hace que cualquier cliente pueda falsear su IP |
 | `BODY_LIMIT` | `1mb` | |
 | `DOCS_ENABLED` | encendido fuera de producción | |
+| `EXPOSE_ERROR_DETAILS` | `false` | Si una respuesta de error incluye el stack y las causas. Los proyectos generados lo ponen en `true` en `env.example`; ponlo en `false` en cualquier entorno compartido |
 | `SHUTDOWN_DELAY_MS` | `5000` | Cuánto tiempo la disponibilidad sigue en falso antes de dejar de aceptar |
 | `SHUTDOWN_TIMEOUT_MS` | `15000` | Perro guardián; el proceso sale aunque una conexión no drene |
 

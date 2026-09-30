@@ -101,6 +101,7 @@ export {
   docsCspDirectives,
   resolveAllowedOrigins,
   resolveBodyLimit,
+  resolveExposeErrorDetails,
   resolveTrustProxy,
 } from "./config/security.config.js";
 export type { DocsReader } from "./config/security.config.js";
