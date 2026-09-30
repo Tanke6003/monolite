@@ -49,7 +49,8 @@ function describeCauses(error: unknown): string[] {
  * Three responsibilities:
  *  1. Translate the error into a coherent HTTP response (`normalizeError`).
  *  2. Record it with all the context — request id, user, route, causes — so
- *     what happened can be reconstructed.
+ *     what happened can be reconstructed. The stack is recorded only for an
+ *     unexpected failure; a rejection is logged without it.
  *  3. Leak no internal detail: in production an unexpected 5xx answers with a
  *     generic message, and the stack never reaches the client.
  */
@@ -63,6 +64,13 @@ export function errorHandler(options: ErrorHandlerOptions = {}): ErrorRequestHan
     const requestId = resolveRequestId(req, context);
     const user = context?.getCurrentUser() ?? null;
 
+    // Only a failure nobody meant carries its stack into the log. A 4xx is an
+    // AppError created on purpose — by the 404, a validation, a BLL — and its
+    // stack points into the router, saying nothing `code`, `path` and
+    // `requestId` do not. The causes stay on every line: they are short, and
+    // on a 409 the driver error behind it is what names the constraint.
+    const unexpected = normalized.statusCode >= 500 || !normalized.isOperational;
+
     const logPayload = {
       requestId,
       method: req.method,
@@ -73,11 +81,11 @@ export function errorHandler(options: ErrorHandlerOptions = {}): ErrorRequestHan
       userName: user?.name ?? null,
       error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
       causes: describeCauses(err),
-      stack: err instanceof Error ? err.stack : undefined,
+      ...(unexpected ? { stack: err instanceof Error ? err.stack : undefined } : {}),
     };
 
     // A 4xx is part of normal operation: it is recorded, but not as an alarm.
-    if (normalized.statusCode >= 500 || !normalized.isOperational) {
+    if (unexpected) {
       logger?.error("Request failed", logPayload);
     } else {
       logger?.warn("Request rejected", logPayload);

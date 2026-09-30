@@ -7,7 +7,7 @@
  */
 import { ZodError, z } from "zod";
 import { AppError, AsyncRequestContext, type ILogger } from "monolite-core";
-import { REQUEST_ID_HEADER, errorHandler, notFoundHandler } from "monolite-http";
+import { REQUEST_ID_HEADER, errorHandler, notFoundHandler, validateBody } from "monolite-http";
 import type { NextFunction, Request, Response } from "express";
 
 type Logger = ILogger & {
@@ -224,6 +224,74 @@ describe("errorHandler", () => {
         causes: ["Error: underneath"],
       })
     );
+  });
+
+  // A rejection is an AppError someone created on purpose; its stack points
+  // into the router and says nothing the code and the path do not. Only a
+  // failure nobody meant carries it into the log.
+  it("logs a 404 from notFoundHandler without its stack", () => {
+    notFoundHandler(req as Request, res as Response, next as NextFunction);
+
+    handle(next.mock.calls[0][0]);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Request rejected",
+      expect.objectContaining({ statusCode: 404, code: "ROUTE_NOT_FOUND" })
+    );
+    expect(logger.warn.mock.calls[0][1]).not.toHaveProperty("stack");
+  });
+
+  it("logs a 400 from validateBody without its stack", () => {
+    req.body = {};
+    validateBody(z.object({ name: z.string() }))(req as Request, res as Response, next as NextFunction);
+
+    handle(next.mock.calls[0][0]);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Request rejected",
+      expect.objectContaining({ statusCode: 400, code: "VALIDATION_ERROR" })
+    );
+    expect(logger.warn.mock.calls[0][1]).not.toHaveProperty("stack");
+  });
+
+  it("keeps the causes of an operational 4xx, which name what was violated", () => {
+    const driver = new Error("ORA-00001: unique constraint (APPUSER.PK_USERS) violated");
+
+    handle(new Error("UsersRepository.insert failed.", { cause: driver }));
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Request rejected",
+      expect.objectContaining({
+        statusCode: 409,
+        causes: ["Error: ORA-00001: unique constraint (APPUSER.PK_USERS) violated"],
+      })
+    );
+    expect(logger.warn.mock.calls[0][1]).not.toHaveProperty("stack");
+  });
+
+  it("logs an unexpected failure with its stack", () => {
+    const crash = new Error("Unexpected crash");
+
+    handle(crash);
+
+    expect(logger.error).toHaveBeenCalledWith(
+      "Request failed",
+      expect.objectContaining({ stack: crash.stack })
+    );
+  });
+
+  it("logs a non-operational 4xx with its stack", () => {
+    handle(new AppError("broken", 400, false));
+
+    expect(logger.error.mock.calls[0][1].stack).toEqual(expect.any(String));
+  });
+
+  it("leaves the response body of a rejection as it was", () => {
+    // Only the log got lighter: what the client sees is still governed by
+    // `exposeDebugInfo`.
+    handle(new AppError("nope", 404));
+
+    expect(Array.isArray(body().stack)).toBe(true);
   });
 
   it("answers even with no logger wired at all", () => {

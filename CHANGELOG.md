@@ -143,6 +143,18 @@ a minor release. Pin exact versions.
   module that wants auto-commit back (a hot insert path, MongoDB without a
   replica set) overrides `tx()` to `return fn()`.
 
+- **`errorHandler` logs a rejected request without its stack trace** (#49).
+  The stack of a 4xx is the stack of an `AppError` that `notFoundHandler`,
+  `validateBody` or a BLL created on purpose: it points into the router and
+  says nothing `code`, `path` and `requestId` do not. One client polling a
+  deleted list wrote the same ten frames on every poll, and a CORS rejection
+  was logged twice — once usefully by the CORS policy, once more with a stack.
+  The stack now goes into the log only for a failure nobody meant: a 5xx, or
+  anything `normalizeError` marks as not operational. The level is unchanged (a
+  burst of 401s is still a `warn` worth seeing), `causes` stay on every line —
+  on a `409 DB_UNIQUE_VIOLATION` the driver error is what names the constraint —
+  and the response body, governed by `exposeDebugInfo`, is untouched.
+
 ### Fixed
 
 - **An empty `CORS_ORIGINS` refused the API's own origin, so the docs reader
