@@ -98,10 +98,7 @@ export class UsersController extends BaseController {
     responses: { 200: { description: "The user", ref: "User" }, 404: "Not found" },
   })
   getOne = async (req: Request, res: Response) => {
-    // Express 5 allows a path parameter to repeat, so its declared type is
-    // `string | string[]`; a repeated `:id` is not an id.
-    const raw = typeof req.params.id === "string" ? req.params.id : undefined;
-    res.json(await this.users.getOne(parseId(raw, "user")));
+    res.json(await this.users.getOne(parseId(req.params.id, "user")));
   };
 
   @Post("/", {
@@ -284,7 +281,7 @@ fails if a new export arrives without a row here.
 | --- | --- |
 | `ApiController`, `Get`, `Post`, `Put`, `Patch`, `Delete` | The decorators. One declaration produces the route, its validation and its slice of the OpenAPI document, so the three cannot disagree. |
 | `RouteOptions`, `ResponseSpec`, `RouteMetadata`, `ControllerMetadata`, `HttpMethod`, `PathParamType` | What a decorator accepts and what it records. |
-| `BaseController`, `parseId` | The little a hand-written controller shares: the id in the path, parsed and refused if it is not one. |
+| `BaseController`, `parseId` | The little a hand-written controller shares: the id in the path, parsed and refused if it is not one. `parseId` takes `req.params.id` as Express 5 types it; a repeated parameter is refused like any other bad id. |
 | `registerControllers`, `registeredControllers`, `getControllerMetadata`, `ControllerType`, `ControllerRegistration` | The registry the router is built from. Exported because a project that mounts its own router needs the same list. |
 | `controllersFromRegistry` | Every registered controller paired with its instance, resolved through the function you pass — usually a container's `resolve`. What `createApp`'s `controllers` option takes. |
 | `registerController` | Mounts one controller's routes on a router you own, with the guard applied to every route not marked public. |

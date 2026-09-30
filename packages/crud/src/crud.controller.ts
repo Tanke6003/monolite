@@ -52,18 +52,6 @@ interface PagedQuery {
 type CrudRequest = Request & { validatedQuery?: unknown };
 
 /**
- * The `:id` of the path, as `parseId` wants it.
- *
- * Express 5 allows a path parameter to repeat, so its declared type is
- * `string | string[]`. A repeated `:id` is not an id, and turning it into
- * `undefined` here hands it the same 400 that `/users/abc` gets, from the same
- * place — rather than silently querying for `"1,2"`.
- */
-function idParam(value: string | string[] | undefined): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-/**
  * The five handlers of a CRUD over HTTP, written once.
  *
  * This is where everything each controller used to repeat verbatim lives: the
@@ -121,7 +109,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
 
   public getOne: CrudHandler = async (req, res, next) => {
     try {
-      const found = await this.service.get(parseId(idParam(req.params.id), this.resource));
+      const found = await this.service.get(parseId(req.params.id, this.resource));
       if (!found) throw this.notFound();
 
       res.json(found);
@@ -143,7 +131,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
 
   public update: CrudHandler = async (req, res, next) => {
     try {
-      const id = parseId(idParam(req.params.id), this.resource);
+      const id = parseId(req.params.id, this.resource);
       const updated = await this.service.update(id, req.body);
       if (!updated) throw this.notFound();
 
@@ -155,7 +143,7 @@ export abstract class CrudController extends BaseController implements ICrudCont
 
   public softDelete: CrudHandler = async (req, res, next) => {
     try {
-      const deleted = await this.service.softDelete(parseId(idParam(req.params.id), this.resource));
+      const deleted = await this.service.softDelete(parseId(req.params.id, this.resource));
       if (!deleted) throw this.notFound();
 
       res.status(204).send();
