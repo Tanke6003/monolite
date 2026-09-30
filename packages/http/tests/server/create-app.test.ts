@@ -12,7 +12,7 @@
  * graceful shutdown — asked of the new shape.
  */
 import path from "node:path";
-import type { Request, RequestHandler, Response } from "express";
+import type { Application, Request, RequestHandler, Response } from "express";
 import { z } from "zod";
 import {
   AppError,
@@ -646,6 +646,68 @@ describe("error handling", () => {
       "Request rejected",
       expect.objectContaining({ requestId: res.body.requestId, code: "APPOINTMENT_OVERLAP" })
     );
+  });
+});
+
+describe("error details in the response", () => {
+  /** A route that fails the way nobody meant, with a driver error underneath. */
+  const crash = (app: Application): void => {
+    app.get("/crash", () => {
+      throw new Error("insert failed", { cause: new Error("connection refused at /srv/db") });
+    });
+  };
+
+  let saved: string | undefined;
+
+  beforeEach(() => {
+    // Set on the process on purpose: the value has to come from the
+    // `EnvSource` createApp was given, and an application that loads its
+    // configuration some other way could neither see nor change this one.
+    saved = process.env.EXPOSE_ERROR_DETAILS;
+    process.env.EXPOSE_ERROR_DETAILS = "true";
+  });
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.EXPOSE_ERROR_DETAILS;
+    else process.env.EXPOSE_ERROR_DETAILS = saved;
+  });
+
+  it("keeps the stack and the causes out when nothing asks for them", async () => {
+    const app = await start({ envs: envsOf(), beforeRoutes: crash });
+
+    try {
+      const rejected = await app.client.get("/api/v1/users/boom", { headers: authed });
+      const failed = await app.client.get("/crash");
+
+      for (const res of [rejected, failed]) {
+        expect(res.body.stack).toBeUndefined();
+        expect(res.body.causes).toBeUndefined();
+      }
+
+      // The log line for the same request still carries it, and the request id
+      // in the response is what leads there.
+      expect(app.logger.error).toHaveBeenCalledWith(
+        "Request failed",
+        expect.objectContaining({ requestId: failed.body.requestId, stack: expect.any(String) })
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("brings them back when EXPOSE_ERROR_DETAILS=true arrives through its EnvSource", async () => {
+    const app = await start({ envs: envsOf({ EXPOSE_ERROR_DETAILS: "true" }), beforeRoutes: crash });
+
+    try {
+      const rejected = await app.client.get("/api/v1/users/boom", { headers: authed });
+      const failed = await app.client.get("/crash");
+
+      expect(rejected.body.stack).toEqual(expect.any(Array));
+      expect(failed.body.stack).toEqual(expect.any(Array));
+      expect(failed.body.causes).toEqual(["Error: connection refused at /srv/db"]);
+    } finally {
+      await app.close();
+    }
   });
 });
 

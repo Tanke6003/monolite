@@ -144,7 +144,7 @@ Generated projects read configuration from the environment. The names that matte
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `NODE_ENV` | `development` | `production` hides stack traces and disables SQL logging |
+| `NODE_ENV` | `development` | `production` disables SQL logging and the docs by default |
 | `PORT` | `3000` | |
 | `API_PREFIX` | `/api/v1` | Where controllers mount |
 | `API_LEGACY_PREFIX` | — | A second mount point during a version migration; `off` disables |
@@ -157,6 +157,7 @@ Generated projects read configuration from the environment. The names that matte
 | `TRUST_PROXY` | `0` | A **number** of hops. `true` makes every client able to spoof its own IP |
 | `BODY_LIMIT` | `1mb` | |
 | `DOCS_ENABLED` | on outside production | |
+| `EXPOSE_ERROR_DETAILS` | `false` | Whether an error response carries the stack and the causes. Generated projects set it to `true` in `env.example`; set it to `false` in any shared environment |
 | `SHUTDOWN_DELAY_MS` | `5000` | How long readiness stays false before the server stops accepting |
 | `SHUTDOWN_TIMEOUT_MS` | `15000` | Watchdog; the process exits even if a connection will not drain |
 

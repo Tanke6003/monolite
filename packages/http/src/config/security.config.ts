@@ -1,6 +1,7 @@
 // Hardening of the HTTP layer, in one place and driven by environment
 // variables: headers (helmet), request throttling, CORS by allow-list, maximum
-// body size and whether the documentation is published.
+// body size, whether the documentation is published and whether an error
+// response carries its stack.
 //
 // It lives here and not in the server because these are configuration
 // decisions, not wiring: the server only mounts what this module decides, and a
@@ -379,4 +380,21 @@ export function buildHelmetOptions(
  */
 export function areDocsEnabled(envs: EnvSource): boolean {
   return readFlag(envs, "DOCS_ENABLED") ?? !isProduction(envs);
+}
+
+// ----------------------------------------------------------------- errors ----
+
+/**
+ * Whether an error response carries the stack trace and the chain of causes.
+ * Off unless `EXPOSE_ERROR_DETAILS=true` asks for it.
+ *
+ * Deliberately not keyed on `NODE_ENV`: that variable changes how Express and
+ * half the ecosystem behave, nobody sets it thinking about response bodies, and
+ * a container where it was never set would publish server paths and driver
+ * errors to anyone able to make a request fail. As with routes, which are
+ * closed unless they say `public: true`, the oversight here is the one that
+ * closes.
+ */
+export function resolveExposeErrorDetails(envs: EnvSource): boolean {
+  return readFlag(envs, "EXPOSE_ERROR_DETAILS") ?? false;
 }

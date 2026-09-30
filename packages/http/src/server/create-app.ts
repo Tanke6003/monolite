@@ -13,6 +13,7 @@ import {
   buildHelmetOptions,
   buildRateLimiter,
   resolveBodyLimit,
+  resolveExposeErrorDetails,
   resolveTrustProxy,
 } from "../config/security.config.js";
 import { errorHandler, notFoundHandler } from "../middlewares/error-handler.js";
@@ -174,7 +175,7 @@ export async function createApp(options: CreateAppOptions): Promise<HttpApp> {
   // documentation: an error handler registered before a route does not cover
   // that route, and the 404 would swallow everything mounted after it.
   app.use(notFoundHandler);
-  app.use(errorHandler({ logger, context }));
+  app.use(errorHandler({ logger, context, exposeDebugInfo: resolveExposeErrorDetails(envs) }));
 
   /**
    * The HTTP server, so it can be closed. Without keeping it, an orderly

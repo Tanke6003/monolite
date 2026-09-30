@@ -322,6 +322,7 @@ fails if a new export arrives without a row here.
 | `buildRateLimiter`, `buildAuthRateLimiter` | Per-IP, with the health checks exempt and the login endpoint on a tighter budget than the rest. |
 | `resolveApiPrefix`, `resolveLegacyPrefix`, `DEFAULT_API_PREFIX`, `DEFAULT_LEGACY_PREFIX` | Where the API is mounted, and the older prefix kept alive beside it. |
 | `resolveBodyLimit`, `resolveTrustProxy` | The two that are wrong by default in every framework: an unbounded body and a blindly trusted `X-Forwarded-For`. |
+| `resolveExposeErrorDetails` | Whether an error response carries its stack and causes: only when `EXPOSE_ERROR_DETAILS=true`. `createApp` passes it to `errorHandler`. |
 | `EnvSource`, `processEnv` | Where all of the above is read from. |
 
 ## Configuration
@@ -341,6 +342,7 @@ built-in adapter over `process.env`.
 | `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX` | `900000` / `10` | Limiter for credential-issuing routes, far narrower: a token is the only thing that opens the rest of the API. |
 | `CSP_ENABLED` | `false` | Content-Security-Policy. It ships off because helmet's default policy breaks Swagger UI and Scalar at once, and a freshly cloned project with blank screens is the surest way to get the policy disabled wholesale instead of tuned. Helmet's other dozen headers always apply. |
 | `DOCS_ENABLED` | on outside production | Whether the documentation is published. The document describes the whole surface of the API, validation rules included. |
+| `EXPOSE_ERROR_DETAILS` | `false` | Whether an error response carries the stack trace and the chain of causes. Off unless asked for, and not tied to `NODE_ENV`: a deployment where nobody set either variable must not hand server paths and driver errors to whoever can make a request fail. The log is not affected by it, and the response's `requestId` leads to its line. |
 
 ## License
 

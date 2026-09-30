@@ -55,6 +55,14 @@ describe("health and the shape of a failure", () => {
     });
   });
 
+  it("says where a failure came from, as `EXPOSE_ERROR_DETAILS` asks", async () => {
+    // Set by `tests/setup/test-env.ts`, as `env.example` sets it. Unset, the
+    // stack stays in the log and out of the response.
+    const response = await http.get(`${API}/nothing-here`).expect(404);
+
+    expect(response.body.stack).toEqual(expect.any(Array));
+  });
+
   it("gives every request an id, whether or not it went well", async () => {
     const response = await http.get("/health/live").expect(200);
 

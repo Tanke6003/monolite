@@ -143,6 +143,29 @@ a minor release. Pin exact versions.
   module that wants auto-commit back (a hot insert path, MongoDB without a
   replica set) overrides `tx()` to `return fn()`.
 
+- **An error response carries its stack only when `EXPOSE_ERROR_DETAILS=true`
+  asks for it** (#48). `errorHandler` used to put `stack` and `causes` in the
+  body whenever `NODE_ENV` was not exactly `production`, so a container where
+  nobody set it — or a deployment that copied the scaffold's `env.example`,
+  which says `development` — answered anyone able to make a request fail with
+  the server's paths, the layout of `node_modules` and the driver errors
+  underneath. An unknown route was enough. It was also the one setting the
+  package read from `process.env` instead of through `EnvSource`.
+
+  `exposeDebugInfo` now defaults to `false`, and `createApp` sets it from
+  `EXPOSE_ERROR_DETAILS` read through its `EnvSource`, with the new
+  `resolveExposeErrorDetails`. Generated projects do the same, and their
+  `env.example` sets it to `true`, so a new project behaves as before: what
+  changed is what a *missing* variable means. The log is not affected, and the
+  response's `requestId` still leads to its line.
+
+  **This is a breaking change** for whoever relied on the stack reaching the
+  client outside production: set `EXPOSE_ERROR_DETAILS=true` where you want it,
+  or pass `exposeDebugInfo: true` to `errorHandler`. An existing project's
+  `server.ts` keeps calling `errorHandler` without the option, so it gets the
+  new default; add `exposeDebugInfo: resolveExposeErrorDetails(envs)` to follow
+  the variable.
+
 - **`errorHandler` logs a rejected request without its stack trace** (#49).
   The stack of a 4xx is the stack of an `AppError` that `notFoundHandler`,
   `validateBody` or a BLL created on purpose: it points into the router and
