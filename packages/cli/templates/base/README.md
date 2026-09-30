@@ -157,6 +157,7 @@ matter, with the defaults this project was generated with:
 | `RATE_LIMIT_MAX` | `120` | Requests per window. `0` disables the limiter |
 | `CSP_ENABLED` | `false` | Content-Security-Policy. Off so the docs page renders |
 | `DOCS_ENABLED` | unset | Empty = on everywhere except production |
+| `EXPOSE_ERROR_DETAILS` | `true` | Stack and causes in error responses. Unset = off; set it to `false` in any shared environment |
 | `LOG_LEVEL` | `debug` | `trace` to `error` |
 | `SHUTDOWN_DELAY_MS` | `0` | Gap before the socket closes, for rolling deploys |
 <!-- #if auth -->

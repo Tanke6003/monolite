@@ -168,8 +168,10 @@ Todo fallo, de cualquier capa, sale por la misma puerta y produce el mismo sobre
 
 - `code` es estable y está pensado para que el cliente ramifique sobre él;
   `message` es para personas y puede reescribirse en cualquier momento.
-- `stack` y `causes` se añaden **sólo fuera de producción**: son lo más útil para
-  depurar y lo más peligroso de publicar.
+- `stack` y `causes` se añaden **sólo cuando `EXPOSE_ERROR_DETAILS=true` los
+  pide**: son lo más útil para depurar y lo más peligroso de publicar. `NODE_ENV`
+  no interviene: un despliegue donde nadie definió ninguna de las dos variables
+  no publica nada. Los proyectos generados lo encienden en `env.example`.
 - Un 5xx marcado como no operacional siempre responde `"Internal server error"`,
   esté donde esté. Ocultar el detalle de un fallo que el código no anticipó es la
   regla, no una cortesía de producción. Un error operacional conserva su mensaje
