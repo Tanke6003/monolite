@@ -169,8 +169,10 @@ envelope:
 
 - `code` is stable and meant to be branched on; `message` is for humans and may be
   rewritten at any time.
-- `stack` and `causes` are added **only outside production** — the most useful
-  thing for debugging and the most dangerous to publish.
+- `stack` and `causes` are added **only when `EXPOSE_ERROR_DETAILS=true` asks
+  for them** — the most useful thing for debugging and the most dangerous to
+  publish. `NODE_ENV` plays no part: a deployment where nobody set either
+  variable publishes nothing. Generated projects turn it on in `env.example`.
 - A 5xx flagged non-operational always answers `"Internal server error"`
   regardless of environment. Hiding the detail of an unanticipated failure is the
   rule, not a production courtesy. An operational error keeps its message even at
