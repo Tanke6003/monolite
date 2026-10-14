@@ -465,6 +465,43 @@ describe("health", () => {
     }
   });
 
+  it("says which layer is down when the application has more than one", async () => {
+    const app = await start({
+      healthProbe: probeOf({
+        ready: false,
+        dataSource: "postgres,mongodb",
+        database: "down",
+        shuttingDown: false,
+        layers: {
+          records: { dataSource: "postgres", database: "up" },
+          documents: { dataSource: "mongodb", database: "down" },
+        },
+      }),
+    });
+
+    try {
+      const res = await app.client.get("/health/ready");
+
+      expect(res.status).toBe(503);
+      expect(res.body.layers).toEqual({
+        records: { dataSource: "postgres", database: "up" },
+        documents: { dataSource: "mongodb", database: "down" },
+      });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("adds no layers field for an application with one engine", async () => {
+    const app = await start({ healthProbe: probeOf(healthy) });
+
+    try {
+      expect((await app.client.get("/health")).body).not.toHaveProperty("layers");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("answers 503 while draining, and /health is the same check", async () => {
     const app = await start({
       healthProbe: probeOf({ ...healthy, ready: false, shuttingDown: true }),

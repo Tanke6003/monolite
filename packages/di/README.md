@@ -35,6 +35,7 @@ container right after.
 | `TOKENS` | The framework-level identifiers: `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext`, `IHealthProbe`, `ITokenBLL`, `IFileStorage`, `IDbPlugin`, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore`. |
 | `Token`, `TokenName` | The value and the key types of the table. |
 | `storeToken` | The token an entity's generic repository is registered under (`USERS` → `USERSStore`). |
+| `unitOfWorkToken`, `transactionContextToken`, `auditTrailToken`, `auditLogStoreToken`, `healthProbeToken`, `layerToken`, `LayerTokenName` | The layer-wide tokens of a named persistence layer (`IUnitOfWork:records`). With no name, the plain token in `TOKENS`. |
 
 tsyringe resolves by string, so a typo in an `@inject("ILoger")` compiles and
 blows up at run time, with the process already up. Going through `TOKENS` means
@@ -78,7 +79,7 @@ dependency.
 | Export | What it registers |
 | --- | --- |
 | `registerPlugins` | `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext` and, if given, `ITokenBLL` and `IFileStorage`. |
-| `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Each store is wrapped so it joins whatever transaction is open, which is what makes `@Transactional()` true of the repositories a module injects. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. |
+| `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Each store is wrapped so it joins whatever transaction is open, which is what makes `@Transactional()` true of the repositories a module injects. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. With a `name`, one layer of several engines; see below. |
 | `registerModules` | Every feature module's own bindings, from the one list in `composition/modules.ts`. Order does not matter: tsyringe resolves when somebody asks, not when something is registered. |
 
 ### Modules
@@ -203,6 +204,29 @@ optional: there is nothing to open and nothing to close.
 Connection settings can also be passed explicitly (`oracle`, `sequelize`,
 `mongo`), which is what an application configured from something other than
 environment variables does.
+
+## More than one engine
+
+Call `registerPersistence` once per engine, each with a `name`:
+
+```ts
+import { createContainer, registerPersistence, unitOfWorkToken } from "monolite-di";
+
+const container = createContainer();
+
+registerPersistence({ container, name: "records", dataSource: "postgres", entities: sql, logger, envs });
+registerPersistence({ container, name: "documents", dataSource: "mongodb", entities: docs, logger, envs });
+
+const recordsWork = container.resolve(unitOfWorkToken("records"));
+```
+
+Stores keep their tokens. The unit of work, change log, transaction context and
+health probe of each layer go under its name, and `TOKENS.IHealthProbe` reports
+all the layers. Each named layer gets its own transaction context, and
+`@Transactional("records")` opens a transaction on that layer only: **a
+transaction never spans layers**. Neither does a relation; one into another
+layer's table fails at start-up. See
+[Data access](../../docs/en/data-access.md#more-than-one-engine).
 
 ## Logging backends
 

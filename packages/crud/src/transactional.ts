@@ -5,6 +5,7 @@
 // body of the method. What makes it worth having is the ambient transaction:
 // without it the block received its scope as a parameter and there was no way
 // to take it out of the signature.
+import { transactionSeamOf } from "monolite-data";
 import type { ITransactionContext, IUnitOfWork, TransactionSeam } from "monolite-data";
 
 /**
@@ -74,17 +75,35 @@ export function adoptTransactionSeam(service: object, seam: TransactionSeam | un
  * base class adopted for it. Never half of each: a unit of work from one place
  * and a context from another is precisely the pair that fails to see its own
  * transaction and opens a second one.
+ *
+ * With a `layer`, the seam of that persistence layer instead (#43), wherever
+ * the service keeps it: a store or a unit of work of the layer among its own
+ * members — `registerPersistence` makes both carry their seam — or the one its
+ * base class adopted. A pair that belongs to another layer does not count,
+ * because that is the transaction the method did not ask for.
  */
-function hostOf(service: object | undefined): Partial<TransactionalHost> | undefined {
+function hostOf(service: object | undefined, layer?: string): Partial<TransactionalHost> | undefined {
+  if (layer !== undefined) return service ? seamOfLayer(service, layer) : undefined;
+
   const own = service as Partial<TransactionalHost> | undefined;
 
   if (missingMembersOf(own).length === 0 || !service) return own;
   return adopted.get(service) ?? own;
 }
 
+function seamOfLayer(service: object, layer: string): TransactionSeam | undefined {
+  for (const value of Object.values(service)) {
+    const seam = transactionSeamOf(value);
+    if (seam?.layer === layer) return seam;
+  }
+
+  const seam = adopted.get(service);
+  return seam?.layer === layer ? seam : undefined;
+}
+
 /** Whether `service` has everything it needs to open a transaction. */
-export function canOpenTransaction(service: object): boolean {
-  return missingMembersOf(hostOf(service)).length === 0;
+export function canOpenTransaction(service: object, layer?: string): boolean {
+  return missingMembersOf(hostOf(service, layer)).length === 0;
 }
 
 /**
@@ -94,14 +113,27 @@ export function canOpenTransaction(service: object): boolean {
  * reported.
  *
  * `caller` opens the error message: it names the method a developer would go
- * and look at.
+ * and look at. `layer` names the persistence layer to open it on, when the
+ * application has more than one.
  */
 export function runInTransaction<R>(
   service: object,
   caller: string,
-  work: () => Promise<R>
+  work: () => Promise<R>,
+  layer?: string
 ): Promise<R> {
-  const host = hostOf(service);
+  const host = hostOf(service, layer);
+
+  if (layer !== undefined && !host) {
+    return Promise.reject(
+      new Error(
+        `[Transactional] ${caller} for layer "${layer}", but ${service.constructor.name} ` +
+          `holds nothing of that layer. Keep one of its stores, or the unit of work injected ` +
+          `under unitOfWorkToken("${layer}"), as a member of the class.`
+      )
+    );
+  }
+
   const missing = missingMembersOf(host);
 
   if (missing.length > 0 || !host?.unitOfWork || !host.transactions) {
@@ -144,7 +176,9 @@ export function runInTransaction<R>(
  * The first argument is the transaction context, or the service itself: a
  * `CrudBLL` subclass that took its seam from its store (#33) has no
  * `transactions` member to pass, and `lockRow(this, ...)` finds the context
- * the same way `@Transactional()` found it.
+ * the same way `@Transactional()` found it. With more than one persistence
+ * layer, pass a store of the layer the row lives in — `lockRow(this.orders,
+ * ...)` — and it locks in that layer's transaction.
  */
 export function lockRow(
   from: ITransactionContext | object,
@@ -154,7 +188,7 @@ export function lockRow(
   const transactions =
     typeof (from as Partial<ITransactionContext>).current === "function"
       ? (from as ITransactionContext)
-      : hostOf(from)?.transactions;
+      : (transactionSeamOf(from)?.transactions ?? hostOf(from)?.transactions);
   const scope = transactions?.current();
 
   if (!scope) {
@@ -199,8 +233,15 @@ export abstract class TransactionalBLL {
  * what it just read, and would otherwise hold a write transaction open across
  * that read. There the explicit `unitOfWork.execute(...)` remains the right
  * shape.
+ *
+ * With more than one persistence layer, `@Transactional("records")` names the
+ * one to open the transaction on. **A transaction never spans layers**: a
+ * write made through another layer's store in the same method goes out on its
+ * own and stays, whatever happens to this transaction. Two engines cannot share
+ * a commit, and nothing here pretends they can. Unqualified, it opens on the
+ * service's own seam — the only layer of an application that has one.
  */
-export function Transactional() {
+export function Transactional(layer?: string) {
   return function (
     _target: object,
     propertyKey: string,
@@ -209,8 +250,11 @@ export function Transactional() {
     const original = descriptor.value as (...args: unknown[]) => Promise<unknown>;
 
     descriptor.value = function (this: object, ...args: unknown[]): Promise<unknown> {
-      return runInTransaction(this, `${propertyKey} is decorated`, () =>
-        original.apply(this, args)
+      return runInTransaction(
+        this,
+        `${propertyKey} is decorated`,
+        () => original.apply(this, args),
+        layer
       );
     };
 

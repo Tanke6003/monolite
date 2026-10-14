@@ -42,7 +42,7 @@ kernel maps them without depending on Zod.
 | --- | --- |
 | `ILogger` | The logging backend. Levels only — request-logging middleware belongs to the HTTP package. |
 | `CurrentUser`, `RequestContextData`, `IRequestContext` | The ambient request context. `CurrentUser` carries `id`, `name`, `email` and `roles`; the auth package fills `roles` in while decoding the token. |
-| `HealthReport`, `IHealthProbe` | Liveness and readiness, kept apart on purpose: a process whose database is down is alive but not ready. |
+| `HealthReport`, `IHealthProbe`, `LayerHealth` | Liveness and readiness, kept apart on purpose: a process whose database is down is alive but not ready. |
 | `IConnectionCheck` | The one method the health probe needs from a connection: `authenticate()`. |
 | `HealthProbeOptions` | Configuration for `HealthProbe`. |
 
@@ -53,6 +53,7 @@ kernel maps them without depending on Zod.
 | `AsyncRequestContext` | `IRequestContext` on top of `AsyncLocalStorage`. Node's equivalent of `IHttpContextAccessor`: the store survives every `await`, so a repository three layers down still sees the user of the request without being handed it. |
 | `SYSTEM_USER` | The audit name (`"System"`) used when there is no request in flight — startup, scheduled jobs, seeds. |
 | `HealthProbe` | `IHealthProbe` with a short result cache and a bounded wait, so probing from several replicas does not become real load and a hung database does not hang the check. It never throws: a failed check *is* the answer. |
+| `CompositeHealthProbe` | One probe over several, keyed by persistence layer. Not ready if any layer's database is down, and `layers` in the report says which. `registerPersistence` builds it when an application has more than one engine. |
 
 ## Usage
 
