@@ -192,6 +192,20 @@ a minor release. Pin exact versions.
   on a `409 DB_UNIQUE_VIOLATION` the driver error is what names the constraint —
   and the response body, governed by `exposeDebugInfo`, is untouched.
 
+- **A handler is typed by the schemas its route declares** (#50). `req.body`
+  was `any` and `req.validatedQuery` `unknown`, so every handler cast what the
+  route had already validated — a copy of the schema's shape that compiled just
+  as well when the decorator pointed at another schema, or when the cast was
+  forgotten. `Handler<{ body: typeof a; query: typeof q }>` in `monolite-http`
+  types both from the schemas, and the verb decorators now check the property
+  they decorate: a handler typed against another schema than the route
+  validates with fails to compile at the decorator. `AuthController.login`
+  drops its `as Credentials`.
+
+  **Breaking:** a handler declared `private` or `protected` under `@Get`,
+  `@Post`, `@Put`, `@Patch` or `@Delete` no longer compiles; make it public. A
+  handler typed `(req: Request, res: Response)` still compiles unchanged.
+
 ### Fixed
 
 - **An empty `CORS_ORIGINS` refused the API's own origin, so the docs reader

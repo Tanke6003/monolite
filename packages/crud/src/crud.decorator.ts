@@ -1,5 +1,6 @@
 import type { ZodType } from "zod";
-import { Delete, Get, Post, Put, type RouteOptions } from "monolite-http";
+import { Delete, Get, Post, Put, type RouteDecorator, type RouteOptions } from "monolite-http";
+import type { ICrudController } from "./crud.controller.js";
 
 /** The five verbs `CrudController` implements. */
 export type CrudVerb = "list" | "getOne" | "create" | "update" | "softDelete";
@@ -42,11 +43,13 @@ export function Crud(options: CrudOptions) {
 
   return function (target: new (...args: never[]) => object): void {
     // The route decorators are applied as if they had been written on the
-    // class; the prototype is what they expect as their `target`.
+    // class; the prototype is what they expect as their `target`. It is typed as
+    // the contract the class has to implement, which is what the decorators
+    // check a handler against.
     const on =
-      (route: (path: string, options?: RouteOptions) => PropertyDecorator) =>
+      (route: RouteDecorator) =>
       (path: string, routeOptions: RouteOptions, handler: CrudVerb) =>
-        route(path, routeOptions)(target.prototype as object, handler);
+        route(path, routeOptions)(target.prototype as ICrudController, handler);
 
     if (has("list")) {
       on(Get)(

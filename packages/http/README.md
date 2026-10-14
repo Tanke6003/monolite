@@ -54,7 +54,7 @@ without a `.bind()`.
 ## A controller
 
 ```ts
-import { ApiController, BaseController, Get, Post, defineDto, definePagedDto, parseId } from "monolite-http";
+import { ApiController, BaseController, Get, Post, defineDto, definePagedDto, parseId, type Handler } from "monolite-http";
 import type { IRequestContext } from "monolite-core";
 import { z } from "zod";
 
@@ -85,11 +85,10 @@ export class UsersController extends BaseController {
     query: listQuery,
     responses: { 200: { description: "Page of users", ref: "PaginatedUsers" } },
   })
-  list = async (req: Request, res: Response) => {
-    // `validateQuery` already parsed and coerced it; the concrete type is
-    // asserted here because each route uses a different schema.
-    const query = req.validatedQuery as z.infer<typeof listQuery>;
-    res.json(await this.users.list(query));
+  list: Handler<{ query: typeof listQuery }> = async (req, res) => {
+    // `validateQuery` already parsed and coerced it, and `Handler` gives it the
+    // schema's output type: `page` and `limit` are numbers, no cast.
+    res.json(await this.users.list(req.validatedQuery));
   };
 
   @Get("/:id", {
@@ -106,12 +105,21 @@ export class UsersController extends BaseController {
     body: createUser,
     responses: { 201: { description: "Created", ref: "User" } },
   })
-  create = async (req: Request, res: Response) => {
-    // The body arrived through the schema, so it is already the parsed shape.
+  create: Handler<{ body: typeof createUser }> = async (req, res) => {
+    // The body arrived through the schema, so it is already the parsed shape —
+    // and typed as such.
     res.status(201).json(await this.users.create(req.body, this.requireUserId()));
   };
 }
 ```
+
+`Handler<{ body, query }>` types `req.body` and `req.validatedQuery` from the
+same schemas the route validates with, so a handler never casts. The schema is
+named twice — a decorator cannot type the property it sits on — but the verb
+decorator checks that the two agree: a handler typed against another schema than
+the route declares is a compile error at the decorator. A handler typed
+`(req: Request, res: Response)` still compiles; one declared `private` does not,
+because the decorator cannot see it.
 
 `BaseController` publishes the identity of the request — `currentUser`,
 `userId`, `userName`, `userEmail`, `userRoles`, `requestId`, and a
@@ -281,6 +289,7 @@ fails if a new export arrives without a row here.
 | --- | --- |
 | `ApiController`, `Get`, `Post`, `Put`, `Patch`, `Delete` | The decorators. One declaration produces the route, its validation and its slice of the OpenAPI document, so the three cannot disagree. |
 | `RouteOptions`, `ResponseSpec`, `RouteMetadata`, `ControllerMetadata`, `HttpMethod`, `PathParamType` | What a decorator accepts and what it records. |
+| `Handler`, `RouteDecorator` | A handler typed by its route's `body` and `query` schemas, and the type of the verb decorators that check it agrees with the route. No cast on `req.body` or `req.validatedQuery`. |
 | `BaseController`, `parseId` | The little a hand-written controller shares: the id in the path, parsed and refused if it is not one. `parseId` takes `req.params.id` as Express 5 types it; a repeated parameter is refused like any other bad id. |
 | `registerControllers`, `registeredControllers`, `getControllerMetadata`, `ControllerType`, `ControllerRegistration` | The registry the router is built from. Exported because a project that mounts its own router needs the same list. |
 | `controllersFromRegistry` | Every registered controller paired with its instance, resolved through the function you pass — usually a container's `resolve`. What `createApp`'s `controllers` option takes. |

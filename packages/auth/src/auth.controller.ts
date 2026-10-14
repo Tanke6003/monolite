@@ -1,7 +1,7 @@
-import type { NextFunction, Request, RequestHandler, Response } from "express";
-import { ApiController, Post } from "monolite-http";
+import type { RequestHandler } from "express";
+import { ApiController, Post, type Handler } from "monolite-http";
 import { z } from "zod";
-import type { Credentials, IAuthBLL } from "./contracts.js";
+import type { IAuthBLL } from "./contracts.js";
 import { AUTH_TOKENS } from "./tokens.js";
 
 /** The body of `POST /auth/login`. Exported so an app can reuse or extend it. */
@@ -85,9 +85,9 @@ export class AuthController {
       429: "Too many attempts",
     },
   })
-  public login = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  public login: Handler<{ body: typeof loginSchema }> = async (req, res, next) => {
     try {
-      res.json(await this.auth.login(req.body as Credentials));
+      res.json(await this.auth.login(req.body));
     } catch (error) {
       next(error);
     }
