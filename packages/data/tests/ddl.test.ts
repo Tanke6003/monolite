@@ -564,3 +564,58 @@ describe("a decimal column", () => {
     expect(migration.join("\n")).toContain("NUMERIC(12, 2)");
   });
 });
+
+describe("day and datetime columns", () => {
+  const invoice = defineEntity<{ pk: number; dueOn: string; paidAt: Date; createdAt: Date }>({
+    table: "INVOICES",
+    primaryKey: "pk",
+    identity: true,
+    columns: {
+      pk: { name: "PK", kind: "number", insertable: false, updatable: false },
+      dueOn: { name: "DUE_ON", kind: "day" },
+      paidAt: { name: "PAID_AT", kind: "datetime" },
+      createdAt: { name: "CREATED_AT", kind: "date" },
+    },
+  });
+
+  it("emits DATE for a day on every engine, and the timestamp type for an instant", () => {
+    const expected: Array<[typeof postgresDdl, string]> = [
+      [postgresDdl, "TIMESTAMPTZ"],
+      [mysqlDdl, "DATETIME(3)"],
+      [sqlServerDdl, "DATETIME2"],
+      [oracleDdl, "TIMESTAMP"],
+    ];
+
+    for (const [dialect, timestamp] of expected) {
+      const { create } = emitTable(invoice, dialect);
+      expect(create).toMatch(/DUE_ON"? DATE\b/);
+      expect(create).toContain(timestamp);
+      // `date`, the old name, still emits exactly what `datetime` does.
+      expect(dialect.typeOf({ name: "X", kind: "date" })).toBe(dialect.typeOf({ name: "X", kind: "datetime" }));
+    }
+  });
+
+  it("generates no migration when a column is renamed from date to datetime", () => {
+    const renamed = {
+      ...invoice,
+      columns: { ...invoice.columns, createdAt: { name: "CREATED_AT", kind: "datetime" } },
+    } as AnyEntityMetadata;
+
+    expect(
+      diffSnapshots(snapshotOf([invoice]), snapshotOf([renamed]), postgresDdl, { entities: [renamed] })
+    ).toEqual([]);
+  });
+
+  it("is a change when an instant becomes a day, because the column type changes", () => {
+    const asDay = {
+      ...invoice,
+      columns: { ...invoice.columns, paidAt: { name: "PAID_AT", kind: "day" } },
+    } as AnyEntityMetadata;
+
+    const script = diffSnapshots(snapshotOf([invoice]), snapshotOf([asDay]), postgresDdl, {
+      entities: [asDay],
+    }).join("\n");
+
+    expect(script).toContain("PAID_AT TYPE DATE");
+  });
+});

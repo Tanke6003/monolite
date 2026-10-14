@@ -211,6 +211,8 @@ El `buildWhere` por defecto contesta con ellos, así que el módulo no escribe n
   `Date` que se lee por su día UTC); cualquier otra cosa —un timestamp,
   `2026-02-30`— se rechaza con un 400 que nombra el parámetro en vez de convertirse
   en un filtro que en silencio no encuentra nada.
+  Una columna `kind: "day"` no necesita borde: `gte("dueOn")` y `lte("dueOn")`
+  comparan días, ambos extremos incluidos.
 - **Comprobaciones al compilar.** Una regla que nombra una propiedad que `IPayment`
   no tiene rompe el build. Pasa el tipo de la consulta como segundo argumento de
   tipo y un parámetro que el esquema no tiene también lo rompe: la deriva que un

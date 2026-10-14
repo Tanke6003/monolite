@@ -6,7 +6,8 @@ import {
   ScryptPasswordHasher,
 } from "monolite-auth";
 import type { IAuthBLL, IPasswordHasher, ITokenBLL, IUserProvider } from "monolite-auth";
-import { registerInstance, registerSingleton } from "monolite-di";
+import type { ICache } from "monolite-core";
+import { registerInstance, registerSingleton, TOKENS } from "monolite-di";
 import type { DependencyContainer } from "monolite-di";
 import { buildAuthRateLimiter } from "monolite-http";
 import { SeedUserProvider } from "../auth/seed-user.provider";
@@ -57,8 +58,11 @@ export function registerAuth(container: DependencyContainer): void {
   // The limiter is its own, and far narrower than the general one: login is the
   // endpoint whose entire attack is to be called a great many times, and hashing
   // on purpose makes each of those calls expensive for this side too.
-  // `AUTH_RATE_LIMIT_MAX=0` switches it off.
-  const loginLimiter = buildAuthRateLimiter(envs);
+  // `AUTH_RATE_LIMIT_MAX=0` switches it off. It counts in the shared cache, so
+  // with `CACHE_DRIVER=redis` two replicas do not each allow the full quota.
+  const loginLimiter = buildAuthRateLimiter(envs, {
+    cache: container.resolve<ICache>(TOKENS.ICache),
+  });
   registerInstance(
     container,
     AUTH_TOKENS.IAuthController,

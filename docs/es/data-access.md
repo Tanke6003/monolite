@@ -80,8 +80,8 @@ export const BRANCHES_ENTITY = defineEntity<IBranch>({
     name:      { name: "NAME",      kind: "string" },
     address:   { name: "ADDRESS",   kind: "string" },
     available: { name: "AVAILABLE", kind: "boolean" },
-    createdAt: { name: "CREATED_AT", kind: "date", updatable: false },
-    updatedAt: { name: "UPDATED_AT", kind: "date" },
+    createdAt: { name: "CREATED_AT", kind: "datetime", updatable: false },
+    updatedAt: { name: "UPDATED_AT", kind: "datetime" },
     createdBy: { name: "CREATED_BY", kind: "string", updatable: false },
     updatedBy: { name: "UPDATED_BY", kind: "string" },
   },
@@ -99,7 +99,7 @@ Renombrar una columna física es un cambio de una línea.
 | --- | --- |
 | `identity` | `true` (por defecto): la base de datos genera la PK. `false`: quien llama tiene que darla, y un insert sin ella lanza. |
 | `insertable` / `updatable` | `false` para las columnas que son de la base de datos (PKs identity, `CREATED_AT`). Por defecto `true`. |
-| `kind` | Dirige la conversión en ambos sentidos: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `decimal`, `string`. Por defecto `string`. Ver [Dinero y otros decimales](#dinero-y-otros-decimales). |
+| `kind` | Dirige la conversión en ambos sentidos: `boolean` ↔ `1/0`, `day` ↔ `"YYYY-MM-DD"`, `datetime` ↔ `Date`, `number`, `decimal`, `string`. Por defecto `string`. Ver [Dinero y otros decimales](#dinero-y-otros-decimales) y [Días de calendario e instantes](#días-de-calendario-e-instantes). |
 | `softDelete` | La columna que marca una fila como borrada lógicamente. Omítelo y la entidad simplemente no tiene borrado lógico. `activeValue`/`deletedValue` valen `1`/`0` por defecto. |
 | `timestamps` | `createdAt` / `updatedAt`. Nunca se toman del cuerpo de la petición. |
 | `audit` | `createdBy` / `updatedBy`, rellenados desde el contexto de la petición — la identidad del token, nunca el cuerpo, para que un cliente no pueda decir que es otro. Fuera de una petición el valor es `System`. |
@@ -175,6 +175,71 @@ signos cambiados, para que una nota de crédito cuadre con la factura que revier
 
 El dinero es el caso que las motiva, no su límite: horas, unidades y días se
 reparten igual y pierden el mismo residuo.
+
+---
+
+## Días de calendario e instantes
+
+Una fecha es una de dos cosas, y el mapeo dice cuál:
+
+```ts
+const columns = {
+  dueOn:     { name: "DUE_ON",     kind: "day" },      // "2026-04-30"
+  createdAt: { name: "CREATED_AT", kind: "datetime" }, // Date
+};
+```
+
+- **`day`** es un día de calendario: una fecha de vencimiento, una fecha de pago, el
+  cierre de un periodo. No tiene hora ni zona horaria: `2026-04-30` es el mismo día
+  para todos. La columna es el `DATE` del motor y la entidad guarda el **string**
+  `"YYYY-MM-DD"`.
+- **`datetime`** es un instante: `createdAt`, `paidAt`. Una columna de timestamp y
+  un `Date` de JS, en UTC.
+
+Que un día sea un string es a propósito. Llevado como `Date` se convierte en
+medianoche *en algún sitio*, y cada pieza de código que lo lee tiene que elegir
+dónde; tarde o temprano dos eligen distinto y un vencimiento se mueve un día. Un
+string no se puede correr, se ordena y se compara bien, se serializa a JSON como sí
+mismo y es lo que el DTO quería de todos modos. Además vuelve igual de todos los
+motores en cualquier zona horaria, cosa que los drivers no logran por su cuenta: el
+de SQL Server devolvía un `DATE` un día antes al oeste de UTC, y Oracle ni siquiera
+acepta el texto para un `DATE`. La suite de integración comprueba la ida y vuelta en
+los cinco motores bajo tres zonas horarias.
+
+Un filtro sobre un `day` compara días, sin literal de borde que equivocar:
+
+```ts
+await invoices.find({ where: { dueOn: { between: ["2026-04-01", "2026-04-30"] } } }); // incluye ambos extremos
+await invoices.find({ where: { dueOn: { lte: "2026-04-30" } } });
+```
+
+Un `Date` escrito en un `day` se lee por su día **UTC**, que es lo que producen
+`new Date("2026-04-30")` y `z.coerce.date()` a partir de un día, y lo que no es un
+día (`"2026-02-30"`, `"30/04/2026"`) se rechaza en vez de guardarse como una
+suposición.
+
+`kind: "date"` es el nombre que tenía `datetime` antes de separar los dos. Sigue
+significando un `Date` y una columna de timestamp, se acepta hasta la 1.0, y
+renombrar una columna de `date` a `datetime` no genera migración. Convertirla en
+`day` sí la genera —cambia el tipo de la columna—, así que convierte los datos a
+conciencia.
+
+### Contar días
+
+`monolite-core` trae la aritmética, hecha en UTC para que la respuesta no dependa
+del `TZ` de la máquina:
+
+```ts
+import { addDays, daysBetween, isDay, toDay } from "monolite-core";
+
+daysBetween("2026-04-30", "2026-05-02"); // 2
+addDays("2026-04-30", 1);                // "2026-05-01"
+isDay("2026-02-30");                     // false
+toDay(new Date("2026-04-30"));           // "2026-04-30"
+```
+
+"Hoy" es la única pregunta que esto no responde, porque sí depende de dónde está la
+aplicación: eso le toca a la zona horaria de la aplicación, no a un día.
 
 ---
 
@@ -870,6 +935,14 @@ lo que da por supuesto el lado de la lectura. Oracle y PostgreSQL no lo necesita
 node-oracledb conserva el instante y la columna de PostgreSQL es `TIMESTAMPTZ`.
 **Si añades otro motor, prueba explícitamente una ida y vuelta con fechas.** Esta
 mordió dos veces al código original.
+
+Un `day` tiene su propia versión de la trampa, del lado de la lectura. tedious
+devuelve un `DATE` de SQL Server como medianoche UTC y Sequelize lo formateaba en
+hora local, así que al oeste de UTC cada día volvía como el anterior; el conector lo
+lee por sus campos UTC. node-oracledb construye un `DATE` leído a partir de campos
+locales y escribe un `Date` enlazado a partir de ellos también, así que el dialecto
+de Oracle enlaza un día como medianoche local y el mapeo vuelve a leer los campos
+locales. PostgreSQL y MySQL devuelven el texto.
 
 **PostgreSQL pasa a minúsculas los identificadores sin comillas**, en el DDL igual
 que en las consultas. Crea el esquema *sin* comillas, para que el SQL en mayúsculas

@@ -278,6 +278,21 @@ errorHandler                siempre el último
 Un manejador de errores de Express sólo cubre lo que se registró antes que él, y un
 manejador de 404 puesto demasiado pronto se traga Swagger.
 
+### Con más de una réplica
+
+Los limitadores de peticiones cuentan en un `ICache` (`monolite-core`), que
+`registerCache` registra según `CACHE_DRIVER`. `memory`, el valor por defecto,
+guarda la cuenta en el proceso: detrás de dos réplicas eso son dos límites, y
+`AUTH_RATE_LIMIT_MAX=5` deja pasar diez intentos de login. `CACHE_DRIVER=redis` la
+lleva a `REDIS_URL` (instala `redis` antes), y es un solo límite caiga donde caiga
+la petición. Nada más cambia: los limitadores, y lo que una aplicación construya
+sobre `TOKENS.ICache`, ven las mismas seis operaciones en ambos casos, y la caché en
+memoria pasa la misma suite de contrato que la de Redis.
+
+Si Redis no responde, el limitador general deja pasar las peticiones —que la caché
+se caiga no debe tirar la API— y el de login las rechaza, porque un login que nadie
+cuenta se puede adivinar a toda velocidad.
+
 ---
 
 ## `monolite-crud` — cinco endpoints, todos sobreescribibles

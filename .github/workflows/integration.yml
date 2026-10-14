@@ -58,6 +58,24 @@ jobs:
         run: npm run test:integration
         env:
           MONOLITE_IT_ENGINES: postgres,mysql,mssql,oracle,mongodb
+          # The cache contract and the limiter across two instances, on the
+          # Redis the same compose file starts.
+          MONOLITE_IT_CACHES: redis
+
+      # The day columns once more, west and east of UTC. A `DATE` is where a
+      # driver's sense of local time leaks in — SQL Server's came back a day
+      # early west of UTC — and the run above is at UTC, where none of that
+      # shows. Only those tests: the rest of the suite does not depend on the
+      # zone, and five servers are not cheap to keep busy.
+      - name: Day columns, west and east of UTC
+        run: |
+          for zone in America/Mexico_City Asia/Tokyo; do
+            echo "::group::TZ=$zone"
+            TZ=$zone npm run test:integration -- -t "day columns"
+            echo "::endgroup::"
+          done
+        env:
+          MONOLITE_IT_ENGINES: postgres,mysql,mssql,oracle,mongodb
 
       - name: What the engines said while it ran
         if: failure()
@@ -76,4 +94,5 @@ jobs:
           echo "::notice::The generated DDL was applied to PostgreSQL, MySQL, SQL Server and Oracle,"
           echo "::notice::the shared repository contract passed on all five engines, and transactions,"
           echo "::notice::row locks and stored procedures were exercised against real servers."
+          echo "::notice::The ICache contract passed on Redis, and the login limiter held across two instances."
           echo "::notice::PostgreSQL and MongoDB also ran side by side as two named layers of one application."

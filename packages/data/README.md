@@ -79,6 +79,7 @@ rest of the SQL is generated exactly once, in `SqlGenericRepository`.
 | `SqlGenericRepository` | The single implementation behind all four SQL engines. Also `lockById` and `executeRaw`, the escape hatch for what the generic API deliberately does not express. |
 | `MongoGenericRepository`, `IMongoDataSource` | The document driver, same contract. |
 | `oracleDialect`, `sqlServerDialect`, `postgresDialect`, `mysqlDialect`, `SqlDialect` | What differs between SQL engines, and nothing else. |
+| `RedisCache`, `RedisCacheConfig` | `ICache` (from `monolite-core`) on Redis, so the rate limits — and anything else built on the cache — hold across replicas. Not a repository engine: it has no `WHERE`, no soft delete and no audit trail, and stays out of `IGenericRepository`. Every key goes under `keyPrefix`; `increment` is one atomic script, `deletePrefix` uses `SCAN`, never `KEYS`. Opened by `authenticate()` on warm-up. |
 | `OracleConnector`, `SequelizeConnector`, `MongoConnector` | The connectors. Sequelize covers SQL Server, PostgreSQL and MySQL/MariaDB in one, because what differs lives in the dialect. `MongoConnectionConfig.options` carries the connection string's query — `directConnection`, `replicaSet`, `tls` — which a replica set behind a port mapping cannot be reached without. |
 | `MemoryUnitOfWork`, `SqlUnitOfWork`, `MongoUnitOfWork` | One unit of work per family, all behind `IUnitOfWork`. |
 | `AsyncTransactionContext` | `ITransactionContext` on `AsyncLocalStorage`. |
@@ -106,6 +107,7 @@ A generated project drives both through `npm run db:sql` and
 | --- | --- |
 | `runGenericRepositoryContract` | The full contract suite. Give it a factory and it verifies the promise. |
 | `CONTRACT_ENTITY`, `ContractItem`, `ContractSetup` | The minimal entity and setup shape the suite operates on. |
+| `runCacheContract`, `CacheContractSetup` | The same for `ICache`, from `monolite-data/testing`: expiry, `add` letting exactly one racer in, `increment` keeping its window, `deletePrefix` leaving neighbours alone. `MemoryCache` and `RedisCache` both pass it. |
 
 ## Example
 
@@ -132,7 +134,7 @@ export const BRANCH_ENTITY = defineEntity<Branch>({
     name: { name: "NAME", kind: "string" },
     city: { name: "CITY", kind: "string" },
     active: { name: "ACTIVE", kind: "boolean" },
-    createdAt: { name: "CREATED_AT", kind: "date", updatable: false },
+    createdAt: { name: "CREATED_AT", kind: "datetime", updatable: false },
     createdBy: { name: "CREATED_BY", kind: "string", updatable: false },
   },
   softDelete: { property: "active", activeValue: 1, deletedValue: 0 },
@@ -229,8 +231,9 @@ The suite expects the Jest globals to be in scope, so import it from a test file
 
 ## Optional peer dependencies
 
-`oracledb`, `sequelize`, `tedious`, `pg`, `mysql2` and `mongodb` are declared as
-optional peer dependencies: install only the one your project actually uses.
+`oracledb`, `sequelize`, `tedious`, `pg`, `mysql2`, `mongodb` and `redis` are
+declared as optional peer dependencies: install only the one your project actually
+uses — and `redis` only if the cache is on Redis (`CACHE_DRIVER=redis`).
 
 One caveat while this is still `0.1.0`: the connectors and `sql-dialect.ts`
 currently import their driver **statically** at the top of the file, so requiring

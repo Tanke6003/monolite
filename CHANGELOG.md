@@ -11,6 +11,57 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **`kind: "day"` tells a calendar day apart from an instant** (#39). `kind:
+  "date"` was one kind for a due date and a `createdAt`, so both became a JS
+  `Date` and every consumer decided for itself which midnight it meant — one
+  application built with the toolkit wrapped 76 reads in a `toIsoDate` helper and
+  still mixed local and UTC accessors in a single subtraction. A `day` column is
+  the engine's `DATE` and a `"YYYY-MM-DD"` string in the entity, on every driver
+  and in every timezone; a filter on it compares days (`{ dueOn: { between:
+  ["2026-04-01", "2026-04-30"] } }` includes both ends, no `T23:59:59.999Z`).
+  `kind: "datetime"` is the explicit name for an instant.
+
+  Getting the same string back from every engine took two driver fixes. SQL
+  Server returned a `DATE` a day early west of UTC (tedious hands over midnight
+  UTC and Sequelize formatted it in local time); the connector now reads it by
+  its UTC fields. Oracle will not take the text for a `DATE`; its dialect binds
+  a day as the local midnight node-oracledb writes as that day. The repository
+  contract gained a `day` column, and CI runs it on all five engines west of UTC,
+  at UTC and east of it — Jest cannot change `TZ` from inside a test, so the
+  unit suite now runs one zone per Node version as well.
+
+  `monolite-core` adds `isDay`, `toDay`, `daysBetween` and `addDays`, computed in
+  UTC so the answer does not depend on the machine.
+
+  `kind: "date"` still means a `Date` and a timestamp column and is accepted
+  until 1.0; renaming it to `datetime` generates no migration. Generated
+  entities now declare `createdAt` and `updatedAt` as `datetime`.
+
+- **A cache seam, and Redis behind it** (#42). `ICache` in `monolite-core` —
+  `get`, `set`, `delete`, `deletePrefix`, `add` (set-if-absent) and an atomic
+  `increment` — with `MemoryCache` as the default and `RedisCache` in
+  `monolite-data`, on `redis` as an optional peer dependency.
+  `registerCache({ container, envs, logger })` in `monolite-di` binds
+  `TOKENS.ICache` from `CACHE_DRIVER=memory|redis` (`REDIS_URL`, keys under
+  `REDIS_KEY_PREFIX` or `SERVICE_NAME:`) and returns the connection for
+  `manage`. Values travel as JSON in both, and a contract kit
+  (`runCacheContract`, in `monolite-data/testing`) holds them to the same
+  answers; the integration suite runs it against a real Redis.
+
+  What it fixes first is the rate limiter. `buildRateLimiter` and
+  `buildAuthRateLimiter` counted in the process, so behind two replicas
+  `AUTH_RATE_LIMIT_MAX=5` let ten login attempts through and a rolling restart
+  reset the count. Given `{ cache }` — or `createApp({ cache })` — they count in
+  the shared cache through `CacheRateLimitStore`, one limit wherever the request
+  lands. If the cache cannot be reached the general limiter lets requests
+  through and the login limiter fails them. Generated projects call
+  `registerCache` and pass the cache to both limiters; with the default
+  `CACHE_DRIVER=memory` they behave exactly as before.
+
+  `loadOptionalDriver` now names the setting that avoids the missing driver,
+  so a cache without `redis` installed says `CACHE_DRIVER=memory` rather than
+  `DATA_SOURCE`.
+
 - **One application, more than one engine (#43).** `registerPersistence` takes
   a `name`, and each named layer registers its unit of work, change log,
   transaction context and health probe under its own token

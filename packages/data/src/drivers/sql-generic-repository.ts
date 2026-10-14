@@ -280,7 +280,10 @@ export class SqlGenericRepository<T extends object, TKey = number>
       const bindName = `b${columns.length}`;
       columns.push(this.schema.columnOf(property));
       values.push(`:${bindName}`);
-      binds[bindName] = this.dialect.toBindValue(this.schema.toColumnValue(property, value));
+      binds[bindName] = this.dialect.toBindValue(
+        this.schema.toColumnValue(property, value),
+        this.schema.kindOf(property)
+      );
     }
 
     // The check happens before adding the timestamp: otherwise an entity with
@@ -418,7 +421,7 @@ export class SqlGenericRepository<T extends object, TKey = number>
             ? this.schema.softDeleteActiveValue
             : this.schema.toColumnValue(property, supplied);
 
-        row[`b${index}`] = this.dialect.toBindValue(value);
+        row[`b${index}`] = this.dialect.toBindValue(value, this.schema.kindOf(property));
       });
       if (createdBy) row.auditUser = auditUser;
       return row;
@@ -449,7 +452,10 @@ export class SqlGenericRepository<T extends object, TKey = number>
 
       const bindName = `s${assignments.length}`;
       assignments.push(`${this.schema.columnOf(property)} = :${bindName}`);
-      binds[bindName] = this.dialect.toBindValue(this.schema.toColumnValue(property, value));
+      binds[bindName] = this.dialect.toBindValue(
+        this.schema.toColumnValue(property, value),
+        this.schema.kindOf(property)
+      );
     }
 
     if (assignments.length === 0) return null;

@@ -206,6 +206,8 @@ all. What you get for free:
   must be a calendar date (`YYYY-MM-DD`, or a `Date` read by its UTC day);
   anything else — a timestamp, `2026-02-30` — is refused with a 400 naming the
   parameter rather than becoming a filter that silently matches nothing.
+  A `kind: "day"` column needs no boundary at all: `gte("dueOn")` and
+  `lte("dueOn")` compare days, both ends included.
 - **Compile-time checks.** A rule naming a property `IPayment` does not have fails
   the build. Pass the query's type as the second type argument and a parameter the
   schema does not have fails it too — the drift a hand-written cast used to hide.
