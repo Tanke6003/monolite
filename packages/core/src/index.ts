@@ -45,6 +45,14 @@ export { roundTo } from "./decimal/rounding.js";
 export { allocate } from "./decimal/allocate.js";
 export type { AllocateOptions, ResidueRule } from "./decimal/allocate.js";
 
+// ------------------------------------------------------------------  day  ---
+// A calendar day as a `YYYY-MM-DD` string — what `kind: "day"` stores in
+// `monolite-data` — and the arithmetic on it. Here for the reason `decimal` is:
+// counting the days to a due date is not persistence, and every package
+// already depends on the kernel.
+export { addDays, daysBetween, isDay, toDay } from "./day/day.js";
+export type { Day } from "./day/day.js";
+
 // -------------------------------------------------------  implementations  ---
 export { AsyncRequestContext, SYSTEM_USER } from "./context/async-request-context.js";
 

@@ -225,6 +225,22 @@ describe("SqlGenericRepository on the MySQL dialect", () => {
     expect(oracleDialect.toBindValue(instant)).toBe(instant);
     expect(postgresDialect.toBindValue(instant)).toBe(instant);
   });
+
+  it("sends a day as its text, except to Oracle, which gets the local midnight it writes as that day", () => {
+    for (const dialect of [mysqlDialect, sqlServerDialect, postgresDialect]) {
+      expect(dialect.toBindValue("2026-04-30", "day")).toBe("2026-04-30");
+    }
+
+    // node-oracledb writes a DATE from these local fields, in whatever timezone
+    // the process runs — CI runs this suite under three.
+    const bound = oracleDialect.toBindValue("2026-04-30", "day") as Date;
+    expect([bound.getFullYear(), bound.getMonth() + 1, bound.getDate(), bound.getHours()]).toEqual([
+      2026, 4, 30, 0,
+    ]);
+
+    // A string bound against any other kind is just a string, even if it looks like a day.
+    expect(oracleDialect.toBindValue("2026-04-30", "string")).toBe("2026-04-30");
+  });
 });
 
 describe("row locking across the four dialects", () => {

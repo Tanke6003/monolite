@@ -146,8 +146,11 @@ export const oracleDdl: DdlDialect = {
         return `NUMBER(${fixedOf(column)})`;
       case "boolean":
         return "NUMBER(1)";
+      case "datetime":
       case "date":
         return "TIMESTAMP";
+      case "day":
+        return "DATE";
       default: {
         const width = widthOf(column);
         return width === "max" ? "CLOB" : `VARCHAR2(${width} CHAR)`;
@@ -181,8 +184,11 @@ export const sqlServerDdl: DdlDialect = {
       // `DATETIME2` and not `DATETIME`: the older type rounds to 3.33 ms, and
       // the driver already sends the value as a UTC wall clock with three
       // decimals — see `asUtcWallClock` in the query dialect.
+      case "datetime":
       case "date":
         return "DATETIME2";
+      case "day":
+        return "DATE";
       default: {
         const width = widthOf(column);
         return `NVARCHAR(${width === "max" ? "MAX" : width})`;
@@ -226,8 +232,11 @@ export const postgresDdl: DdlDialect = {
         return `NUMERIC(${fixedOf(column)})`;
       case "boolean":
         return "SMALLINT";
+      case "datetime":
       case "date":
         return "TIMESTAMPTZ";
+      case "day":
+        return "DATE";
       default: {
         const width = widthOf(column);
         return width === "max" ? "TEXT" : `VARCHAR(${width})`;
@@ -261,8 +270,11 @@ export const mysqlDdl: DdlDialect = {
       // `DATETIME` with no precision truncates to the second, and a timestamp
       // that loses its milliseconds makes two rows written in the same second
       // unorderable.
+      case "datetime":
       case "date":
         return "DATETIME(3)";
+      case "day":
+        return "DATE";
       default: {
         const width = widthOf(column);
         return width === "max" ? "TEXT" : `VARCHAR(${width})`;

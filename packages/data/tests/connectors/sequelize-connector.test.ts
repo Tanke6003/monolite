@@ -12,6 +12,7 @@ const sequelize = {
   authenticate: jest.fn(),
   close: jest.fn(),
   transaction: jest.fn(),
+  connectionManager: { refreshTypeParser: jest.fn() },
 };
 
 jest.mock("sequelize", () => ({
@@ -297,6 +298,33 @@ describe("SequelizeConnector", () => {
 
       expect(affected).toBe(0);
       expect(sequelize.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("SQL Server DATE", () => {
+    type Parser = { types: Record<string, number[]>; parse: (value: Date) => string };
+    const registered = (): Parser[] =>
+      sequelize.connectionManager.refreshTypeParser.mock.calls.flatMap(
+        ([types]) => Object.values(types as Record<string, Parser>)
+      );
+
+    it("reads the day tedious hands over as UTC midnight by its UTC fields", () => {
+      build("mssql");
+
+      const [parser] = registered();
+      expect(parser.types.mssql).toEqual([40]);
+
+      // What tedious builds for a DATE column holding 2026-04-30. Sequelize's
+      // own parser formatted it in local time: 2026-04-29 west of UTC, which is
+      // one of the three zones CI runs this suite under.
+      expect(parser.parse(new Date(Date.UTC(2026, 3, 30)))).toBe("2026-04-30");
+    });
+
+    it("leaves the other engines' parsers alone: theirs already return the text", () => {
+      build("postgres");
+      build("mysql");
+
+      expect(sequelize.connectionManager.refreshTypeParser).not.toHaveBeenCalled();
     });
   });
 

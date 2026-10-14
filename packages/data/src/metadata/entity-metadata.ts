@@ -7,10 +7,16 @@
  * `MemoryGenericRepository` know how to generate the whole CRUD without a
  * single hand-written line of SQL.
  */
-import { roundTo } from "monolite-core";
+import { roundTo, toDay } from "monolite-core";
 
 /** Decimals a `decimal` column keeps when its mapping does not say. */
 const DEFAULT_DECIMAL_SCALE = 2;
+
+/** The day of a `Date` by its local fields. Only for a driver that built it from them. */
+function localDayOf(value: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
 
 /**
  * The logical type of a column.
@@ -23,8 +29,18 @@ const DEFAULT_DECIMAL_SCALE = 2;
  * every driver agrees on the value and the in-memory one agrees with the engine
  * it stands in for — which is what makes a test written against memory mean
  * anything about production.
+ *
+ * `day` and `datetime` are the two things a date can be. A `day` is a calendar
+ * day — a due date, the end of a period — with no time and no timezone: a
+ * `DATE` column, and a `"YYYY-MM-DD"` string in the entity, because a day that
+ * never becomes an instant cannot be shifted by a timezone. A `datetime` is an
+ * instant — `createdAt` — a timestamp column and a JS `Date`, in UTC.
+ *
+ * `date` is the name `datetime` had before the two were told apart, and means
+ * exactly what it always did. It is accepted until 1.0, and a column renamed
+ * from one to the other generates no migration.
  */
-export type ColumnKind = "number" | "decimal" | "string" | "boolean" | "date";
+export type ColumnKind = "number" | "decimal" | "string" | "boolean" | "day" | "datetime" | "date";
 
 export interface ColumnMetadata {
   /** Physical column name. */
@@ -309,8 +325,9 @@ export class EntitySchema<T> {
   }
 
   /**
-   * Rounds a `decimal` property to its scale, and returns anything else exactly
-   * as it came.
+   * Rounds a `decimal` property to its scale, brings a `day` property to its
+   * `YYYY-MM-DD` text — refusing what is not a day, as every engine would — and
+   * returns anything else exactly as it came.
    *
    * It is public because the in-memory driver needs it and cannot get it any
    * other way. The SQL and document drivers pass every value through
@@ -322,6 +339,9 @@ export class EntitySchema<T> {
    * PostgreSQL have to agree about that, or the suite is not evidence.
    */
   quantize(property: string, value: unknown): unknown {
+    if (this.kindOf(property) === "day") {
+      return value === undefined || value === null ? value : toDay(value);
+    }
     if (this.kindOf(property) !== "decimal") return value;
     if (value === undefined || value === null) return value;
 
@@ -380,6 +400,12 @@ export class EntitySchema<T> {
       // decimal is silently dropped by one and rejected by another.
       case "decimal":
         return this.quantize(property, typeof value === "number" ? value : Number(value));
+      // A string, to every engine. Each one reads `'2026-04-30'` into a `DATE`
+      // as that day; a `Date` would be read as an instant first, and which day
+      // that instant falls on is the question this kind exists to not ask.
+      case "day":
+        return toDay(value);
+      case "datetime":
       case "date":
         return value instanceof Date ? value : new Date(String(value));
       default:
@@ -402,6 +428,13 @@ export class EntitySchema<T> {
       // approximation from being read as a value somebody can be charged.
       case "decimal":
         return this.quantize(property, typeof value === "number" ? value : Number(value));
+      // PostgreSQL, MySQL and SQL Server hand a `DATE` back as the day's text
+      // already (see `SequelizeConnector`). Oracle hands back a `Date` built
+      // from the column's fields **in local time**, so its local fields are the
+      // day that was stored — the UTC ones are the previous day east of UTC.
+      case "day":
+        return value instanceof Date ? localDayOf(value) : toDay(value);
+      case "datetime":
       case "date":
         return value instanceof Date ? value : new Date(String(value));
       case "string":

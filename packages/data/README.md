@@ -133,7 +133,7 @@ export const BRANCH_ENTITY = defineEntity<Branch>({
     name: { name: "NAME", kind: "string" },
     city: { name: "CITY", kind: "string" },
     active: { name: "ACTIVE", kind: "boolean" },
-    createdAt: { name: "CREATED_AT", kind: "date", updatable: false },
+    createdAt: { name: "CREATED_AT", kind: "datetime", updatable: false },
     createdBy: { name: "CREATED_BY", kind: "string", updatable: false },
   },
   softDelete: { property: "active", activeValue: 1, deletedValue: 0 },
