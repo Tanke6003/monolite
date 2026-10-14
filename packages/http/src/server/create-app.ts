@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import express, { type Application, type RequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
+import type { ICache, IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 
 import { resolveApiPrefix, resolveLegacyPrefix } from "../config/api.config.js";
 import { processEnv, type EnvSource } from "../config/env-source.js";
@@ -50,6 +50,11 @@ export interface CreateAppOptions {
   controllers?: ControllerRegistration[];
   /** Readiness probe. Without it only `/health/live` is published. */
   healthProbe?: IHealthProbe;
+  /**
+   * Where the rate limiter counts. Without it, in the process — one limit per
+   * replica. Pass the container's `ICache` and the limit holds across them.
+   */
+  cache?: ICache;
   /**
    * Directory served as static files, resolved against the working directory
    * when relative. Nothing is served if it is omitted.
@@ -105,6 +110,7 @@ export async function createApp(options: CreateAppOptions): Promise<HttpApp> {
     guard,
     controllers = [],
     healthProbe,
+    cache,
     staticDir,
     cspDirectives,
     beforeRoutes,
@@ -133,7 +139,7 @@ export async function createApp(options: CreateAppOptions): Promise<HttpApp> {
 
   // Before the parsing: a request that is going to be rejected does not get its
   // body read, which is exactly the work an abuse is trying to cause.
-  const limiter = buildRateLimiter(envs);
+  const limiter = buildRateLimiter(envs, { cache });
   if (limiter) app.use(limiter);
 
   // Before the body as well: a preflight carries none. The server's own origin

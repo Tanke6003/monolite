@@ -3,6 +3,7 @@
 import {
   createCompositionRoot,
   entitiesOf,
+  registerCache,
   registerModules,
   registerPersistence,
   registerPlugins,
@@ -75,6 +76,13 @@ export const root = createCompositionRoot((root) => {
   // process, not a dependency anybody injects. Handing it over here is what
   // gets it opened on warm-up and closed on shutdown.
   root.manage(persistence.connection);
+
+  // The cache the rate limiters count in. In the process by default, which is
+  // one limit per replica; `CACHE_DRIVER=redis` puts it on `REDIS_URL` and
+  // makes it one limit across all of them. Registered before auth, whose login
+  // limiter counts in it too.
+  const cache = registerCache({ container: root.container, envs, logger: plugins.logger });
+  root.manage(cache.connection);
   // #if auth
 
   registerAuth(root.container);

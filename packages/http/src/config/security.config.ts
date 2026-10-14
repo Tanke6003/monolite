@@ -10,9 +10,10 @@ import type { CorsOptions, CorsOptionsDelegate } from "cors";
 import type { Request } from "express";
 import rateLimit, { type RateLimitRequestHandler } from "express-rate-limit";
 import type { HelmetOptions } from "helmet";
-import { AppError, type ILogger } from "monolite-core";
+import { AppError, type ICache, type ILogger } from "monolite-core";
 import { REQUEST_ID_HEADER } from "../middlewares/request-context.js";
 import type { EnvSource } from "./env-source.js";
+import { CacheRateLimitStore } from "./rate-limit-store.js";
 
 /**
  * Defaults. They are chosen so the toolkit starts up secure with no variable
@@ -197,12 +198,29 @@ export function buildCorsPolicy(envs: EnvSource, logger?: ILogger): CorsOptionsD
 
 // ------------------------------------------------------------ rate limit ----
 
+/** What a limiter can be given besides the environment. */
+export interface RateLimiterOptions {
+  /**
+   * Where the counts are kept. Without it they live in the process, which is
+   * one limit per replica; with the `ICache` the container holds —
+   * `CACHE_DRIVER=redis` — it is one limit across all of them.
+   */
+  cache?: ICache;
+}
+
 interface LimiterSpec {
   windowKey: string;
   limitKey: string;
   windowFallback: number;
   limitFallback: number;
   message: string;
+  /** Under which keys this limiter counts in the cache. One per limiter. */
+  prefix: string;
+  /**
+   * What to do when the cache cannot be reached: let the request through, or
+   * fail it. Each limiter answers differently — see the two builders.
+   */
+  passOnStoreError: boolean;
 }
 
 /**
@@ -212,7 +230,11 @@ interface LimiterSpec {
  * `code`, `requestId` and `timestamp` like any other error. The `RateLimit-*`
  * headers are added by the library itself.
  */
-function buildLimiter(envs: EnvSource, spec: LimiterSpec): RateLimitRequestHandler | null {
+function buildLimiter(
+  envs: EnvSource,
+  spec: LimiterSpec,
+  options: RateLimiterOptions
+): RateLimitRequestHandler | null {
   const limit = toInt(envs.getEnv(spec.limitKey), spec.limitFallback, 0);
   if (limit === 0) return null;
 
@@ -221,6 +243,11 @@ function buildLimiter(envs: EnvSource, spec: LimiterSpec): RateLimitRequestHandl
     limit,
     standardHeaders: "draft-7",
     legacyHeaders: false,
+    // A store of its own per limiter even on one cache: the library refuses
+    // a store shared between two limiters, and the prefix keeps their counts
+    // apart — `/auth/login` goes through both.
+    ...(options.cache ? { store: new CacheRateLimitStore(options.cache, spec.prefix) } : {}),
+    passOnStoreError: spec.passOnStoreError,
     handler: (_req, _res, next) => {
       next(new AppError(spec.message, 429, true, { code: "RATE_LIMITED" }));
     },
@@ -231,15 +258,28 @@ function buildLimiter(envs: EnvSource, spec: LimiterSpec): RateLimitRequestHandl
  * General per-IP limiter. It leaves the health checks out: a load balancer
  * probes every few seconds and would exhaust the quota of its own IP, so the
  * instance would end up marked as down for being healthy.
+ *
+ * If the cache cannot be reached it lets the request through. This limiter
+ * blunts abuse of the whole API; failing closed would turn a cache outage into
+ * an outage of everything.
  */
-export function buildRateLimiter(envs: EnvSource): RateLimitRequestHandler | null {
-  const limiter = buildLimiter(envs, {
-    windowKey: "RATE_LIMIT_WINDOW_MS",
-    limitKey: "RATE_LIMIT_MAX",
-    windowFallback: SECURITY_DEFAULTS.windowMs,
-    limitFallback: SECURITY_DEFAULTS.limit,
-    message: "Too many requests. Try again in a moment.",
-  });
+export function buildRateLimiter(
+  envs: EnvSource,
+  options: RateLimiterOptions = {}
+): RateLimitRequestHandler | null {
+  const limiter = buildLimiter(
+    envs,
+    {
+      windowKey: "RATE_LIMIT_WINDOW_MS",
+      limitKey: "RATE_LIMIT_MAX",
+      windowFallback: SECURITY_DEFAULTS.windowMs,
+      limitFallback: SECURITY_DEFAULTS.limit,
+      message: "Too many requests. Try again in a moment.",
+      prefix: "rate-limit:general:",
+      passOnStoreError: true,
+    },
+    options
+  );
 
   if (!limiter) return null;
 
@@ -256,15 +296,28 @@ export function buildRateLimiter(envs: EnvSource): RateLimitRequestHandler | nul
  * Limiter for the routes that hand out credentials. Far narrower than the
  * general one: a token is the only thing that opens the rest of the API, so it
  * is the first thing anyone will try to ask for in a loop.
+ *
+ * If the cache cannot be reached it fails the request, unlike the general one.
+ * A login that cannot be counted is a login that can be guessed at full speed,
+ * and refusing sign-ins for the length of an outage is the cheaper failure.
  */
-export function buildAuthRateLimiter(envs: EnvSource): RateLimitRequestHandler | null {
-  return buildLimiter(envs, {
-    windowKey: "AUTH_RATE_LIMIT_WINDOW_MS",
-    limitKey: "AUTH_RATE_LIMIT_MAX",
-    windowFallback: SECURITY_DEFAULTS.authWindowMs,
-    limitFallback: SECURITY_DEFAULTS.authLimit,
-    message: "Too many attempts. Try again later.",
-  });
+export function buildAuthRateLimiter(
+  envs: EnvSource,
+  options: RateLimiterOptions = {}
+): RateLimitRequestHandler | null {
+  return buildLimiter(
+    envs,
+    {
+      windowKey: "AUTH_RATE_LIMIT_WINDOW_MS",
+      limitKey: "AUTH_RATE_LIMIT_MAX",
+      windowFallback: SECURITY_DEFAULTS.authWindowMs,
+      limitFallback: SECURITY_DEFAULTS.authLimit,
+      message: "Too many attempts. Try again later.",
+      prefix: "rate-limit:auth:",
+      passOnStoreError: false,
+    },
+    options
+  );
 }
 
 // ---------------------------------------------------------------- helmet ----

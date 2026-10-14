@@ -3,9 +3,9 @@
  *
  * It carries the vocabulary the whole toolkit shares: the error type services
  * throw, the mapper that turns anything thrown into an HTTP-shaped answer, the
- * contracts for logging, request context and health, the fixed-scale decimal
- * arithmetic an application handling amounts would otherwise write for itself,
- * and the two plain implementations that need nothing but Node. It stays free
+ * contracts for logging, request context, health and caching, the fixed-scale
+ * decimal arithmetic an application handling amounts would otherwise write for
+ * itself, and the plain implementations that need nothing but Node. It stays free
  * of Express, of any database driver and of any DI container on purpose — every
  * package may depend on the kernel, so anything the kernel depends on becomes
  * mandatory for all of them.
@@ -20,6 +20,8 @@ export type { NormalizedError } from "./errors/error-mapper.js";
 
 // ------------------------------------------------------------  contracts  ---
 export type { ILogger } from "./contracts/logger.js";
+
+export type { CounterValue, ICache, IncrementOptions } from "./contracts/cache.js";
 
 export type {
   CurrentUser,
@@ -55,4 +57,8 @@ export type { Day } from "./day/day.js";
 export { AsyncRequestContext, SYSTEM_USER } from "./context/async-request-context.js";
 
 export { HealthProbe } from "./health/health-probe.js";
+
+// Per process. `monolite-data` has the Redis one, behind the same contract.
+export { MemoryCache } from "./cache/memory-cache.js";
+export type { MemoryCacheOptions } from "./cache/memory-cache.js";
 export type { HealthProbeOptions, IConnectionCheck } from "./health/health-probe.js";

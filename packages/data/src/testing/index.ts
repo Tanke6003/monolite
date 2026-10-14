@@ -12,3 +12,7 @@
  */
 export { CONTRACT_ENTITY, runGenericRepositoryContract } from "./repository-contract.js";
 export type { ContractItem, ContractSetup } from "./repository-contract.js";
+
+// The same idea for `ICache`: one suite, every implementation.
+export { runCacheContract } from "./cache-contract.js";
+export type { CacheContractSetup } from "./cache-contract.js";
