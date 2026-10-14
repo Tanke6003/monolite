@@ -116,6 +116,12 @@ export interface PersistenceLayer {
 
   /** The registrations the layer was built from, in the order they were given. */
   entities: readonly AnyEntityRegistration[];
+
+  /** The layer's name, when `registerPersistence` was given one. */
+  name?: string;
+
+  /** The context the layer's stores join transactions through, when they do. */
+  transactions?: ITransactionContext;
 }
 
 /**
@@ -390,6 +396,7 @@ interface Assembly {
   /** Builds the unit of work over the registry of repositories. */
   unitOfWork: (stores: ReadonlyMap<string, AnyGenericRepository>) => IUnitOfWork;
   connection?: IManagedConnection;
+  transactions?: ITransactionContext;
 }
 
 function storeOf<T extends object, TKey>(
@@ -454,7 +461,9 @@ function assertRelationsResolve(entities: readonly AnyEntityRegistration[]): voi
 
   throw new Error(
     `[persistence] relation(s) pointing at an entity that is not registered: ${broken.join(", ")}. ` +
-      `Registered: ${[...registered].sort().join(", ") || "none"}.`
+      `Registered: ${[...registered].sort().join(", ") || "none"}. ` +
+      "If the table belongs to another persistence layer, a relation cannot reach it: keep the " +
+      "key as a plain column and read the other side through its own store."
   );
 }
 
@@ -484,6 +493,7 @@ function assemble(assembly: Assembly): PersistenceLayer {
     auditLogStore,
     connection: assembly.connection,
     entities: assembly.entities,
+    transactions: assembly.transactions,
   };
 }
 
@@ -535,6 +545,7 @@ export function createPersistenceLayer(options: PersistenceOptions): Persistence
       driver,
       entities,
       auditLog,
+      transactions,
       create: (metadata, _seed, trail) =>
         new SqlGenericRepository(oracle, metadata, logger, oracleDialect, context, trail),
       trail: (store) => new SqlAuditTrail(store as SqlGenericRepository<IAuditLog>),
@@ -563,6 +574,7 @@ export function createPersistenceLayer(options: PersistenceOptions): Persistence
       driver,
       entities,
       auditLog,
+      transactions,
       create: (metadata, _seed, trail) =>
         new SqlGenericRepository(plugin, metadata, logger, dialect, context, trail),
       trail: (store) => new SqlAuditTrail(store as SqlGenericRepository<IAuditLog>),
@@ -589,6 +601,7 @@ export function createPersistenceLayer(options: PersistenceOptions): Persistence
       driver,
       entities,
       auditLog,
+      transactions,
       create: (metadata, _seed, trail) =>
         new MongoGenericRepository(mongo, metadata, logger, context, trail),
       trail: (store) => new MongoAuditTrail(store as MongoGenericRepository<IAuditLog>),
@@ -608,6 +621,7 @@ export function createPersistenceLayer(options: PersistenceOptions): Persistence
     driver,
     entities,
     auditLog,
+    transactions,
     create: (metadata, seed, trail) =>
       new MemoryGenericRepository(metadata, seed ?? [], context, trail),
     trail: (store) => new MemoryAuditTrail(store),

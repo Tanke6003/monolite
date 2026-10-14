@@ -72,6 +72,49 @@ export function storeToken(entity: string): string {
   return `${entity}Store`;
 }
 
+/**
+ * The registrations a persistence layer makes once, rather than once per
+ * entity. These are the tokens a second layer would collide on, so a named
+ * layer registers them under its own name; see `layerToken`.
+ */
+export type LayerTokenName =
+  | "IUnitOfWork"
+  | "ITransactionContext"
+  | "IAuditTrail"
+  | "IAuditLogStore"
+  | "IHealthProbe";
+
+/**
+ * Token of a layer-wide registration of the persistence layer called `layer`.
+ *
+ * With no name it is the plain token in `TOKENS`, which is what an application
+ * with one layer has always injected and keeps injecting. A named layer gets
+ * `IUnitOfWork:records`, `IHealthProbe:documents` and so on: per-entity stores
+ * have unique tokens already, and these are the ones a second
+ * `registerPersistence` would otherwise overwrite — with `@Transactional()`
+ * quietly opening its transaction on whichever engine registered last.
+ */
+export function layerToken(token: LayerTokenName, layer?: string): string {
+  return layer === undefined ? TOKENS[token] : `${TOKENS[token]}:${layer}`;
+}
+
+/** The unit of work of the layer called `layer`, or of the only one. */
+export const unitOfWorkToken = (layer?: string): string => layerToken("IUnitOfWork", layer);
+
+/** The transaction context a named layer's stores join; see `registerPersistence`. */
+export const transactionContextToken = (layer?: string): string =>
+  layerToken("ITransactionContext", layer);
+
+export const auditTrailToken = (layer?: string): string => layerToken("IAuditTrail", layer);
+
+export const auditLogStoreToken = (layer?: string): string => layerToken("IAuditLogStore", layer);
+
+/**
+ * One layer's health probe. `TOKENS.IHealthProbe` stays the one `/health`
+ * reads: with more than one layer it reports all of them.
+ */
+export const healthProbeToken = (layer?: string): string => layerToken("IHealthProbe", layer);
+
 type Vowel = "a" | "e" | "i" | "o" | "u" | "A" | "E" | "I" | "O" | "U";
 type Sibilant = "s" | "x" | "z" | "ch" | "sh" | "S" | "X" | "Z" | "Ch" | "cH" | "CH" | "Sh" | "sH" | "SH";
 

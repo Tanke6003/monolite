@@ -95,3 +95,4 @@ jobs:
           echo "::notice::the shared repository contract passed on all five engines, and transactions,"
           echo "::notice::row locks and stored procedures were exercised against real servers."
           echo "::notice::The ICache contract passed on Redis, and the login limiter held across two instances."
+          echo "::notice::PostgreSQL and MongoDB also ran side by side as two named layers of one application."

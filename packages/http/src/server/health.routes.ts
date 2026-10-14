@@ -38,6 +38,8 @@ export function healthRoutes(options: HealthRoutesOptions = {}): Router {
     // Useful for knowing which driver the instance is actually running against.
     dataSource: report.dataSource,
     database: report.database,
+    // Only with more than one persistence layer: which store is the one down.
+    ...(report.layers ? { layers: report.layers } : {}),
     ...(apiPrefix ? { apiPrefix } : {}),
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),

@@ -164,7 +164,12 @@ export { RedisCache } from "./connectors/redis-cache.js";
 export type { RedisCacheConfig } from "./connectors/redis-cache.js";
 
 // ----------------------------------------------------------  transactions  ---
-export { TRANSACTION_SEAM, transactionAware, transactionSeamOf } from "./transaction-aware.js";
+export {
+  attachTransactionSeam,
+  TRANSACTION_SEAM,
+  transactionAware,
+  transactionSeamOf,
+} from "./transaction-aware.js";
 export type { TransactionSeam } from "./transaction-aware.js";
 
 // ------------------------------------------------------------------  raw  ---

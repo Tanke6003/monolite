@@ -61,6 +61,25 @@ a minor release. Pin exact versions.
   `loadOptionalDriver` now names the setting that avoids the missing driver,
   so a cache without `redis` installed says `CACHE_DRIVER=memory` rather than
   `DATA_SOURCE`.
+
+- **One application, more than one engine (#43).** `registerPersistence` takes
+  a `name`, and each named layer registers its unit of work, change log,
+  transaction context and health probe under its own token
+  (`unitOfWorkToken("records")`, `healthProbeToken("documents")`, …) instead of
+  overwriting the previous layer's. Per-entity store tokens don't change, so a
+  module still injects its store without knowing the engine. A layer without a
+  name keeps the plain `TOKENS`: single-engine applications and generated
+  projects are unchanged.
+
+  `@Transactional("records")` opens the transaction on that layer. **A
+  transaction never spans layers**: a write to another layer in the same method
+  is committed on its own and stays if this one rolls back. Each named layer has
+  its own transaction context; two layers sharing one, a duplicate layer name or
+  a relation into another layer's table fail at start-up, naming the layers.
+  With more than one layer, `/health` reports each one under `layers`
+  (`CompositeHealthProbe` in `monolite-core`). `lockRow` also accepts a store,
+  and locks in that store's layer.
+
 - **`tokensFor(name)` in `monolite-di` derives a module's four DI identifiers**
   (#41). A generated `<entity>.tokens.ts` used to transcribe `"PaymentsStore"`,
   `"IPaymentsBLL"`, `"IPaymentsRepository"` and `"IPaymentsController"` by hand —

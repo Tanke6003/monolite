@@ -31,8 +31,18 @@ export type {
 } from "./container.js";
 
 // ---------------------------------------------------------------  tokens  ---
-export { storeToken, tokensFor, TOKENS } from "./tokens.js";
-export type { ModuleTokens, Plural, Token, TokenName } from "./tokens.js";
+export {
+  auditLogStoreToken,
+  auditTrailToken,
+  healthProbeToken,
+  layerToken,
+  storeToken,
+  tokensFor,
+  TOKENS,
+  transactionContextToken,
+  unitOfWorkToken,
+} from "./tokens.js";
+export type { LayerTokenName, ModuleTokens, Plural, Token, TokenName } from "./tokens.js";
 
 // --------------------------------------------------------  configuration  ---
 export type { IEnvs } from "./env.js";

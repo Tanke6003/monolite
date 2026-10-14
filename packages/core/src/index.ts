@@ -29,7 +29,7 @@ export type {
   RequestContextData,
 } from "./contracts/request-context.js";
 
-export type { HealthReport, IHealthProbe } from "./contracts/health.js";
+export type { HealthReport, IHealthProbe, LayerHealth } from "./contracts/health.js";
 
 // --------------------------------------------------------------  decimal  ---
 // Arithmetic on a number with a fixed number of decimals — the same thing
@@ -57,6 +57,7 @@ export type { Day } from "./day/day.js";
 export { AsyncRequestContext, SYSTEM_USER } from "./context/async-request-context.js";
 
 export { HealthProbe } from "./health/health-probe.js";
+export { CompositeHealthProbe } from "./health/composite-health-probe.js";
 
 // Per process. `monolite-data` has the Redis one, behind the same contract.
 export { MemoryCache } from "./cache/memory-cache.js";

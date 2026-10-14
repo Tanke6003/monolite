@@ -8,6 +8,18 @@ export interface HealthReport {
   database: "up" | "down" | "not_applicable";
   /** `true` while the process is draining after receiving SIGTERM. */
   shuttingDown: boolean;
+  /**
+   * One entry per persistence layer, when the application has more than one
+   * engine. `dataSource` and `database` above then sum them up — `database` is
+   * `down` if any layer's is — and this says which store it was.
+   */
+  layers?: Record<string, LayerHealth>;
+}
+
+/** What `HealthReport.layers` says about each persistence layer. */
+export interface LayerHealth {
+  dataSource: string;
+  database: HealthReport["database"];
 }
 
 /**

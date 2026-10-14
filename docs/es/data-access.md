@@ -554,6 +554,89 @@ El bloqueo sólo alcanza a las peticiones de **un proceso**. Con más de una
 instancia corriendo, la garantía tiene que estar en la base de datos — un índice
 único parcial sobre las columnas que no deben chocar.
 
+### Más de un motor
+
+Una aplicación puede guardar sus registros en PostgreSQL y sus documentos en
+MongoDB. Cada motor es una **capa**: una llamada a `registerPersistence` con
+`name`.
+
+```ts
+import { createContainer, entitiesOf, registerPersistence } from "monolite-di";
+
+const container = createContainer();
+
+const records = registerPersistence({
+  container,
+  name: "records",
+  dataSource: "postgres",
+  entities: entitiesOf(SQL_MODULES),
+  logger,
+  envs,
+});
+
+const documents = registerPersistence({
+  container,
+  name: "documents",
+  dataSource: "mongodb",
+  entities: entitiesOf(DOCUMENT_MODULES),
+  logger,
+  envs,
+});
+```
+
+- **Los stores no cambian.** Cada entidad conserva su token, y un módulo
+  inyecta su store sin saber qué motor tiene debajo.
+- **Lo que es de toda la capa lleva su nombre.** La unidad de trabajo, el
+  registro de cambios y la sonda de salud quedan bajo
+  `unitOfWorkToken("records")`, `auditTrailToken("records")`,
+  `healthProbeToken("records")`, etc. Una capa sin nombre sigue en los
+  `TOKENS` de siempre, así que una aplicación con un solo motor no cambia nada.
+- **Cada capa con nombre tiene su propio contexto de transacción.** Sus stores
+  solo se unen a sus propias transacciones. Dos capas que reciben el mismo
+  `transactions` fallan al arrancar.
+- **`/health` informa de cada capa.** `TOKENS.IHealthProbe` las resume (no está
+  lista si alguna base de datos está caída) y `layers` dice cuál fue.
+
+**Una transacción nunca abarca dos capas.** Dos motores no pueden compartir un
+commit. `@Transactional("records")` abre una transacción solo en PostgreSQL.
+Una escritura en MongoDB dentro del mismo método sale por su cuenta y se
+queda, aunque la parte de PostgreSQL haga rollback:
+
+```ts
+import { Transactional } from "monolite-crud";
+import type { IGenericRepository } from "monolite-data";
+
+export class AccountsBLL {
+  constructor(
+    private readonly accounts: IGenericRepository<IAccount>,
+    private readonly events: IGenericRepository<IEvent>
+  ) {}
+
+  @Transactional("records")
+  async open(name: string): Promise<void> {
+    const account = await this.accounts.insert({ name, balanceCents: 0 });
+    // MongoDB: confirmado ya, y no se deshace si la línea de abajo lanza.
+    await this.events.insert({ kind: "opened", accountId: account.pkAccount });
+    await checkLimits(account);
+  }
+}
+```
+
+El decorador encuentra la capa por lo que el servicio tiene: uno de sus stores,
+o su unidad de trabajo inyectada con `unitOfWorkToken("records")`. Un `CrudBLL`
+abre en la capa del store con el que se construyó, así que ahí basta con
+`@Transactional()`. Para bloquear una fila, pasa un store de su capa:
+`lockRow(this.accounts, "ACCOUNTS", id)`.
+
+Si algo tiene que pasar en los dos motores o en ninguno, escribe el segundo
+paso de forma que se pueda reintentar, o regístralo en el primer motor y
+aplícalo después. Es una decisión de diseño; el toolkit no puede tomarla por ti.
+
+**Una relación tampoco puede cruzar capas.** Ningún join ni ninguna clave
+foránea llega a otro motor. Una relación hacia una tabla de otra capa falla al
+arrancar y nombra las dos capas. Guarda la clave como columna normal y lee el
+otro lado con su propio store.
+
 ---
 
 ## Dónde se detiene la API genérica

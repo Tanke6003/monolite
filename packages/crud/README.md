@@ -169,7 +169,7 @@ const branches = await loadRelated(appointments, {
 | `CrudController`, `ICrudController` | The five HTTP handlers |
 | `Crud`, `CrudOptions`, `CrudVerb` | The decorator that mounts the routes |
 | `createMapper`, `Mapper`, `MappingProfile`, `FieldMapping`, `MappedField`, `ComputedField` | Declarative entity <-> DTO mapping |
-| `Transactional`, `TransactionalBLL`, `lockRow` | Ambient transactions |
+| `Transactional`, `TransactionalBLL`, `lockRow` | Ambient transactions. `@Transactional("records")` names the persistence layer when the application has more than one engine |
 | `loadRelated`, `IncludeSpec` | Batched loading of an N:1 relation |
 
 ## License

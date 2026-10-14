@@ -538,6 +538,89 @@ The lock only reaches the requests of **one process**. With more than one instan
 running, the guarantee has to be in the database — a partial unique index on the
 columns that must not collide.
 
+### More than one engine
+
+An application can keep its records in PostgreSQL and its documents in
+MongoDB. Each engine is a **layer**: one `registerPersistence` call with a
+`name`.
+
+```ts
+import { createContainer, entitiesOf, registerPersistence } from "monolite-di";
+
+const container = createContainer();
+
+const records = registerPersistence({
+  container,
+  name: "records",
+  dataSource: "postgres",
+  entities: entitiesOf(SQL_MODULES),
+  logger,
+  envs,
+});
+
+const documents = registerPersistence({
+  container,
+  name: "documents",
+  dataSource: "mongodb",
+  entities: entitiesOf(DOCUMENT_MODULES),
+  logger,
+  envs,
+});
+```
+
+- **Stores don't change.** Each entity keeps its token, and a module injects
+  its store without knowing which engine is under it.
+- **Layer-wide registrations get the layer's name.** The unit of work, the
+  change log and the health probe go under `unitOfWorkToken("records")`,
+  `auditTrailToken("records")`, `healthProbeToken("records")` and so on. A
+  layer without a name keeps the plain `TOKENS`, so an application with one
+  engine changes nothing.
+- **Each named layer has its own transaction context.** Its stores join only
+  its own transactions. Two layers handed the same `transactions` fail at
+  start-up.
+- **`/health` reports every layer.** `TOKENS.IHealthProbe` sums them up — not
+  ready if any database is down — and `layers` says which one it was.
+
+**A transaction never spans layers.** Two engines cannot share a commit.
+`@Transactional("records")` opens a transaction on PostgreSQL only. A write to
+MongoDB in the same method goes out on its own and stays, even if the
+PostgreSQL part rolls back:
+
+```ts
+import { Transactional } from "monolite-crud";
+import type { IGenericRepository } from "monolite-data";
+
+export class AccountsBLL {
+  constructor(
+    private readonly accounts: IGenericRepository<IAccount>,
+    private readonly events: IGenericRepository<IEvent>
+  ) {}
+
+  @Transactional("records")
+  async open(name: string): Promise<void> {
+    const account = await this.accounts.insert({ name, balanceCents: 0 });
+    // MongoDB: committed now, and not undone if the line below throws.
+    await this.events.insert({ kind: "opened", accountId: account.pkAccount });
+    await checkLimits(account);
+  }
+}
+```
+
+The decorator finds the layer through what the service holds: one of its
+stores, or its unit of work injected under `unitOfWorkToken("records")`. A
+`CrudBLL` opens on the layer of the store it was built with, so plain
+`@Transactional()` is enough there. To lock a row, pass a store of its layer:
+`lockRow(this.accounts, "ACCOUNTS", id)`.
+
+If something must happen on both engines or on neither, write the second step
+so it can be retried, or record it in the first engine and apply it later.
+That is a design decision; the toolkit can't make it for you.
+
+**A relation cannot cross layers either.** No join and no foreign key reaches
+another engine. A relation to a table in another layer fails at start-up and
+names both layers. Keep the key as a plain column and read the other side
+through its own store.
+
 ---
 
 ## Where the generic API stops

@@ -12,6 +12,12 @@ import type { IUnitOfWork } from "./contracts/unit-of-work.js";
 export interface TransactionSeam {
   readonly unitOfWork: IUnitOfWork;
   readonly transactions: ITransactionContext;
+  /**
+   * The persistence layer the unit of work belongs to, when it has a name.
+   * `@Transactional("records")` looks for the seam whose layer is `records`;
+   * absent, the seam is the application's only — or default — layer.
+   */
+  readonly layer?: string;
 }
 
 /**
@@ -48,6 +54,23 @@ export function transactionSeamOf(repository: unknown): TransactionSeam | undefi
   if (typeof seam.transactions?.current !== "function") return undefined;
 
   return seam;
+}
+
+/**
+ * Makes `unitOfWork` carry its own seam, so `transactionSeamOf` reads it off
+ * the unit of work as it reads it off a store.
+ *
+ * That is what lets a service holding a named layer's unit of work — injected
+ * under `unitOfWorkToken("records")` and kept under any member name — be found
+ * by `@Transactional("records")`. Non-enumerable, so the unit of work looks the
+ * same as before to anything that walks its properties.
+ */
+export function attachTransactionSeam(unitOfWork: IUnitOfWork, seam: TransactionSeam): void {
+  Object.defineProperty(unitOfWork, TRANSACTION_SEAM, {
+    value: seam,
+    enumerable: false,
+    configurable: true,
+  });
 }
 
 /**
@@ -93,9 +116,13 @@ export function transactionAware<T extends object, TKey = number>(
    * carries the seam `transactionSeamOf` reads, so a service holding nothing
    * but this store can open a transaction around its own writes.
    */
-  unitOfWork?: IUnitOfWork
+  unitOfWork?: IUnitOfWork,
+  /** The name of the layer the store belongs to; see `TransactionSeam.layer`. */
+  layer?: string
 ): IGenericRepository<T, TKey> {
-  const seam: TransactionSeam | undefined = unitOfWork ? { unitOfWork, transactions } : undefined;
+  const seam: TransactionSeam | undefined = unitOfWork
+    ? { unitOfWork, transactions, ...(layer === undefined ? {} : { layer }) }
+    : undefined;
 
   /**
    * The store to answer with, decided per access.
