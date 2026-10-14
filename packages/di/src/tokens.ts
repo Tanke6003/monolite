@@ -30,6 +30,11 @@ export const TOKENS = {
   /** Issues and verifies access tokens. Implemented outside this package. */
   ITokenBLL: "ITokenBLL",
   IFileStorage: "IFileStorage",
+  /**
+   * Shared key-value store with expiry: the rate limiter's counts, and what a
+   * lock or a denylist is built on. `registerCache` binds it.
+   */
+  ICache: "ICache",
 
   // ------------------------------------------------------------ persistence --
   /**

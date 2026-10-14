@@ -11,6 +11,30 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **A cache seam, and Redis behind it** (#42). `ICache` in `monolite-core` —
+  `get`, `set`, `delete`, `deletePrefix`, `add` (set-if-absent) and an atomic
+  `increment` — with `MemoryCache` as the default and `RedisCache` in
+  `monolite-data`, on `redis` as an optional peer dependency.
+  `registerCache({ container, envs, logger })` in `monolite-di` binds
+  `TOKENS.ICache` from `CACHE_DRIVER=memory|redis` (`REDIS_URL`, keys under
+  `REDIS_KEY_PREFIX` or `SERVICE_NAME:`) and returns the connection for
+  `manage`. Values travel as JSON in both, and a contract kit
+  (`runCacheContract`, in `monolite-data/testing`) holds them to the same
+  answers; the integration suite runs it against a real Redis.
+
+  What it fixes first is the rate limiter. `buildRateLimiter` and
+  `buildAuthRateLimiter` counted in the process, so behind two replicas
+  `AUTH_RATE_LIMIT_MAX=5` let ten login attempts through and a rolling restart
+  reset the count. Given `{ cache }` — or `createApp({ cache })` — they count in
+  the shared cache through `CacheRateLimitStore`, one limit wherever the request
+  lands. If the cache cannot be reached the general limiter lets requests
+  through and the login limiter fails them. Generated projects call
+  `registerCache` and pass the cache to both limiters; with the default
+  `CACHE_DRIVER=memory` they behave exactly as before.
+
+  `loadOptionalDriver` now names the setting that avoids the missing driver,
+  so a cache without `redis` installed says `CACHE_DRIVER=memory` rather than
+  `DATA_SOURCE`.
 - **`tokensFor(name)` in `monolite-di` derives a module's four DI identifiers**
   (#41). A generated `<entity>.tokens.ts` used to transcribe `"PaymentsStore"`,
   `"IPaymentsBLL"`, `"IPaymentsRepository"` and `"IPaymentsController"` by hand —

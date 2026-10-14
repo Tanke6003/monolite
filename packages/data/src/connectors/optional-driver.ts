@@ -13,6 +13,11 @@
  * `import type` is erased at compile time and costs nothing at runtime.
  */
 
+const PERSISTENCE = {
+  area: "persistence",
+  otherwise: "point DATA_SOURCE at an engine whose driver is present",
+};
+
 /**
  * `true` when the module itself is missing, rather than something inside it.
  *
@@ -35,8 +40,15 @@ function isMissingModule(error: unknown, module: string): boolean {
  * package the application never mentioned— tells the reader nothing about what
  * they did or what to do next. This one names the engine that asked, the
  * package that is missing and the two ways out of it.
+ *
+ * `ways` is where the message comes from and what the second way out is: the
+ * database engines answer to `DATA_SOURCE`, the cache to `CACHE_DRIVER`.
  */
-export function loadOptionalDriver<T>(module: string, engine: string): T {
+export function loadOptionalDriver<T>(
+  module: string,
+  engine: string,
+  ways: { area: string; otherwise: string } = PERSISTENCE
+): T {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require(module) as T;
@@ -44,9 +56,9 @@ export function loadOptionalDriver<T>(module: string, engine: string): T {
     if (!isMissingModule(error, module)) throw error;
 
     throw new Error(
-      `[persistence] The ${engine} connector needs "${module}", which is an optional peer ` +
-        `dependency and is not installed. Install it with \`npm install ${module}\`, or point ` +
-        "DATA_SOURCE at an engine whose driver is present.",
+      `[${ways.area}] The ${engine} connector needs "${module}", which is an optional peer ` +
+        `dependency and is not installed. Install it with \`npm install ${module}\`, or ` +
+        `${ways.otherwise}.`,
       { cause: error }
     );
   }

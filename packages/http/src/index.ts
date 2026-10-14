@@ -106,7 +106,8 @@ export {
   resolveExposeErrorDetails,
   resolveTrustProxy,
 } from "./config/security.config.js";
-export type { DocsReader } from "./config/security.config.js";
+export type { DocsReader, RateLimiterOptions } from "./config/security.config.js";
+export { CacheRateLimitStore } from "./config/rate-limit-store.js";
 
 export { processEnv } from "./config/env-source.js";
 export type { EnvSource } from "./config/env-source.js";

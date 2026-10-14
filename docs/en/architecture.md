@@ -273,6 +273,21 @@ errorHandler                always last
 Express error handler only covers what was registered before it, and a 404 handler
 placed too early swallows Swagger.
 
+### Behind more than one replica
+
+The rate limiters count in an `ICache` (`monolite-core`), which `registerCache`
+binds from `CACHE_DRIVER`. `memory`, the default, keeps the count in the process —
+behind two replicas that is two limits, and `AUTH_RATE_LIMIT_MAX=5` lets ten login
+attempts through. `CACHE_DRIVER=redis` puts it on `REDIS_URL` (install `redis`
+first), and it is one limit wherever the request lands. Nothing else changes: the
+limiters, and anything an application builds on `TOKENS.ICache`, see the same six
+operations either way, and the in-memory cache passes the same contract suite the
+Redis one does.
+
+If Redis cannot be reached, the general limiter lets requests through — an outage
+of the cache should not become an outage of the API — and the login limiter fails
+them, because a login nobody counts can be guessed at full speed.
+
 ---
 
 ## `monolite-crud` — five endpoints, all overridable

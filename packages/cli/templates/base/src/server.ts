@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import cors from "cors";
 import express, { type Application } from "express";
 import helmet from "helmet";
-import type { IHealthProbe, ILogger, IRequestContext } from "monolite-core";
+import type { ICache, IHealthProbe, ILogger, IRequestContext } from "monolite-core";
 import {
   buildCorsPolicy,
   buildHelmetOptions,
@@ -74,8 +74,9 @@ export class Server {
 
     // Before the body parsers: a request that is going to be rejected does not
     // get its body read, which is exactly the work an abuse is trying to cause.
-    // `RATE_LIMIT_MAX=0` switches it off.
-    const limiter = buildRateLimiter(envs);
+    // `RATE_LIMIT_MAX=0` switches it off. It counts in the container's cache,
+    // which is what makes it one limit across replicas with `CACHE_DRIVER=redis`.
+    const limiter = buildRateLimiter(envs, { cache: container.resolve<ICache>(TOKENS.ICache) });
     if (limiter) this.app.use(limiter);
 
     // Before the body parsers as well: a preflight carries none. The allow-list

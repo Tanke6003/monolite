@@ -325,7 +325,8 @@ fails if a new export arrives without a row here.
 | `buildHelmetOptions`, `DEFAULT_CSP_DIRECTIVES`, `SECURITY_DEFAULTS` | The headers, and the CSP that stays off until `CSP_ENABLED=true` — see the note above about a blank documentation page. |
 | `buildCorsPolicy` | The CORS policy `createApp` mounts: the `CORS_ORIGINS` allow-list plus the server's own origin, so the docs page it serves can send a `POST` with the list empty. |
 | `buildCorsOptions`, `resolveAllowedOrigins` | The allow-list alone, as plain options: a blocked origin answers in the API's own error shape. It cannot see the request, so it does not know the server's own origin. |
-| `buildRateLimiter`, `buildAuthRateLimiter` | Per-IP, with the health checks exempt and the login endpoint on a tighter budget than the rest. |
+| `buildRateLimiter`, `buildAuthRateLimiter`, `RateLimiterOptions` | Per-IP, with the health checks exempt and the login endpoint on a tighter budget than the rest. Given `{ cache }` — the container's `ICache` — they count in it, which with Redis is one limit across replicas rather than one per replica. If the cache cannot be reached the general limiter lets requests through and the login one fails them. |
+| `CacheRateLimitStore` | The `express-rate-limit` store behind that: one atomic `increment` per hit, a fixed window, a prefix per limiter. |
 | `resolveApiPrefix`, `resolveLegacyPrefix`, `DEFAULT_API_PREFIX`, `DEFAULT_LEGACY_PREFIX` | Where the API is mounted, and the older prefix kept alive beside it. |
 | `resolveBodyLimit`, `resolveTrustProxy` | The two that are wrong by default in every framework: an unbounded body and a blindly trusted `X-Forwarded-For`. |
 | `resolveExposeErrorDetails` | Whether an error response carries its stack and causes: only when `EXPOSE_ERROR_DETAILS=true`. `createApp` passes it to `errorHandler`. |
@@ -346,6 +347,13 @@ built-in adapter over `process.env`.
 | `CORS_ORIGINS` | *(none)* | Comma-separated allow-list. `*` accepts any origin. Requests with no `Origin` are always accepted — those are curl, Postman or a health probe, and CORS does not protect against them anyway. |
 | `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX` | `60000` / `120` | General limiter. `0` disables it. |
 | `AUTH_RATE_LIMIT_WINDOW_MS` / `AUTH_RATE_LIMIT_MAX` | `900000` / `10` | Limiter for credential-issuing routes, far narrower: a token is the only thing that opens the rest of the API. |
+
+Both limiters count in the process unless they are given a cache — `createApp`'s
+`cache` option, or `{ cache }` to the builders. Behind two replicas a count in the
+process is two counts: `AUTH_RATE_LIMIT_MAX=5` lets ten attempts through, and a
+rolling restart resets it. Pass the container's `ICache` with `CACHE_DRIVER=redis`
+(see `registerCache` in `monolite-di`) and it is one count wherever the request
+lands.
 | `CSP_ENABLED` | `false` | Content-Security-Policy. It ships off because helmet's default policy breaks Swagger UI and Scalar at once, and a freshly cloned project with blank screens is the surest way to get the policy disabled wholesale instead of tuned. Helmet's other dozen headers always apply. |
 | `DOCS_ENABLED` | on outside production | Whether the documentation is published. The document describes the whole surface of the API, validation rules included. |
 | `EXPOSE_ERROR_DETAILS` | `false` | Whether an error response carries the stack trace and the chain of causes. Off unless asked for, and not tied to `NODE_ENV`: a deployment where nobody set either variable must not hand server paths and driver errors to whoever can make a request fail. The log is not affected by it, and the response's `requestId` leads to its line. |

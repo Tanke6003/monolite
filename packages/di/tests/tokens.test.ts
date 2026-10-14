@@ -66,6 +66,7 @@ describe("TOKENS", () => {
         "IHealthProbe",
         "ITokenBLL",
         "IFileStorage",
+        "ICache",
         "IDbPlugin",
         "IUnitOfWork",
         "IAuditTrail",

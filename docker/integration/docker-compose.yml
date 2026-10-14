@@ -93,3 +93,15 @@ services:
       interval: 10s
       timeout: 10s
       retries: 60
+
+  redis:
+    # Not a repository engine: the shared store behind `ICache`, which is what
+    # makes a rate limit the limit across replicas. Its suite runs the same
+    # cache contract the in-memory cache passes.
+    image: redis:7
+    ports: ["56379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

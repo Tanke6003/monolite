@@ -32,7 +32,7 @@ container right after.
 
 | Export | What it is |
 | --- | --- |
-| `TOKENS` | The framework-level identifiers: `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext`, `IHealthProbe`, `ITokenBLL`, `IFileStorage`, `IDbPlugin`, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore`. |
+| `TOKENS` | The framework-level identifiers: `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext`, `IHealthProbe`, `ITokenBLL`, `IFileStorage`, `ICache`, `IDbPlugin`, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore`. |
 | `Token`, `TokenName` | The value and the key types of the table. |
 | `storeToken` | The token an entity's generic repository is registered under (`USERS` → `USERSStore`). |
 
@@ -79,6 +79,7 @@ dependency.
 | --- | --- |
 | `registerPlugins` | `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext` and, if given, `ITokenBLL` and `IFileStorage`. |
 | `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Each store is wrapped so it joins whatever transaction is open, which is what makes `@Transactional()` true of the repositories a module injects. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. |
+| `registerCache` | `ICache`, on the store `CACHE_DRIVER` names: `memory` (the default, in the process) or `redis` (`REDIS_URL`, keys under `REDIS_KEY_PREFIX` or `SERVICE_NAME:`). An unknown driver fails start-up rather than quietly falling back to memory. Returns the layer; hand its `connection` to `manage`. |
 | `registerModules` | Every feature module's own bindings, from the one list in `composition/modules.ts`. Order does not matter: tsyringe resolves when somebody asks, not when something is registered. |
 
 ### Modules
@@ -114,6 +115,7 @@ import type { IHealthProbe } from "monolite-core";
 import {
   createCompositionRoot,
   createLogger,
+  registerCache,
   registerPersistence,
   registerPlugins,
   TOKENS,
@@ -150,6 +152,11 @@ export const root = createCompositionRoot((root) => {
   // The connection is not registered in the container — nobody injects it — but
   // the process owns it, so the root opens and closes it.
   root.manage(persistence.connection);
+
+  // The cache the rate limiters count in: memory unless CACHE_DRIVER=redis.
+  // In memory there is no connection, and `manage` ignores the `undefined`.
+  const cache = registerCache({ container: root.container, envs, logger: plugins.logger });
+  root.manage(cache.connection);
 
   // From here on order stops mattering: a module declares its classes and
   // tsyringe resolves the dependencies when somebody asks for them.
