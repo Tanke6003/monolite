@@ -36,9 +36,11 @@ export {
 export type {
   ControllerMetadata,
   ControllerType,
+  Handler,
   HttpMethod,
   PathParamType,
   ResponseSpec,
+  RouteDecorator,
   RouteMetadata,
   RouteOptions,
 } from "./routing/route.decorators.js";

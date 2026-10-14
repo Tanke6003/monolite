@@ -55,6 +55,49 @@ never runs.
 
 ---
 
+## Typed handlers
+
+`req.body` is `any` and `req.validatedQuery` is `unknown` in Express, so a
+handler typed `(req: Request, res: Response)` has to cast what the route already
+validated — and a cast is a copy of the schema's shape that nothing keeps in
+step with it. `Handler` takes the schemas instead:
+
+```ts
+import { z } from "zod";
+import { Get, Post, type Handler } from "monolite-http";
+
+const createUserSchema = z.object({ name: z.string(), email: z.email() });
+const paginationSchema = z.object({ page: z.coerce.number().default(1) });
+
+export class UsersController {
+  @Get("/", { query: paginationSchema })
+  public getAll: Handler<{ query: typeof paginationSchema }> = async (req, res) => {
+    res.json({ page: req.validatedQuery.page }); // number, after coercion
+  };
+
+  @Post("/", { body: createUserSchema })
+  public create: Handler<{ body: typeof createUserSchema }> = async (req, res) => {
+    res.status(201).json({ name: req.body.name }); // string
+  };
+}
+```
+
+The schema is named twice, once in the decorator and once in the type, because
+a decorator cannot give a type to the property it decorates. The decorator does
+check the property, though: a handler typed against another schema than the
+route validates with fails to compile, at the decorator, naming the field that
+is missing.
+
+Two consequences worth knowing:
+
+- A handler typed with Express's own `Request` still compiles — it accepts any
+  body, so it satisfies every route. Moving to `Handler` is per handler.
+- A handler declared `private` or `protected` does not. It used to, since the
+  router looks the property up by name at runtime, but the decorator cannot see
+  a member its type hides. Make it public.
+
+---
+
 ## The decorators
 
 | Decorator | What it declares |

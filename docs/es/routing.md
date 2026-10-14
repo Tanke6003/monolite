@@ -55,6 +55,49 @@ decorador nunca se ejecuta.
 
 ---
 
+## Manejadores tipados
+
+En Express `req.body` es `any` y `req.validatedQuery` es `unknown`, así que un
+manejador tipado `(req: Request, res: Response)` tiene que hacer un cast de lo que
+la ruta ya validó, y un cast es una copia de la forma del esquema que nada
+mantiene al día. `Handler` recibe los esquemas en su lugar:
+
+```ts
+import { z } from "zod";
+import { Get, Post, type Handler } from "monolite-http";
+
+const createUserSchema = z.object({ name: z.string(), email: z.email() });
+const paginationSchema = z.object({ page: z.coerce.number().default(1) });
+
+export class UsersController {
+  @Get("/", { query: paginationSchema })
+  public getAll: Handler<{ query: typeof paginationSchema }> = async (req, res) => {
+    res.json({ page: req.validatedQuery.page }); // number, ya convertido
+  };
+
+  @Post("/", { body: createUserSchema })
+  public create: Handler<{ body: typeof createUserSchema }> = async (req, res) => {
+    res.status(201).json({ name: req.body.name }); // string
+  };
+}
+```
+
+El esquema se nombra dos veces, en el decorador y en el tipo, porque un decorador
+no puede darle tipo a la propiedad que decora. Lo que sí hace es comprobarla: un
+manejador tipado con otro esquema distinto del que valida la ruta no compila, y
+el error sale en el decorador, nombrando el campo que falta.
+
+Dos consecuencias que conviene saber:
+
+- Un manejador tipado con el `Request` de Express sigue compilando: acepta
+  cualquier cuerpo, así que satisface cualquier ruta. Pasar a `Handler` se hace
+  manejador por manejador.
+- Uno declarado `private` o `protected` ya no compila. Antes sí, porque el router
+  busca la propiedad por nombre en tiempo de ejecución, pero el decorador no ve un
+  miembro que su tipo oculta. Hay que hacerlo público.
+
+---
+
 ## Los decoradores
 
 | Decorador | Qué declara |

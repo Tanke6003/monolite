@@ -7,8 +7,8 @@
 // times**. Today a Zod schema says `limit` is an integer between 1 and 100, a
 // hand-written `@openapi` block repeats it, and nothing forces them to agree; as
 // soon as one changes, the other lies. Here only the schema exists.
-import type { RequestHandler } from "express";
-import type { ZodType } from "zod";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
+import type { output, ZodType } from "zod";
 
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
@@ -167,6 +167,59 @@ export function ApiController(prefix: string, options: { tag?: string; token?: s
   };
 }
 
+/** What a schema leaves behind once it has parsed, or `unknown` without one. */
+type Parsed<S> = S extends ZodType ? output<S> : unknown;
+
+/**
+ * A route handler typed by the schemas its route validates with.
+ *
+ * The body schema was already used three times — to validate, to document and,
+ * through `z.infer`, to type the DTO — and the handler was the fourth use and
+ * the only one that restated it: `req.body` is `any`, `req.validatedQuery` is
+ * `unknown`, so every handler cast, and a cast is a copy that drifts the way
+ * copies do. Here the handler names the schema instead of its shape:
+ *
+ * ```ts
+ * @Post("/", { body: createPersonBody })
+ * create: Handler<{ body: typeof createPersonBody }> = async (req, res) => {
+ *   res.status(201).json(await this.people.create(req.body)); // CreatePerson, inferred
+ * };
+ * ```
+ *
+ * The schema is named twice because a decorator cannot give a contextual type
+ * to the initializer of the property it decorates. What keeps the two names
+ * honest is the verb decorator, which checks the property it lands on: a
+ * handler typed against another schema than the route validates with is a
+ * compile error there.
+ *
+ * A handler written as `(req: Request, res: Response) => ...` still satisfies
+ * every `Handler<S>`, since its `Request` accepts any body.
+ */
+export type Handler<S extends Pick<RouteOptions, "body" | "query"> = Record<never, never>> = (
+  req: Request<Request["params"], unknown, Parsed<S["body"]>> & {
+    validatedQuery: Parsed<S["query"]>;
+  },
+  res: Response,
+  next: NextFunction
+) => unknown;
+
+/**
+ * A verb decorator.
+ *
+ * The `target` is checked, not just received: it has to carry, under the name
+ * being decorated, a handler that accepts what this route validates. That is
+ * what turns `Handler<{ body: typeof a }>` under `@Post("/", { body: b })` into
+ * a compile error instead of a request typed as something it is not.
+ *
+ * The price is that the handler has to be public. A `private` one worked —
+ * TypeScript's `private` is gone at runtime and the router looks the property up
+ * by name — but the type of `target` cannot see it, so it no longer compiles.
+ */
+export type RouteDecorator = <S extends RouteOptions = RouteOptions>(
+  path: string,
+  options?: S
+) => <K extends string>(target: { [P in K]: Handler<S> }, propertyKey: K) => void;
+
 /**
  * Factory of the verb decorators.
  *
@@ -175,9 +228,9 @@ export function ApiController(prefix: string, options: { tag?: string; token?: s
  * `.bind()`. A property decorator receives the prototype and the name, which is
  * all that is needed to register.
  */
-function route(method: HttpMethod) {
-  return (path: string, options: RouteOptions = {}) =>
-    function (target: object, propertyKey: string | symbol): void {
+function route(method: HttpMethod): RouteDecorator {
+  return (path, options) =>
+    function (target, propertyKey): void {
       const constructor = (target as { constructor: object }).constructor;
       metadataOf(constructor).routes.push({
         ...options,
