@@ -321,9 +321,19 @@ function asColumnMetadata(name: string, snapshot: ColumnSnapshot) {
   };
 }
 
+/**
+ * `date` is the old name of `datetime` — the same column, the same type in
+ * every dialect — so renaming a mapping from one to the other is not a change
+ * to the schema, and must not generate an `ALTER` that rewrites the table.
+ */
+function sameKind(left: string, right: string): boolean {
+  const canonical = (kind: string): string => (kind === "date" ? "datetime" : kind);
+  return canonical(left) === canonical(right);
+}
+
 function sameColumn(left: ColumnSnapshot, right: ColumnSnapshot): boolean {
   return (
-    left.kind === right.kind &&
+    sameKind(left.kind, right.kind) &&
     left.length === right.length &&
     left.precision === right.precision &&
     left.scale === right.scale &&

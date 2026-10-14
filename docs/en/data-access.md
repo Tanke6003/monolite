@@ -78,8 +78,8 @@ export const BRANCHES_ENTITY = defineEntity<IBranch>({
     name:      { name: "NAME",      kind: "string" },
     address:   { name: "ADDRESS",   kind: "string" },
     available: { name: "AVAILABLE", kind: "boolean" },
-    createdAt: { name: "CREATED_AT", kind: "date", updatable: false },
-    updatedAt: { name: "UPDATED_AT", kind: "date" },
+    createdAt: { name: "CREATED_AT", kind: "datetime", updatable: false },
+    updatedAt: { name: "UPDATED_AT", kind: "datetime" },
     createdBy: { name: "CREATED_BY", kind: "string", updatable: false },
     updatedBy: { name: "UPDATED_BY", kind: "string" },
   },
@@ -97,7 +97,7 @@ Renaming a physical column is a one-line change.
 | --- | --- |
 | `identity` | `true` (default): the database generates the PK. `false`: the caller must supply it, and an insert without it throws. |
 | `insertable` / `updatable` | `false` for columns the database owns (identity PKs, `CREATED_AT`). Default `true`. |
-| `kind` | Drives conversion in both directions: `boolean` ↔ `1/0`, `date` ↔ `Date`, `number`, `decimal`, `string`. Defaults to `string`. See [Money and other decimals](#money-and-other-decimals). |
+| `kind` | Drives conversion in both directions: `boolean` ↔ `1/0`, `day` ↔ `"YYYY-MM-DD"`, `datetime` ↔ `Date`, `number`, `decimal`, `string`. Defaults to `string`. See [Money and other decimals](#money-and-other-decimals) and [Calendar days and instants](#calendar-days-and-instants). |
 | `softDelete` | The column marking a row logically deleted. Omit it and the entity simply has no logical delete. `activeValue`/`deletedValue` default to `1`/`0`. |
 | `timestamps` | `createdAt` / `updatedAt`. Never taken from the request body. |
 | `audit` | `createdBy` / `updatedBy`, filled from the request context — the identity in the token, never the body, so a client cannot claim to be someone else. Outside a request the value is `System`. |
@@ -171,6 +171,67 @@ flipped, so a credit note matches the invoice it reverses.
 
 Money is the case that motivates both, not the limit of them: hours, units and days
 divide the same way and lose the same remainder.
+
+---
+
+## Calendar days and instants
+
+A date is one of two things, and the mapping says which:
+
+```ts
+const columns = {
+  dueOn:     { name: "DUE_ON",     kind: "day" },      // "2026-04-30"
+  createdAt: { name: "CREATED_AT", kind: "datetime" }, // Date
+};
+```
+
+- **`day`** is a calendar day — a due date, a payment date, the end of a period. It
+  has no time and no timezone: `2026-04-30` is the same day to everyone. The column
+  is the engine's `DATE` and the entity holds the **string** `"YYYY-MM-DD"`.
+- **`datetime`** is an instant — `createdAt`, `paidAt`. A timestamp column and a JS
+  `Date`, in UTC.
+
+A day is a string on purpose. Carried as a `Date` it becomes midnight *somewhere*,
+and every piece of code that reads it has to pick where; sooner or later two pick
+differently and a due date moves by one. A string cannot be shifted, sorts and
+compares correctly, serialises to JSON as itself, and is what the DTO wanted anyway.
+It also comes back the same from every engine in every timezone — which the drivers
+do not manage on their own: SQL Server's handed a `DATE` back a day early west of
+UTC, and Oracle will not take the text for a `DATE` at all. The integration suite
+checks the round trip on all five engines under three timezones.
+
+A filter on a `day` compares days, with no boundary literal to get wrong:
+
+```ts
+await invoices.find({ where: { dueOn: { between: ["2026-04-01", "2026-04-30"] } } }); // both ends included
+await invoices.find({ where: { dueOn: { lte: "2026-04-30" } } });
+```
+
+A `Date` written to a `day` is read by its **UTC** day — what `new Date("2026-04-30")`
+and `z.coerce.date()` produce from a day — and anything that is not a day
+(`"2026-02-30"`, `"30/04/2026"`) is refused rather than stored as a guess.
+
+`kind: "date"` is the name `datetime` had before the two were told apart. It still
+means a `Date` and a timestamp column, is accepted until 1.0, and renaming a column
+from `date` to `datetime` generates no migration. Turning one into a `day` does —
+the column type changes — so convert the data deliberately.
+
+### Counting days
+
+`monolite-core` has the arithmetic, done in UTC so the answer does not depend on
+the machine's `TZ`:
+
+```ts
+import { addDays, daysBetween, isDay, toDay } from "monolite-core";
+
+daysBetween("2026-04-30", "2026-05-02"); // 2
+addDays("2026-04-30", 1);                // "2026-05-01"
+isDay("2026-02-30");                     // false
+toDay(new Date("2026-04-30"));           // "2026-04-30"
+```
+
+"Today" is the one question this does not answer, because it does depend on where
+the application is — that belongs to the application's timezone, not to a day.
 
 ---
 
@@ -762,6 +823,13 @@ UTC without an offset, which is exactly what the read side assumes. Oracle and
 PostgreSQL do not need it — node-oracledb preserves the instant and the PostgreSQL
 column is `TIMESTAMPTZ`. **If you add another engine, test a date round trip
 explicitly.** This one bit the original codebase twice.
+
+A `day` has its own version of the trap, on the read side. tedious returns a SQL
+Server `DATE` as midnight UTC and Sequelize formatted it in local time, so west of
+UTC every day came back as the one before; the connector reads it by its UTC
+fields instead. node-oracledb builds a fetched `DATE` from local fields and writes
+a bound `Date` from them too, so the Oracle dialect binds a day as local midnight
+and the mapping reads the local fields back. PostgreSQL and MySQL return the text.
 
 **PostgreSQL folds unquoted identifiers to lowercase**, in the DDL exactly as in
 queries. Create the schema *without* quotes, so the uppercase SQL the repository

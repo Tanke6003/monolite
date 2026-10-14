@@ -1,5 +1,5 @@
 import type { FieldOperators, WhereFilter } from "../contracts/generic-repository.js";
-import { EntitySchema } from "../metadata/entity-metadata.js";
+import { EntitySchema, type ColumnKind } from "../metadata/entity-metadata.js";
 import { containsPattern, isOperatorObject, LIKE_ESCAPE } from "./filter-helpers.js";
 
 export interface CompiledWhere {
@@ -34,7 +34,7 @@ export class SqlWhereCompiler<T> {
      * Final adjustment of the value before binding it, specific to the engine.
      * The dialect supplies it; without it, values travel as they are.
      */
-    private readonly toBindValue: (value: unknown) => unknown = (value) => value,
+    private readonly toBindValue: (value: unknown, kind?: ColumnKind) => unknown = (value) => value,
     /**
      * How a case-sensitive `LIKE` is written here; see `SqlDialect.buildLike`.
      *
@@ -56,7 +56,10 @@ export class SqlWhereCompiler<T> {
 
   private bind(property: string, value: unknown): string {
     const name = `${this.prefix}${this.index++}`;
-    this.binds[name] = this.toBindValue(this.schema.toColumnValue(property, value));
+    this.binds[name] = this.toBindValue(
+      this.schema.toColumnValue(property, value),
+      this.schema.kindOf(property)
+    );
     return `:${name}`;
   }
 

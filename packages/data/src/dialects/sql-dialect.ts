@@ -1,4 +1,5 @@
 import type { SqlExecuteResult } from "../contracts/sql-executor.js";
+import type { ColumnKind } from "../metadata/entity-metadata.js";
 import { loadOptionalDriver } from "../connectors/optional-driver.js";
 
 export interface BuildInsertParams {
@@ -47,8 +48,11 @@ export interface SqlDialect {
   /**
    * Last conversion before handing a value to the driver. It exists because not
    * all of them read a date the same way (see `sqlServerDialect`).
+   *
+   * `kind` is the column's, when the value is bound against one. A `day`
+   * arrives as text, and only Oracle needs to know that text is a day.
    */
-  toBindValue(value: unknown): unknown;
+  toBindValue(value: unknown, kind?: ColumnKind): unknown;
   /** Pagination clause. */
   buildPagination(hasTake: boolean): string;
   /**
@@ -88,6 +92,22 @@ const STANDARD_PAGINATION = (hasTake: boolean): string =>
   ` OFFSET :pgskip ROWS${hasTake ? " FETCH NEXT :pgtake ROWS ONLY" : ""}`;
 
 const passthrough = (value: unknown): unknown => value;
+
+/**
+ * A day, as the `Date` node-oracledb writes into a `DATE` as that day.
+ *
+ * Oracle will not take `'2026-04-30'` for a `DATE` without a format, and the
+ * one it assumes is the session's `NLS_DATE_FORMAT` — `DD-MON-RR` by default.
+ * A `Date` it does take, and the thin driver writes a `Date` bound against a
+ * `DATE` or a `TIMESTAMP` **from its local fields**, the same fields it builds a
+ * fetched `DATE` from. Local midnight in, so the stored day is the day given,
+ * whatever `TZ` the process runs under; `EntitySchema.toEntityValue` reads the
+ * local fields back out.
+ */
+function asLocalMidnight(day: string): Date {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year, month - 1, date);
+}
 
 /**
  * `SELECT ... FOR UPDATE`, spoken by Oracle, PostgreSQL and MySQL/InnoDB. The
@@ -150,7 +170,7 @@ export const oracleDialect: SqlDialect = {
     (result.outBinds?.[INSERTED_ID] as unknown[] | undefined)?.[0],
 
   // node-oracledb binds a JS Date preserving the instant.
-  toBindValue: passthrough,
+  toBindValue: (value, kind) => (kind === "day" && typeof value === "string" ? asLocalMidnight(value) : value),
   buildPagination: STANDARD_PAGINATION,
   buildRowLock: STANDARD_ROW_LOCK,
 };

@@ -11,6 +11,31 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **`kind: "day"` tells a calendar day apart from an instant** (#39). `kind:
+  "date"` was one kind for a due date and a `createdAt`, so both became a JS
+  `Date` and every consumer decided for itself which midnight it meant — one
+  application built with the toolkit wrapped 76 reads in a `toIsoDate` helper and
+  still mixed local and UTC accessors in a single subtraction. A `day` column is
+  the engine's `DATE` and a `"YYYY-MM-DD"` string in the entity, on every driver
+  and in every timezone; a filter on it compares days (`{ dueOn: { between:
+  ["2026-04-01", "2026-04-30"] } }` includes both ends, no `T23:59:59.999Z`).
+  `kind: "datetime"` is the explicit name for an instant.
+
+  Getting the same string back from every engine took two driver fixes. SQL
+  Server returned a `DATE` a day early west of UTC (tedious hands over midnight
+  UTC and Sequelize formatted it in local time); the connector now reads it by
+  its UTC fields. Oracle will not take the text for a `DATE`; its dialect binds
+  a day as the local midnight node-oracledb writes as that day. The repository
+  contract gained a `day` column, and CI runs it on all five engines west of UTC,
+  at UTC and east of it — Jest cannot change `TZ` from inside a test, so the
+  unit suite now runs one zone per Node version as well.
+
+  `monolite-core` adds `isDay`, `toDay`, `daysBetween` and `addDays`, computed in
+  UTC so the answer does not depend on the machine.
+
+  `kind: "date"` still means a `Date` and a timestamp column and is accepted
+  until 1.0; renaming it to `datetime` generates no migration. Generated
+  entities now declare `createdAt` and `updatedAt` as `datetime`.
 - **`tokensFor(name)` in `monolite-di` derives a module's four DI identifiers**
   (#41). A generated `<entity>.tokens.ts` used to transcribe `"PaymentsStore"`,
   `"IPaymentsBLL"`, `"IPaymentsRepository"` and `"IPaymentsController"` by hand —
