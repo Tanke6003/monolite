@@ -28,6 +28,8 @@ export interface ContractItem {
   /** A `decimal`, which is the one kind the engines disagree about on their own. */
   price?: number | null;
   tag?: string | null;
+  /** A `day`: a calendar day, which no engine may shift by a timezone. */
+  dueOn?: string | Date | null;
   active?: boolean;
 }
 
@@ -46,6 +48,7 @@ export const CONTRACT_ENTITY = defineEntity<ContractItem>({
     qty: { name: "QTY", kind: "number" },
     price: { name: "PRICE", kind: "decimal", precision: 12, scale: 2 },
     tag: { name: "TAG", kind: "string" },
+    dueOn: { name: "DUE_ON", kind: "day" },
     active: { name: "ACTIVE", kind: "boolean" },
   },
   softDelete: { property: "active", activeValue: 1, deletedValue: 0 },
@@ -156,6 +159,75 @@ export function runGenericRepositoryContract(driver: string, setup: ContractSetu
 
         expect(found.map((item) => item.name)).toEqual(["dear"]);
         expect(await repository.count({ price: { lt: 10 } })).toBe(1);
+      });
+    });
+
+    // A `day` is where a driver's idea of "now, here" leaks in if anything
+    // does: one returns midnight UTC, another midnight local, a third formats
+    // either in the wrong one. Each of those failures shows up in only one
+    // timezone, and the timezone is the process's — set `TZ` when starting the
+    // runner, since Jest hands a test a copy of `process.env` and assigning it
+    // there changes nothing. This repository runs it west of UTC, at UTC and
+    // east of it.
+    describe("day columns", () => {
+      it("comes back as the same YYYY-MM-DD it went in as", async () => {
+        const { pkItem } = await repository.insert({ name: "a", dueOn: "2026-04-30" });
+
+        expect((await repository.getById(pkItem))?.dueOn).toBe("2026-04-30");
+      });
+
+      it("stores a Date by the day it was parsed from", async () => {
+        const { pkItem } = await repository.insert({ name: "a", dueOn: new Date("2026-01-01") });
+
+        expect((await repository.getById(pkItem))?.dueOn).toBe("2026-01-01");
+      });
+
+      it("writes an update and a bulk insert the same way as an insert", async () => {
+        const { pkItem } = await repository.insert({ name: "a", dueOn: "2026-04-30" });
+        await repository.update(pkItem, { dueOn: "2026-12-31" });
+        expect((await repository.getById(pkItem))?.dueOn).toBe("2026-12-31");
+
+        await repository.insertMany([{ name: "bulk", dueOn: "2028-02-29" }]);
+        const [bulk] = await repository.find({ where: { name: "bulk" } });
+        expect(bulk.dueOn).toBe("2028-02-29");
+      });
+
+      it("keeps null a null", async () => {
+        const { pkItem } = await repository.insert({ name: "a", dueOn: null });
+
+        expect((await repository.getById(pkItem))?.dueOn ?? null).toBeNull();
+      });
+
+      it("compares as a day: both ends of a range included, no boundary literal", async () => {
+        await repository.insert({ name: "march", dueOn: "2026-03-31" });
+        await repository.insert({ name: "first", dueOn: "2026-04-01" });
+        await repository.insert({ name: "last", dueOn: "2026-04-30" });
+        await repository.insert({ name: "may", dueOn: "2026-05-01" });
+
+        expect(await names({ dueOn: { between: ["2026-04-01", "2026-04-30"] } })).toEqual([
+          "first",
+          "last",
+        ]);
+        expect(await names({ dueOn: { lte: "2026-04-30", gt: "2026-03-31" } })).toEqual([
+          "first",
+          "last",
+        ]);
+        expect(await names({ dueOn: "2026-04-30" })).toEqual(["last"]);
+        expect(await names({ dueOn: { in: ["2026-03-31", "2026-05-01"] } })).toEqual(["march", "may"]);
+      });
+
+      it("sorts by the calendar", async () => {
+        await repository.insert({ name: "dec", dueOn: "2026-12-01" });
+        await repository.insert({ name: "feb", dueOn: "2026-02-01" });
+        await repository.insert({ name: "oct", dueOn: "2025-10-01" });
+
+        const sorted = await repository.find({ orderBy: { field: "dueOn" } });
+        expect(sorted.map((item) => item.name)).toEqual(["oct", "feb", "dec"]);
+      });
+
+      it("refuses what is not a day rather than storing a guess", async () => {
+        await expect(repository.insert({ name: "a", dueOn: "2026-02-30" })).rejects.toThrow();
+        await expect(repository.insert({ name: "a", dueOn: "30/04/2026" })).rejects.toThrow();
       });
     });
 

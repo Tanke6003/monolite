@@ -106,6 +106,42 @@ function matchesOperators(value: unknown, operators: FieldOperators<unknown>): b
   return true;
 }
 
+/** The operators whose operands are values of the column, not patterns. */
+const VALUE_OPERATORS = ["eq", "ne", "gt", "gte", "lt", "lte"] as const;
+const LIST_OPERATORS = ["in", "notIn", "between"] as const;
+
+/**
+ * The operands of a filter on a `day` column, as the column holds them.
+ *
+ * Every other engine passes an operand through `toColumnValue`, which turns a
+ * day into its text and refuses what is not one. This driver compares the
+ * operand with what it stored, so it has to do the same — or a `Date` compared
+ * against `"2026-04-30"` falls through to text comparison of a millisecond
+ * count, and a filter that throws in production matches nothing in a test.
+ */
+function asDayOperands(
+  property: string,
+  condition: unknown,
+  schema: EntitySchema<unknown>
+): unknown {
+  const day = (value: unknown): unknown => schema.quantize(property, value);
+
+  if (!isOperatorObject(condition)) return condition === null ? null : day(condition);
+
+  const operators = { ...(condition as Record<string, unknown>) };
+  for (const operator of VALUE_OPERATORS) {
+    if (operators[operator] !== undefined && operators[operator] !== null) {
+      operators[operator] = day(operators[operator]);
+    }
+  }
+  for (const operator of LIST_OPERATORS) {
+    if (Array.isArray(operators[operator])) {
+      operators[operator] = (operators[operator] as unknown[]).map(day);
+    }
+  }
+  return operators;
+}
+
 export function matchesFilter<T>(
   entity: T,
   filter: WhereFilter<T> | undefined,
@@ -135,18 +171,22 @@ export function matchesFilter<T>(
     // "nothing matches".
     schema.columnOf(key);
     const value = (entity as Record<string, unknown>)[key];
+    const operand =
+      schema.kindOf(key) === "day"
+        ? asDayOperands(key, condition, schema as EntitySchema<unknown>)
+        : condition;
 
-    if (condition === null) {
+    if (operand === null) {
       if (value !== null && value !== undefined) return false;
       continue;
     }
 
-    if (isOperatorObject(condition)) {
-      if (!matchesOperators(value, condition as FieldOperators<unknown>)) return false;
+    if (isOperatorObject(operand)) {
+      if (!matchesOperators(value, operand as FieldOperators<unknown>)) return false;
       continue;
     }
 
-    if (!looseEquals(value, condition)) return false;
+    if (!looseEquals(value, operand)) return false;
   }
 
   return true;

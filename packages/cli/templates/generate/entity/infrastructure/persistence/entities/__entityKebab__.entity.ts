@@ -35,8 +35,8 @@ export const __entityConst__ = defineEntity<I__entityName__>({
     // refuses an integer. The generated DDL emits the integer type that matches,
     // which is the sort of agreement generating it is for.
     available: { name: "AVAILABLE", kind: "boolean", nullable: false, default: "1" },
-    createdAt: { name: "CREATED_AT", kind: "date", updatable: false },
-    updatedAt: { name: "UPDATED_AT", kind: "date" },
+    createdAt: { name: "CREATED_AT", kind: "datetime", updatable: false },
+    updatedAt: { name: "UPDATED_AT", kind: "datetime" },
     createdBy: { name: "CREATED_BY", kind: "string", length: 100, updatable: false },
     updatedBy: { name: "UPDATED_BY", kind: "string", length: 100 },
   },

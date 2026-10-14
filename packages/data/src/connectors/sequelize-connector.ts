@@ -177,6 +177,34 @@ function mysqlAffected(answered: unknown): number {
   return 0;
 }
 
+/**
+ * SQL Server's `DATE` back as the day that was stored, in any timezone.
+ *
+ * PostgreSQL and MySQL already return a `DATE` as its text, through Sequelize's
+ * own parsers. SQL Server's parser does not: tedious hands over the day as
+ * midnight **UTC** (`useUTC` is on by default, and has to stay on for the
+ * timestamp columns), and Sequelize formats that with `moment` in **local**
+ * time — so west of UTC every day came back as the one before it. This reads
+ * the same `Date` by its UTC fields instead, which is how it was built.
+ *
+ * Sequelize keeps parsers per dialect for the whole process, so this is what
+ * every SQL Server connection in it gets, not only this one; none of them had
+ * a reason to want the previous day.
+ */
+function readDatesAsUtcDays(connection: Sequelize): void {
+  const SQL_SERVER_DATE = 40;
+
+  (connection.connectionManager as unknown as {
+    refreshTypeParser(types: Record<string, unknown>): void;
+  }).refreshTypeParser({
+    DATEONLY: {
+      key: "DATEONLY",
+      types: { mssql: [SQL_SERVER_DATE] },
+      parse: (value: Date) => value.toISOString().slice(0, 10),
+    },
+  });
+}
+
 export class SequelizeConnector implements ISqlDbPlugin {
   readonly engine: DbEngine;
   private readonly connection: Sequelize;
@@ -199,6 +227,8 @@ export class SequelizeConnector implements ISqlDbPlugin {
           ? (sql: string) => this.logger.debug(sql)
           : false,
     } as Options);
+
+    if (config.engine === "mssql") readDatesAsUtcDays(this.connection);
   }
 
   async authenticate(): Promise<void> {

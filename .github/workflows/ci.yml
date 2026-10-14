@@ -16,6 +16,18 @@ jobs:
         # LTS lines people actually run. Testing only some of them means the
         # rest are supported by assertion rather than by evidence.
         node: [20, 22, 24]
+        # And each one in a different timezone — west of UTC, at it, east of
+        # it — because a calendar day read through the wrong clock is off by
+        # one in only one of them. It costs no job: the zone rides on the Node
+        # version. Jest hands a test a copy of `process.env`, so a test cannot
+        # set `TZ` for itself; the process has to start with it.
+        include:
+          - node: 20
+            tz: America/Mexico_City
+          - node: 22
+            tz: UTC
+          - node: 24
+            tz: Asia/Tokyo
 
     steps:
       - uses: actions/checkout@v6
@@ -33,8 +45,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
+      - name: Test (TZ=${{ matrix.tz }})
         run: npm test -- --coverage
+        env:
+          TZ: ${{ matrix.tz }}
 
       # The release tooling decides a version nobody reviews and publishes
       # something nobody can unpublish, so it is checked on the way in rather
