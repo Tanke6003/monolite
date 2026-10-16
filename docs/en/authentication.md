@@ -156,19 +156,68 @@ change; ids do not.
 
 ---
 
+## Signing out and revoking tokens
+
+A JWT is valid until its `exp` by construction — the signature cannot be taken
+back. Revoking one means remembering, somewhere every instance can read, that it
+no longer counts. `CacheTokenRevocation` keeps that list in the shared `ICache`,
+and only for as long as each token had left to live, so it empties itself.
+
+```ts
+import { CacheTokenRevocation } from "monolite-auth";
+
+const revocation = new CacheTokenRevocation(cache, { maxTokenLifetime: 3600 });
+
+const auth = new AuthBLL(users, hasher, tokens, { revocation });
+const guard = requireAuth(tokens, { revocation, context });
+```
+
+The guard and the BLL must be given **the same instance**, or signing out is
+written somewhere nobody reads.
+
+- **`POST /auth/logout`** revokes the token the request carries and answers 204.
+  It is guarded like any other route, so signing out twice is a 401
+  `TOKEN_REVOKED`, not a second 204.
+- **`revocation.revokeAllFor(userId)`** withdraws every token issued to that user
+  so far — for a disabled account, a changed password, a lost device. Tokens
+  issued afterwards still work; keeping a disabled account out for good is your
+  `IUserProvider`'s job, by not finding it at sign-in.
+- Every token `JwtTokenBLL` signs now carries a **`jti`**, the name it is revoked
+  by. A token signed before the upgrade has none, and `logout` answers 400
+  `TOKEN_NOT_REVOCABLE` for it until it expires on its own.
+
+With revocation configured, every guarded request reads the cache — two keys, in
+parallel. When the cache cannot be reached the guard answers **503
+`AUTH_UNAVAILABLE`** rather than letting the request through: a token revoked
+because it was stolen is exactly the one that must not ride through an outage.
+The login limiter makes the same choice.
+
+| `code` | Status | Meaning |
+| --- | --- | --- |
+| `TOKEN_REVOKED` | 401 | The token was signed out or its user was cut off. Sign in again. |
+| `AUTH_UNAVAILABLE` | 503 | The revocation store is down. Retry. |
+| `TOKEN_NOT_REVOCABLE` | 400 | `logout` on a token with no `jti`. |
+| `LOGOUT_UNAVAILABLE` | 501 | `logout` on a server with no revocation configured. |
+
+`revokeAllFor` is compared against the token's `iat`, which is in whole seconds:
+a token issued in the same second as the cut-off is still accepted. Refusing it
+would also refuse the fresh token handed out right after a password change.
+
+With `CACHE_DRIVER=memory` a sign-out holds only in the process that received
+it. Behind more than one replica, use Redis.
+
+---
+
 ## What this package does not do
 
 Being explicit, because the gaps matter more than the features:
 
-- **No refresh tokens.** A refresh flow needs somewhere to store and revoke
-  them, and that store is an application decision. Issuing a second JWT and
-  calling it a refresh token buys nothing — it cannot be revoked either.
+- **No refresh tokens.** A refresh token has to be stored, rotated on every use
+  and tied to the account it extends, and that table is an application decision.
+  Issuing a second JWT and calling it a refresh token buys nothing.
 - **No registration, no password reset, no email verification.** All three need
   to send mail, rate-limit by address and decide a policy. They are application
   features that happen to touch authentication.
-- **No session store, no logout.** A JWT is valid until it expires; "logging out"
-  is the client discarding it. Real revocation needs a denylist, which is the same
-  storage decision as above.
 - **No OAuth or OIDC.** If you need one, verify the provider's token with your own
   `ITokenBLL` implementation and keep the rest of this package as it is.
 

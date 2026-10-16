@@ -105,6 +105,49 @@ export interface ITokenBLL {
 }
 
 /**
+ * Withdrawing tokens before they expire.
+ *
+ * A signed token is valid until its `exp` by construction: the signature cannot
+ * be taken back. Revoking one therefore means remembering, somewhere every
+ * instance can read, that it no longer counts — and remembering it only for as
+ * long as the token would otherwise have lived, so the list empties itself.
+ * The default implementation keeps that list in `ICache` (see
+ * `CacheTokenRevocation`).
+ *
+ * It works on claims, not on token strings, so it does not care who issued the
+ * token or how it was verified: a token minted after a local password, a Google
+ * sign-in or another service's check is withdrawn the same way.
+ */
+export interface ITokenRevocation {
+  /**
+   * Withdraws one token, identified by its `jti`. Signing out is this.
+   *
+   * @throws Error when the claims carry no `jti`: there is nothing to name the
+   * token by, and pretending to revoke it would leave it working.
+   */
+  revoke(claims: TokenClaims): Promise<void>;
+
+  /**
+   * Withdraws every token issued to `subject` so far, without knowing them.
+   *
+   * For a disabled account, a changed password, a stolen laptop. Tokens issued
+   * afterwards are unaffected, so the person can sign in again — unless the
+   * application refuses them at sign-in, which is where a disabled account is
+   * actually kept out.
+   */
+  revokeAllFor(subject: string): Promise<void>;
+
+  /**
+   * Whether the token has been withdrawn by either of the two methods above.
+   *
+   * It **throws** when the store cannot be reached, and that is not the same
+   * answer as `false`: the guard refuses the request rather than letting a
+   * possibly-revoked token through (see `requireAuth`).
+   */
+  isRevoked(claims: TokenClaims): Promise<boolean>;
+}
+
+/**
  * Signing in. It is the whole of the authentication use case: everything else
  * in this package either feeds it (the user provider, the hasher) or consumes
  * what it produced (the middleware that verifies the token).
@@ -117,4 +160,13 @@ export interface IAuthBLL {
    * same error, whatever the reason (see `AuthBLL`).
    */
   login(credentials: Credentials): Promise<AuthResult>;
+
+  /**
+   * Withdraws the token these claims came from, so it stops being accepted
+   * before it expires.
+   *
+   * @throws AppError 501 when no `ITokenRevocation` was configured, and 400
+   * when the token carries no `jti` to revoke it by.
+   */
+  logout(claims: TokenClaims): Promise<void>;
 }

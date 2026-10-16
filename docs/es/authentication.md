@@ -157,19 +157,70 @@ Los nombres cambian; los ids no.
 
 ---
 
+## Cerrar sesión y revocar tokens
+
+Un JWT vale hasta su `exp` por construcción: la firma no se puede retirar.
+Revocarlo es recordar, en algún sitio que todas las instancias lean, que ya no
+cuenta. `CacheTokenRevocation` guarda esa lista en el `ICache` compartido, y sólo
+durante el tiempo que a cada token le quedaba de vida, así que se vacía sola.
+
+```ts
+import { CacheTokenRevocation } from "monolite-auth";
+
+const revocation = new CacheTokenRevocation(cache, { maxTokenLifetime: 3600 });
+
+const auth = new AuthBLL(users, hasher, tokens, { revocation });
+const guard = requireAuth(tokens, { revocation, context });
+```
+
+La guarda y la BLL tienen que recibir **la misma instancia**; si no, el cierre de
+sesión se escribe donde nadie lee.
+
+- **`POST /auth/logout`** revoca el token que trae la petición y responde 204.
+  Está protegida como cualquier otra ruta, así que cerrar sesión dos veces da un
+  401 `TOKEN_REVOKED`, no un segundo 204.
+- **`revocation.revokeAllFor(userId)`** retira todos los tokens emitidos hasta
+  ahora a ese usuario: cuenta deshabilitada, contraseña cambiada, dispositivo
+  perdido. Los tokens emitidos después siguen funcionando; mantener fuera una
+  cuenta deshabilitada es trabajo de tu `IUserProvider`, no encontrándola al
+  iniciar sesión.
+- Todo token que firma `JwtTokenBLL` lleva ahora un **`jti`**, el nombre por el
+  que se revoca. Un token firmado antes de actualizar no lo tiene, y `logout`
+  responde 400 `TOKEN_NOT_REVOCABLE` hasta que caduque solo.
+
+Con la revocación configurada, cada petición protegida lee la caché: dos claves,
+en paralelo. Si la caché no responde, la guarda contesta **503
+`AUTH_UNAVAILABLE`** en vez de dejar pasar la petición: un token revocado porque
+lo robaron es justo el que no debe colarse durante una caída. El limitador del
+login toma la misma decisión.
+
+| `code` | Estado | Significado |
+| --- | --- | --- |
+| `TOKEN_REVOKED` | 401 | Se cerró la sesión del token o se le cortó el acceso al usuario. Hay que volver a iniciar sesión. |
+| `AUTH_UNAVAILABLE` | 503 | El almacén de revocaciones está caído. Reintentar. |
+| `TOKEN_NOT_REVOCABLE` | 400 | `logout` con un token sin `jti`. |
+| `LOGOUT_UNAVAILABLE` | 501 | `logout` en un servidor sin revocación configurada. |
+
+`revokeAllFor` se compara con el `iat` del token, que va en segundos enteros: un
+token emitido en el mismo segundo que el corte sigue aceptándose. Rechazarlo
+rechazaría también el token nuevo que se entrega justo después de cambiar la
+contraseña.
+
+Con `CACHE_DRIVER=memory` un cierre de sesión sólo vale en el proceso que lo
+recibió. Con más de una réplica, usa Redis.
+
+---
+
 ## Lo que este paquete no hace
 
 Explícitamente, porque los huecos importan más que las funcionalidades:
 
-- **Nada de refresh tokens.** Un flujo de refresco necesita dónde guardarlos y
-  revocarlos, y ese almacén es una decisión de la aplicación. Emitir un segundo JWT
-  y llamarlo token de refresco no aporta nada: tampoco se puede revocar.
+- **Nada de refresh tokens.** Un refresh token hay que guardarlo, rotarlo en cada
+  uso y atarlo a la cuenta que extiende, y esa tabla es una decisión de la
+  aplicación. Emitir un segundo JWT y llamarlo token de refresco no aporta nada.
 - **Ni registro, ni recuperación de contraseña, ni verificación de correo.** Los
   tres necesitan enviar correo, limitar por dirección y decidir una política. Son
   funcionalidades de la aplicación que casualmente tocan la autenticación.
-- **Ni almacén de sesiones ni logout.** Un JWT vale hasta que caduca; "cerrar
-  sesión" es que el cliente lo tire. La revocación de verdad necesita una lista de
-  bloqueo, que es la misma decisión de almacenamiento de arriba.
 - **Ni OAuth ni OIDC.** Si los necesitas, verifica el token del proveedor con tu
   propia implementación de `ITokenBLL` y deja el resto del paquete como está.
 

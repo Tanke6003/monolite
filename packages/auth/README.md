@@ -173,6 +173,26 @@ app.use("/api/invoices", requireRoles("admin"), requireRoles("billing"));
 Both answer through `AppError`, so a 401 or a 403 from here carries the same
 shape — code, request id — as every other error in the API.
 
+## Signing out
+
+`POST /auth/logout` revokes the token the request carries. A JWT cannot be taken
+back, so revoking one means remembering it: `CacheTokenRevocation` keeps a
+denylist of `jti`s in the shared `ICache`, each for exactly as long as its token
+had left to live.
+
+```ts
+const revocation = new CacheTokenRevocation(cache, { maxTokenLifetime: 3600 });
+
+const auth = new AuthBLL(users, hasher, tokens, { revocation });
+const guard = requireAuth(tokens, { revocation }); // the same instance
+```
+
+`revocation.revokeAllFor(userId)` withdraws every token a user holds — for a
+disabled account or a changed password. With revocation configured the guard
+reads the cache on every request, and answers 503 rather than letting a request
+through when it cannot. Without it, the guard is exactly as before and
+`logout` answers 501.
+
 ## No refresh endpoint
 
 There is no `POST /auth/refresh`, on purpose. Refreshing honestly means a
@@ -191,12 +211,13 @@ whose id you keep in your own table.
 | Export | What it is |
 | --- | --- |
 | `AuthUser`, `AuthUserWithSecret`, `Credentials`, `AuthResult`, `TokenClaims`, `SignedToken` | The vocabulary |
-| `IUserProvider`, `IPasswordHasher`, `ITokenBLL`, `IAuthBLL` | The four seams |
-| `AuthBLL`, `AuthBLLOptions` | The login flow |
+| `IUserProvider`, `IPasswordHasher`, `ITokenBLL`, `ITokenRevocation`, `IAuthBLL` | The seams |
+| `AuthBLL`, `AuthBLLOptions` | Signing in and out |
+| `ITokenRevocation`, `CacheTokenRevocation`, `CacheTokenRevocationOptions` | Withdrawing tokens before they expire |
 | `JwtTokenBLL`, `JwtTokenBLLOptions` | Signing and verifying JWTs |
 | `ScryptPasswordHasher`, `ScryptPasswordHasherOptions` | The dependency-free hasher |
-| `requireAuth`, `requireRoles`, `authenticatedUser`, `RequireAuthOptions` | Route guards |
-| `AuthController`, `loginSchema`, `authResultSchema` | `POST /auth/login` |
+| `requireAuth`, `requireRoles`, `authenticatedUser`, `verifiedClaims`, `RequireAuthOptions` | Route guards |
+| `AuthController`, `loginSchema`, `authResultSchema` | `POST /auth/login`, `POST /auth/logout` |
 | `AUTH_TOKENS`, `AuthToken` | The DI identifiers, which is what you register your own `IUserProvider` under |
 
 ## License

@@ -23,6 +23,8 @@ import { AppError } from "monolite-core";
 import {
   AuthBLL,
   ScryptPasswordHasher,
+  type AuthBLLOptions,
+  type ITokenRevocation,
   type AuthUserWithSecret,
   type IPasswordHasher,
   type ITokenBLL,
@@ -44,7 +46,7 @@ interface Harness {
   tokens: jest.Mocked<ITokenBLL>;
 }
 
-function harness(options: { dummyPasswordHash?: string; expiresIn?: string | number } = {}): Harness {
+function harness(options: AuthBLLOptions = {}): Harness {
   const users = { findByEmail: jest.fn() } as unknown as jest.Mocked<IUserProvider>;
 
   const hasher = {
@@ -328,5 +330,47 @@ describe("the timing of a failed login", () => {
 
     expect(ratio).toBeGreaterThan(0.2);
     expect(ratio).toBeLessThan(5);
+  });
+});
+
+describe("logout", () => {
+  const revocationDouble = (): jest.Mocked<ITokenRevocation> =>
+    ({
+      revoke: jest.fn().mockResolvedValue(undefined),
+      revokeAllFor: jest.fn(),
+      isRevoked: jest.fn(),
+    }) as unknown as jest.Mocked<ITokenRevocation>;
+
+  it("revokes the token the claims came from", async () => {
+    const revocation = revocationDouble();
+    const { service } = harness({ revocation });
+    const claims = { sub: "7", jti: "abc", exp: 2_000_000_000 };
+
+    await service.logout(claims);
+
+    expect(revocation.revoke).toHaveBeenCalledWith(claims);
+  });
+
+  it("answers 501 when nothing was configured to revoke with", async () => {
+    // A quiet success would have the client throw away a token that still
+    // works for whoever else holds a copy.
+    const { service } = harness();
+
+    await expect(service.logout({ sub: "7", jti: "abc" })).rejects.toMatchObject({
+      statusCode: 501,
+      code: "LOGOUT_UNAVAILABLE",
+    });
+  });
+
+  it("answers 400 for a token with no `jti`, without touching the store", async () => {
+    // Tokens signed before every token carried one.
+    const revocation = revocationDouble();
+    const { service } = harness({ revocation });
+
+    await expect(service.logout({ sub: "7" })).rejects.toMatchObject({
+      statusCode: 400,
+      code: "TOKEN_NOT_REVOCABLE",
+    });
+    expect(revocation.revoke).not.toHaveBeenCalled();
   });
 });

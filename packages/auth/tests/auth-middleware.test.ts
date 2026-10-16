@@ -17,6 +17,8 @@ import {
   authenticatedUser,
   requireAuth,
   requireRoles,
+  verifiedClaims,
+  type ITokenRevocation,
   type RequireAuthOptions,
 } from "monolite-auth";
 
@@ -282,6 +284,115 @@ describe("requireRoles", () => {
     const { error } = check({ scope: "read" }, ["admin"]);
 
     expect(error).toMatchObject({ statusCode: 401, code: "NO_AUTHENTICATED_USER" });
+  });
+});
+
+/**
+ * With a denylist, the guard asks it on every request — and that is the only
+ * time it becomes asynchronous. Without one it stays exactly as it was.
+ */
+describe("requireAuth with revocation", () => {
+  const revocationAnswering = (
+    isRevoked: () => Promise<boolean>
+  ): jest.Mocked<ITokenRevocation> =>
+    ({
+      revoke: jest.fn(),
+      revokeAllFor: jest.fn(),
+      isRevoked: jest.fn(isRevoked),
+    }) as unknown as jest.Mocked<ITokenRevocation>;
+
+  async function guardAsync(
+    token: string,
+    options: RequireAuthOptions
+  ): Promise<{ req: Request; next: jest.Mock; error: AppError | undefined }> {
+    const req = requestWith({ authorization: `Bearer ${token}` }) as Request;
+    const next = jest.fn();
+
+    await requireAuth(tokens, options)(req, {} as Response, next as NextFunction);
+
+    return { req, next, error: next.mock.calls[0]?.[0] as AppError | undefined };
+  }
+
+  it("lets a token nobody revoked through, and asks about its claims", async () => {
+    const revocation = revocationAnswering(async () => false);
+    const token = tokenFor({ sub: "7" });
+
+    const { next, error, req } = await guardAsync(token, { revocation });
+
+    expect(error).toBeUndefined();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(revocation.isRevoked).toHaveBeenCalledWith(expect.objectContaining({ sub: "7" }));
+    expect(authenticatedUser(req)).toMatchObject({ id: "7" });
+  });
+
+  it("answers 401 TOKEN_REVOKED for a token that was revoked, and names nobody", async () => {
+    const revocation = revocationAnswering(async () => true);
+
+    const { error, req } = await guardAsync(tokenFor({ sub: "7" }), { revocation });
+
+    expect(error).toMatchObject({ statusCode: 401, code: "TOKEN_REVOKED" });
+    expect(authenticatedUser(req)).toBeNull();
+  });
+
+  it("refuses with a 503 when the store cannot be asked, rather than letting it through", async () => {
+    // A token revoked because it was stolen is exactly the one that must not
+    // ride through an outage.
+    const revocation = revocationAnswering(async () => {
+      throw new Error("ECONNREFUSED");
+    });
+
+    const { error, next } = await guardAsync(tokenFor({ sub: "7" }), { revocation });
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(error).toMatchObject({ statusCode: 503, code: "AUTH_UNAVAILABLE" });
+    expect((error as AppError).cause).toMatchObject({ message: "ECONNREFUSED" });
+  });
+
+  it("does not ask the store about a token that failed to verify", async () => {
+    const revocation = revocationAnswering(async () => false);
+
+    const { error } = await guardAsync("nonsense", { revocation });
+
+    expect(error).toMatchObject({ code: "INVALID_TOKEN" });
+    expect(revocation.isRevoked).not.toHaveBeenCalled();
+  });
+
+  it("publishes into the request context once the store has answered", async () => {
+    const context = new AsyncRequestContext();
+    const revocation = revocationAnswering(async () => false);
+
+    await context.run({ requestId: "r-1", user: null }, async () => {
+      await guardAsync(tokenFor({ sub: "7" }), { revocation, context });
+
+      expect(context.getCurrentUserId()).toBe("7");
+    });
+  });
+
+  it("does not answer twice when what runs after it throws", async () => {
+    // An error from downstream is not the store failing; turning it into a 503
+    // would call `next` a second time.
+    const revocation = revocationAnswering(async () => false);
+    const req = requestWith({ authorization: `Bearer ${tokenFor({ sub: "7" })}` }) as Request;
+    const next = jest.fn(() => {
+      throw new Error("downstream");
+    });
+
+    await expect(
+      requireAuth(tokens, { revocation })(req, {} as Response, next as unknown as NextFunction)
+    ).rejects.toThrow("downstream");
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("verifiedClaims", () => {
+  it("hands back the claims of the accepted token, `jti` included", () => {
+    const { req } = guard({ authorization: `Bearer ${tokenFor({ sub: "7" })}` });
+
+    expect(verifiedClaims(req)).toMatchObject({ sub: "7", jti: expect.any(String) });
+  });
+
+  it("is null on a request the guard never accepted", () => {
+    expect(verifiedClaims(guard({}).req)).toBeNull();
   });
 });
 
