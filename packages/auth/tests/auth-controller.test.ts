@@ -10,9 +10,20 @@
  * a package that refuses to know how anything is stored.
  */
 import express, { type Express, type RequestHandler } from "express";
-import { AppError } from "monolite-core";
+import { AppError, MemoryCache } from "monolite-core";
 import { errorHandler, getControllerMetadata, registerController } from "monolite-http";
-import { AuthController, authResultSchema, loginSchema, type IAuthBLL } from "monolite-auth";
+import {
+  AuthBLL,
+  AuthController,
+  CacheTokenRevocation,
+  JwtTokenBLL,
+  authResultSchema,
+  loginSchema,
+  requireAuth,
+  type IAuthBLL,
+  type IPasswordHasher,
+  type IUserProvider,
+} from "monolite-auth";
 import { serve, type ServedApp } from "./support/http-client.js";
 
 const result = {
@@ -21,16 +32,17 @@ const result = {
   user: { id: "7", name: "Ana", email: "ana@example.com", roles: ["admin"] },
 };
 
-const buildApp = (controller: AuthController): Express => {
+const refuseEveryone: RequestHandler = (_req, _res, next) =>
+  next(new AppError("No token provided", 401, true, { code: "NO_TOKEN" }));
+
+// By default the guard would turn every request away; the login route is
+// public, so it is never reached — which is itself part of what is checked.
+const buildApp = (controller: AuthController, guard: RequestHandler = refuseEveryone): Express => {
   const app = express();
   app.use(express.json());
 
   const router = express.Router();
-  // The guard would turn every request away; the route is public, so it is
-  // never reached — which is itself part of what is being checked.
-  registerController(router, AuthController, controller, (_req, _res, next) =>
-    next(new AppError("No token provided", 401, true, { code: "NO_TOKEN" }))
-  );
+  registerController(router, AuthController, controller, guard);
   app.use(router);
   app.use(errorHandler());
 
@@ -134,5 +146,59 @@ describe("AuthController", () => {
     it("describes its own answer", () => {
       expect(authResultSchema.safeParse(result).success).toBe(true);
     });
+  });
+
+  it("is not public: signing out needs the token being withdrawn", () => {
+    const route = getControllerMetadata(AuthController)!.routes.find(
+      (candidate) => candidate.handler === "logout"
+    )!;
+
+    expect(route).toMatchObject({ method: "post", path: "/logout" });
+    expect(route.public).toBeFalsy();
+  });
+
+  it("does not reach the service without a token", async () => {
+    auth.logout = jest.fn();
+
+    const res = await served.client.post("/auth/logout");
+
+    expect(res.status).toBe(401);
+    expect(auth.logout).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The whole loop on real parts — the token BLL, the denylist on the in-memory
+ * cache, the guard reading it — because each half passing its own tests says
+ * nothing about whether they agree on a key.
+ */
+describe("signing out, end to end", () => {
+  let served: ServedApp;
+  let token: string;
+
+  beforeEach(async () => {
+    const tokens = new JwtTokenBLL({ secret: "controller-test-secret" });
+    const revocation = new CacheTokenRevocation(new MemoryCache());
+    const users = { findByEmail: async () => null } as IUserProvider;
+    const hasher = { hash: async () => "", verify: async () => false } as IPasswordHasher;
+    const auth = new AuthBLL(users, hasher, tokens, { revocation });
+
+    token = tokens.sign({ sub: "7" }).token;
+    served = await serve(
+      buildApp(new AuthController(auth), requireAuth(tokens, { revocation }))
+    );
+  });
+
+  afterEach(() => served.close());
+
+  it("answers 204, and the same token is refused afterwards", async () => {
+    const headers = { authorization: `Bearer ${token}` };
+
+    const first = await served.client.post("/auth/logout", { headers });
+    const second = await served.client.post("/auth/logout", { headers });
+
+    expect(first.status).toBe(204);
+    expect(second.status).toBe(401);
+    expect(second.body).toMatchObject({ code: "TOKEN_REVOKED" });
   });
 });

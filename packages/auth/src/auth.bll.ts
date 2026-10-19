@@ -7,7 +7,9 @@ import type {
   IAuthBLL,
   IPasswordHasher,
   ITokenBLL,
+  ITokenRevocation,
   IUserProvider,
+  TokenClaims,
 } from "./contracts.js";
 
 export interface AuthBLLOptions {
@@ -21,6 +23,11 @@ export interface AuthBLLOptions {
    * what a successful one costs.
    */
   dummyPasswordHash?: string;
+  /**
+   * Where `logout` withdraws tokens. The same instance `requireAuth` reads,
+   * or signing out is recorded somewhere nobody looks.
+   */
+  revocation?: ITokenRevocation;
 }
 
 /**
@@ -91,6 +98,29 @@ export class AuthBLL implements IAuthBLL {
     );
 
     return { token, expiresIn, user: publicUser(user) };
+  }
+
+  async logout(claims: TokenClaims): Promise<void> {
+    const revocation = this.options.revocation;
+
+    // 501 rather than a quiet success: a client told it signed out would throw
+    // away a token that still works for whoever else has a copy.
+    if (!revocation) {
+      throw new AppError("Signing out is not configured on this server", 501, true, {
+        code: "LOGOUT_UNAVAILABLE",
+      });
+    }
+
+    // Tokens signed before `jti` was added to every token have nothing to be
+    // revoked by. They expire on their own within one token lifetime of the
+    // upgrade; until then the client is told the truth.
+    if (typeof claims.jti !== "string" || claims.jti.length === 0) {
+      throw new AppError("This token cannot be revoked", 400, true, {
+        code: "TOKEN_NOT_REVOCABLE",
+      });
+    }
+
+    await revocation.revoke(claims);
   }
 
   /**

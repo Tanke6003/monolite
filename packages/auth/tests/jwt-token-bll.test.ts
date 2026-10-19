@@ -43,6 +43,26 @@ describe("JwtTokenBLL", () => {
     });
   });
 
+  /**
+   * The `jti` is the name a token is revoked by. Without one, signing out
+   * has nothing to write down.
+   */
+  describe("jti", () => {
+    it("gives every token one, different each time", () => {
+      const first = jwt.decode(tokens.sign({ sub: "7" }).token) as { jti?: string };
+      const second = jwt.decode(tokens.sign({ sub: "7" }).token) as { jti?: string };
+
+      expect(first.jti).toEqual(expect.any(String));
+      expect(first.jti).not.toBe(second.jti);
+    });
+
+    it("keeps the one a caller brought", () => {
+      const { token } = tokens.sign({ sub: "7", jti: "mine" });
+
+      expect(tokens.verify<{ jti: string }>(token).jti).toBe("mine");
+    });
+  });
+
   describe("expiresIn", () => {
     /**
      * The lifetime is read back off the token that was just signed rather than

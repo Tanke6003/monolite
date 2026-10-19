@@ -22,6 +22,7 @@ export type {
   IAuthBLL,
   IPasswordHasher,
   ITokenBLL,
+  ITokenRevocation,
   IUserProvider,
   SignedToken,
   TokenClaims,
@@ -39,6 +40,10 @@ export type { JwtTokenBLLOptions } from "./jwt.token-bll.js";
 export { ScryptPasswordHasher } from "./password.hasher.js";
 export type { ScryptPasswordHasherOptions } from "./password.hasher.js";
 
+// ----------------------------------------------------------  revocation  ---
+export { CacheTokenRevocation } from "./token-revocation.js";
+export type { CacheTokenRevocationOptions } from "./token-revocation.js";
+
 // ---------------------------------------------------------------  login  ---
 export { AuthBLL } from "./auth.bll.js";
 export type { AuthBLLOptions } from "./auth.bll.js";
@@ -47,7 +52,12 @@ export type { AuthBLLOptions } from "./auth.bll.js";
 // The claim-to-identity mapping is not re-exported: it is `toCurrentUser` in
 // `monolite-http`, which is the same function the request context is built
 // around, and having one name for it is the point.
-export { authenticatedUser, requireAuth, requireRoles } from "./auth.middleware.js";
+export {
+  authenticatedUser,
+  requireAuth,
+  requireRoles,
+  verifiedClaims,
+} from "./auth.middleware.js";
 export type { RequireAuthOptions } from "./auth.middleware.js";
 
 // ----------------------------------------------------------  controller  ---

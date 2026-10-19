@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import { ApiController, Post, type Handler } from "monolite-http";
 import { z } from "zod";
+import { verifiedClaims } from "./auth.middleware.js";
 import type { IAuthBLL } from "./contracts.js";
 import { AUTH_TOKENS } from "./tokens.js";
 
@@ -29,8 +30,8 @@ export const authResultSchema = z.object({
 });
 
 /**
- * The HTTP face of `AuthBLL`: one route, and everything it needs to be
- * documented and validated.
+ * The HTTP face of `AuthBLL`: signing in and signing out, and everything they
+ * need to be documented and validated.
  *
  * There is no `POST /auth/refresh`. Refreshing honestly means a second,
  * longer-lived credential that is stored, rotated on every use and revocable —
@@ -88,6 +89,32 @@ export class AuthController {
   public login: Handler<{ body: typeof loginSchema }> = async (req, res, next) => {
     try {
       res.json(await this.auth.login(req.body));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Not public: the token being withdrawn is the one that authenticates the
+   * request, so the guard has already verified it — and refused it if it was
+   * revoked before, which makes a second sign-out a 401 rather than a 204.
+   */
+  @Post("/logout", {
+    summary: "Signs out",
+    description:
+      "Revokes the token this request carries, so it stops being accepted before it expires.",
+    responses: {
+      204: "Signed out",
+      400: "The token carries no id to revoke it by",
+      401: "No valid token",
+      501: "Revocation is not configured",
+      503: "The revocation store cannot be reached",
+    },
+  })
+  public logout: Handler = async (req, res, next) => {
+    try {
+      await this.auth.logout(verifiedClaims(req) ?? {});
+      res.status(204).end();
     } catch (error) {
       next(error);
     }

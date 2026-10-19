@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import jwt, { JsonWebTokenError, type JwtPayload, type SignOptions } from "jsonwebtoken";
 import type { ITokenBLL, SignedToken, TokenClaims } from "./contracts.js";
 
@@ -79,6 +80,9 @@ export class JwtTokenBLL implements ITokenBLL {
   sign<TPayload extends object>(payload: TPayload, expiresIn?: string | number): SignedToken {
     const options: SignOptions = {
       expiresIn: (expiresIn ?? this.defaultExpiresIn) as SignOptions["expiresIn"],
+      // Every token gets a `jti`, the name it can be revoked by. A caller that
+      // brings its own keeps it — `jsonwebtoken` refuses to be given both.
+      ...("jti" in payload ? {} : { jwtid: randomUUID() }),
       ...(this.issuer ? { issuer: this.issuer } : {}),
       ...(this.audience ? { audience: this.audience } : {}),
     };
