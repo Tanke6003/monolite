@@ -24,6 +24,8 @@ export const AUTH_TOKENS = {
   /** Where the login looks users up. Always the application's own class. */
   IUserProvider: "IUserProvider",
   IAuthBLL: "IAuthBLL",
+  /** The denylist `requireAuth` reads and `AuthBLL.logout` writes. */
+  ITokenRevocation: "ITokenRevocation",
   /** Token `AuthController` declares, and the one the router resolves it by. */
   IAuthController: "IAuthController",
 } as const;

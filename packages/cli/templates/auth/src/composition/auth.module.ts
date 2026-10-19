@@ -2,10 +2,17 @@ import {
   AUTH_TOKENS,
   AuthController,
   AuthBLL,
+  CacheTokenRevocation,
   JwtTokenBLL,
   ScryptPasswordHasher,
 } from "monolite-auth";
-import type { IAuthBLL, IPasswordHasher, ITokenBLL, IUserProvider } from "monolite-auth";
+import type {
+  IAuthBLL,
+  IPasswordHasher,
+  ITokenBLL,
+  ITokenRevocation,
+  IUserProvider,
+} from "monolite-auth";
 import type { ICache } from "monolite-core";
 import { registerInstance, registerSingleton, TOKENS } from "monolite-di";
 import type { DependencyContainer } from "monolite-di";
@@ -37,18 +44,35 @@ export function registerAuth(container: DependencyContainer): void {
   // The constructor refuses an empty secret rather than signing with a default,
   // so this is where a misconfigured deployment stops — at startup, in the boot
   // log, instead of at the first forged token.
+  // Seconds. `jsonwebtoken` also takes "1h" and "7d", but the variable is read
+  // as a number here so a typo is a startup failure rather than a lifetime
+  // somebody has to go and measure.
+  const tokenLifetime = toInt(readEnv("JWT_EXPIRES_IN"), 3600, 1);
   const tokens: ITokenBLL = new JwtTokenBLL({
     secret: requireEnv("JWT_SECRET"),
-    // Seconds. `jsonwebtoken` also takes "1h" and "7d", but the variable is
-    // read as a number here so a typo is a startup failure rather than a
-    // lifetime somebody has to go and measure.
-    expiresIn: toInt(readEnv("JWT_EXPIRES_IN"), 3600, 1),
+    expiresIn: tokenLifetime,
   });
   // Registered under the string both `monolite-auth` and `monolite-di` use,
   // so whatever asks for a token BLL finds this one.
   registerInstance<ITokenBLL>(container, AUTH_TOKENS.ITokenBLL, tokens);
 
-  const auth: IAuthBLL = new AuthBLL(container.resolve(AUTH_TOKENS.IUserProvider), hasher, tokens);
+  const cache = container.resolve<ICache>(TOKENS.ICache);
+
+  // Signed-out and cut-off tokens, kept in the shared cache until they would
+  // have expired anyway. The guard in `presentation/routes.ts` reads this same
+  // instance. With `CACHE_DRIVER=memory` a sign-out holds only in the process
+  // that received it; behind more than one replica, use Redis.
+  //
+  // To cut a user off — disabled account, changed password — resolve it and
+  // call `revokeAllFor(userId)`.
+  const revocation: ITokenRevocation = new CacheTokenRevocation(cache, {
+    maxTokenLifetime: tokenLifetime,
+  });
+  registerInstance<ITokenRevocation>(container, AUTH_TOKENS.ITokenRevocation, revocation);
+
+  const auth: IAuthBLL = new AuthBLL(container.resolve(AUTH_TOKENS.IUserProvider), hasher, tokens, {
+    revocation,
+  });
   registerInstance<IAuthBLL>(container, AUTH_TOKENS.IAuthBLL, auth);
 
   // The controller declares this token in its own decorator, which is how the
@@ -60,9 +84,7 @@ export function registerAuth(container: DependencyContainer): void {
   // on purpose makes each of those calls expensive for this side too.
   // `AUTH_RATE_LIMIT_MAX=0` switches it off. It counts in the shared cache, so
   // with `CACHE_DRIVER=redis` two replicas do not each allow the full quota.
-  const loginLimiter = buildAuthRateLimiter(envs, {
-    cache: container.resolve<ICache>(TOKENS.ICache),
-  });
+  const loginLimiter = buildAuthRateLimiter(envs, { cache });
   registerInstance(
     container,
     AUTH_TOKENS.IAuthController,

@@ -28,6 +28,27 @@ a minor release. Pin exact versions.
   The field is new in every generated project's `/health` response. A client
   that rejects unknown fields has to accept it.
 
+- **Signing out, and revoking tokens before they expire** (#68). A JWT stayed
+  valid until `exp` whatever happened to it: no logout, no way to cut off a
+  stolen token or a disabled account. `ITokenRevocation` in `monolite-auth`, with
+  `CacheTokenRevocation` on the shared `ICache`, keeps a denylist of `jti`s —
+  each for exactly the time its token had left — and a per-user "not before"
+  mark (`revokeAllFor(userId)`) for a changed password or a disabled account.
+  `POST /auth/logout` revokes the token the request carries. `JwtTokenBLL`
+  stamps a `jti` on every token, and `verifiedClaims(req)` hands a handler the
+  claims the guard accepted.
+
+  `requireAuth(tokens, { revocation })` checks the denylist on every guarded
+  request and answers 401 `TOKEN_REVOKED`; when the cache cannot be reached it
+  answers 503 `AUTH_UNAVAILABLE` instead of letting the request through, as the
+  login limiter already does. Without `revocation` the guard is unchanged and
+  stays synchronous. Generated projects wire it in, with the logout route and
+  its end-to-end test.
+
+  **Breaking:** `IAuthBLL` gains `logout(claims)`. An application that
+  implements `IAuthBLL` itself has to add it; `AuthBLL` answers 501
+  `LOGOUT_UNAVAILABLE` when it was built without a `revocation`.
+
 - **`kind: "day"` tells a calendar day apart from an instant** (#39). `kind:
   "date"` was one kind for a due date and a `createdAt`, so both became a JS
   `Date` and every consumer decided for itself which midnight it meant — one

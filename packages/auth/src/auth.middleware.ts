@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from "express";
 import { AppError, type CurrentUser, type IRequestContext } from "monolite-core";
 import { toCurrentUser as defaultToCurrentUser } from "monolite-http";
-import type { ITokenBLL, TokenClaims } from "./contracts.js";
+import type { ITokenBLL, ITokenRevocation, TokenClaims } from "./contracts.js";
 
 /**
  * Where the verified identity is parked on the request.
@@ -12,6 +12,9 @@ import type { ITokenBLL, TokenClaims } from "./contracts.js";
  * read each other's identity instead of each seeing an unauthenticated request.
  */
 const AUTHENTICATED_USER: unique symbol = Symbol.for("monolite.auth.currentUser");
+
+/** The verified claims, parked beside the identity; see `verifiedClaims`. */
+const VERIFIED_CLAIMS: unique symbol = Symbol.for("monolite.auth.claims");
 
 /**
  * What this middleware writes onto the request.
@@ -27,6 +30,7 @@ const AUTHENTICATED_USER: unique symbol = Symbol.for("monolite.auth.currentUser"
 type AuthenticatedRequest = Request & {
   user?: string | Record<string, unknown>;
   [AUTHENTICATED_USER]?: CurrentUser | null;
+  [VERIFIED_CLAIMS]?: TokenClaims;
 };
 
 export interface RequireAuthOptions {
@@ -51,6 +55,17 @@ export interface RequireAuthOptions {
    * name every application in the toolkit has to carry.
    */
   toCurrentUser?: (claims: TokenClaims) => CurrentUser | null;
+
+  /**
+   * Where withdrawn tokens are looked up. Without it a token is accepted until
+   * it expires, whatever happened to it — signing out does nothing.
+   *
+   * With it, every guarded request asks the store, and a store that cannot be
+   * reached refuses the request with a 503 rather than letting it through. The
+   * login limiter makes the same choice: a token somebody revoked because it was
+   * stolen is exactly the one that must not ride through an outage.
+   */
+  revocation?: ITokenRevocation;
 }
 
 /**
@@ -98,7 +113,7 @@ export function requireAuth(
 ): RequestHandler {
   const toCurrentUser = options.toCurrentUser ?? defaultToCurrentUser;
 
-  return (req, _res, next): void => {
+  return (req, _res, next): void | Promise<void> => {
     const header = req.headers.authorization;
 
     // Rejections go through `next` and the global handler so that a 401 carries
@@ -125,18 +140,63 @@ export function requireAuth(
       return;
     }
 
-    const request = req as AuthenticatedRequest;
-    request.user = claims;
-    request[AUTHENTICATED_USER] = toCurrentUser(claims);
+    const admit = (): void => {
+      const request = req as AuthenticatedRequest;
+      request.user = claims;
+      request[VERIFIED_CLAIMS] = claims;
+      request[AUTHENTICATED_USER] = toCurrentUser(claims);
 
-    // The store is mutated rather than replaced so the request id opened by the
-    // context middleware survives: this is one step inside that request, not a
-    // new one.
-    const store = options.context?.get();
-    if (store) store.user = request[AUTHENTICATED_USER] ?? null;
+      // The store is mutated rather than replaced so the request id opened by
+      // the context middleware survives: this is one step inside that request,
+      // not a new one.
+      const store = options.context?.get();
+      if (store) store.user = request[AUTHENTICATED_USER] ?? null;
 
-    next();
+      next();
+    };
+
+    // Without a denylist the guard stays synchronous, as it always was: only
+    // the deployments that asked for revocation pay for the round trip.
+    const revocation = options.revocation;
+    if (!revocation) {
+      admit();
+      return;
+    }
+
+    // `then` with two callbacks rather than `then().catch()`: an error thrown
+    // by whatever `next` runs must not be mistaken for the store failing and
+    // answered a second time.
+    return revocation.isRevoked(claims).then(
+      (revoked) => {
+        if (revoked) {
+          next(
+            new AppError("The token has been revoked", 401, true, { code: "TOKEN_REVOKED" })
+          );
+          return;
+        }
+        admit();
+      },
+      (error: unknown) => {
+        next(
+          new AppError("Authentication is temporarily unavailable", 503, true, {
+            code: "AUTH_UNAVAILABLE",
+            cause: error,
+          })
+        );
+      }
+    );
   };
+}
+
+/**
+ * The claims of the token `requireAuth` accepted for this request, or `null`
+ * when the route was not guarded.
+ *
+ * What signing out needs: the identity alone does not carry the `jti` and the
+ * `exp` the token is revoked by.
+ */
+export function verifiedClaims(req: Request): TokenClaims | null {
+  return (req as AuthenticatedRequest)[VERIFIED_CLAIMS] ?? null;
 }
 
 /**

@@ -50,6 +50,22 @@ describe("authentication, end to end", () => {
 
     expect(response.body).toMatchObject({ status: "error", code: "VALIDATION_ERROR" });
   });
+
+  it("signs out: the token stops working before it expires", async () => {
+    const { body } = await http.post(`${API}/auth/login`).send(SEED_CREDENTIALS).expect(200);
+    const bearer = `Bearer ${(body as { token: string }).token}`;
+
+    await http.post(`${API}/auth/logout`).set("Authorization", bearer).expect(204);
+
+    // The same token, a second time: the guard now refuses it, so signing out
+    // twice is a 401 and not another 204.
+    const again = await http.post(`${API}/auth/logout`).set("Authorization", bearer).expect(401);
+    expect(again.body).toMatchObject({ code: "TOKEN_REVOKED" });
+  });
+
+  it("does not sign out without a token", async () => {
+    await http.post(`${API}/auth/logout`).expect(401);
+  });
 #if example
 
   it("closes a route that nothing marked public", async () => {
