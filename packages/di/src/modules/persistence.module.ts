@@ -5,6 +5,7 @@ import type { IAuditTrail, ITransactionContext, IUnitOfWork } from "monolite-dat
 import { container as rootContainer, registerInstance } from "../container.js";
 import type { DependencyContainer } from "../container.js";
 import { createPersistenceLayer } from "../repository.factory.js";
+import { publishReadiness } from "./readiness.js";
 import type {
   AnyEntityRegistration,
   PersistenceLayer,
@@ -15,7 +16,6 @@ import {
   auditTrailToken,
   healthProbeToken,
   storeToken,
-  TOKENS,
   transactionContextToken,
   unitOfWorkToken,
 } from "../tokens.js";
@@ -201,7 +201,8 @@ export function registerPersistence(options: PersistenceModuleOptions): Persiste
  *
  * With only the unnamed layer it is that layer's own probe, as it always was.
  * With more, one over all of them, which says which store is down instead of
- * one answer for the process.
+ * one answer for the process. The shared cache, once registered, is reported
+ * next to it (`publishReadiness`).
  */
 function registerReadiness(container: DependencyContainer, layers: Map<string, LayerRecord>): void {
   const probes = new Map<string, IHealthProbe>();
@@ -211,11 +212,7 @@ function registerReadiness(container: DependencyContainer, layers: Map<string, L
 
   const only = layers.size === 1 ? layers.get(DEFAULT_LAYER)?.probe : undefined;
 
-  registerInstance<IHealthProbe>(
-    container,
-    TOKENS.IHealthProbe,
-    only ?? new CompositeHealthProbe(probes)
-  );
+  publishReadiness(container, { database: only ?? new CompositeHealthProbe(probes) });
 }
 
 function assertLayerName(name: string, layers: Map<string, LayerRecord>): void {

@@ -492,6 +492,29 @@ describe("health", () => {
     }
   });
 
+  it("reports the cache, and stays ok while a cache that is not required is down", async () => {
+    const app = await start({ healthProbe: probeOf({ ...healthy, cache: "down" }) });
+
+    try {
+      const res = await app.client.get("/health");
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ status: "ok", cache: "down" });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("adds no cache field when no cache was registered", async () => {
+    const app = await start({ healthProbe: probeOf(healthy) });
+
+    try {
+      expect((await app.client.get("/health")).body).not.toHaveProperty("cache");
+    } finally {
+      await app.close();
+    }
+  });
+
   it("adds no layers field for an application with one engine", async () => {
     const app = await start({ healthProbe: probeOf(healthy) });
 

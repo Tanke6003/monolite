@@ -45,6 +45,8 @@ kernel maps them without depending on Zod.
 | `HealthReport`, `IHealthProbe`, `LayerHealth` | Liveness and readiness, kept apart on purpose: a process whose database is down is alive but not ready. |
 | `IConnectionCheck` | The one method the health probe needs from a connection: `authenticate()`. |
 | `HealthProbeOptions` | Configuration for `HealthProbe`. |
+| `CheckTuning` | `ttlMs` and `timeoutMs`, shared by the database and the cache checks. |
+| `CacheHealthOptions` | Configuration for `CacheHealthProbe`: the cache's connection, the tuning, and `required`. |
 | `ICache`, `IncrementOptions`, `CounterValue` | A key-value store with expiry that every replica can share: `get`, `set`, `delete`, `deletePrefix`, `add` (set-if-absent, what a lock and a denylist stand on) and an atomic `increment` (what a rate limit stands on). Values travel as JSON in every implementation. `monolite-data` has the Redis one. |
 
 ### Implementations
@@ -56,6 +58,7 @@ kernel maps them without depending on Zod.
 | `MemoryCache`, `MemoryCacheOptions` | `ICache` in the process — the default. Stores JSON like a shared store would, so a test on it says something about Redis, and sweeps expired keys on write rather than with a timer. Per process, so behind two replicas it is two caches. |
 | `HealthProbe` | `IHealthProbe` with a short result cache and a bounded wait, so probing from several replicas does not become real load and a hung database does not hang the check. It never throws: a failed check *is* the answer. |
 | `CompositeHealthProbe` | One probe over several, keyed by persistence layer. Not ready if any layer's database is down, and `layers` in the report says which. `registerPersistence` builds it when an application has more than one engine. |
+| `CacheHealthProbe` | A database probe with the shared cache reported next to it, as `cache`. A cache that is down is reported and does not make the instance not ready — every replica shares it, so that would turn a cache outage into a full one — unless `required: true`. `registerCache` adds it. |
 
 ## Usage
 

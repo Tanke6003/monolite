@@ -9,7 +9,7 @@
  * loud, that this run verifies no cache.
  */
 import { randomUUID } from "node:crypto";
-import type { ILogger } from "monolite-core";
+import { CacheHealthProbe, HealthProbe, type ILogger } from "monolite-core";
 import { RedisCache } from "monolite-data";
 import { runCacheContract } from "monolite-data/testing";
 
@@ -79,6 +79,33 @@ describeRedis("redis", () => {
 
     it("confirms the connection on authenticate, as warm-up calls it", async () => {
       await expect(open().authenticate()).resolves.toBeUndefined();
+    });
+  });
+
+  describe("in the health probe", () => {
+    const database = () => new HealthProbe({ dataSource: "memory" });
+
+    it("reports a server that answers as up", async () => {
+      const cache = open();
+      const probe = new CacheHealthProbe(database(), { connection: { authenticate: () => cache.ping() } });
+
+      await expect(probe.report()).resolves.toMatchObject({ ready: true, cache: "up" });
+    });
+
+    it("reports a server that is not there as down, within the timeout", async () => {
+      // Nothing listens on port 1. The client keeps trying to reconnect on its
+      // own, so without the probe's timeout this answer would never come.
+      const cache = new RedisCache({ url: "redis://localhost:1" }, logger);
+      const probe = new CacheHealthProbe(database(), {
+        connection: { authenticate: () => cache.ping() },
+        timeoutMs: 200,
+      });
+
+      try {
+        await expect(probe.report()).resolves.toMatchObject({ ready: true, cache: "down" });
+      } finally {
+        await cache.close().catch(() => undefined);
+      }
     });
   });
 });

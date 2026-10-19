@@ -50,7 +50,9 @@ npm run dev
 ```
 
 `GET /health/ready` answers once the database is reachable — `/health` and
-`/health/live` answer too. The OpenAPI document is at `/openapi.json`, generated
+`/health/live` answer too. Readiness reports the cache next to the database
+(`not_applicable` for the in-memory one); a Redis that is down shows as
+`cache: "down"` without taking the instance out of rotation. The OpenAPI document is at `/openapi.json`, generated
 from the route decorators, and the reader chosen at the prompt is mounted over it
 at `/docs`.
 

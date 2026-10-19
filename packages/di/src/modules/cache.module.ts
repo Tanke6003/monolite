@@ -1,11 +1,12 @@
 import { MemoryCache } from "monolite-core";
-import type { ICache, ILogger } from "monolite-core";
+import type { CacheHealthOptions, ICache, ILogger } from "monolite-core";
 import { RedisCache } from "monolite-data";
 import type { RedisCacheConfig } from "monolite-data";
 import { container as rootContainer, registerInstance } from "../container.js";
 import type { DependencyContainer, IManagedConnection } from "../container.js";
 import type { IEnvs } from "../env.js";
 import { TOKENS } from "../tokens.js";
+import { publishReadiness } from "./readiness.js";
 
 export type CacheDriver = "memory" | "redis";
 
@@ -21,6 +22,13 @@ export interface CacheModuleOptions {
   driver?: CacheDriver;
   /** Overrides what the environment says about the Redis server. */
   redis?: RedisCacheConfig;
+  /**
+   * Reports the cache in `/health`, next to the database. On by default; pass
+   * `false` to leave it out, or an object to tune the check's cache and
+   * timeout — and `required: true` for a cache that is down to make the
+   * instance not ready, which by default it does not.
+   */
+  healthProbe?: boolean | Omit<CacheHealthOptions, "connection">;
 }
 
 export interface CacheLayer {
@@ -70,6 +78,16 @@ export function registerCache(options: CacheModuleOptions): CacheLayer {
 
   registerInstance<ICache>(container, TOKENS.ICache, layer.cache);
   logger.info(`Cache: ${layer.driver}`);
+
+  if (options.healthProbe !== false) {
+    const tuning = typeof options.healthProbe === "object" ? options.healthProbe : {};
+    // `ping`, not the connection's `authenticate`, which logs a line every time
+    // it succeeds — every few seconds under a load balancer.
+    const redis = layer.cache instanceof RedisCache ? layer.cache : undefined;
+    const connection = redis && { authenticate: () => redis.ping() };
+
+    publishReadiness(container, { cache: { ...tuning, connection } });
+  }
 
   return layer;
 }
