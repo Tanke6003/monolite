@@ -6,6 +6,13 @@ export interface HealthReport {
   dataSource: string;
   /** `not_applicable` for in-memory, where there is no connection to check. */
   database: "up" | "down" | "not_applicable";
+  /**
+   * The shared cache, when the application registered one: `not_applicable`
+   * for the in-memory cache, which cannot be unreachable. A cache that is down
+   * is reported here without making `ready` false, unless it was declared
+   * required.
+   */
+  cache?: "up" | "down" | "not_applicable";
   /** `true` while the process is draining after receiving SIGTERM. */
   shuttingDown: boolean;
   /**

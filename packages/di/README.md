@@ -80,7 +80,7 @@ dependency.
 | --- | --- |
 | `registerPlugins` | `IEnvs`, `ILogger`, `IRequestContext`, `ITransactionContext` and, if given, `ITokenBLL` and `IFileStorage`. |
 | `registerPersistence` | One store per entity, `IUnitOfWork`, `IAuditTrail`, `IAuditLogStore` and `IHealthProbe`. Each store is wrapped so it joins whatever transaction is open, which is what makes `@Transactional()` true of the repositories a module injects. Returns the whole layer, because the connection is not a dependency: it is a resource of the process. With a `name`, one layer of several engines; see below. |
-| `registerCache` | `ICache`, on the store `CACHE_DRIVER` names: `memory` (the default, in the process) or `redis` (`REDIS_URL`, keys under `REDIS_KEY_PREFIX` or `SERVICE_NAME:`). An unknown driver fails start-up rather than quietly falling back to memory. Returns the layer; hand its `connection` to `manage`. |
+| `registerCache` | `ICache`, on the store `CACHE_DRIVER` names: `memory` (the default, in the process) or `redis` (`REDIS_URL`, keys under `REDIS_KEY_PREFIX` or `SERVICE_NAME:`). An unknown driver fails start-up rather than quietly falling back to memory. Returns the layer; hand its `connection` to `manage`. It also adds `cache` to `TOKENS.IHealthProbe`'s report, whichever of the two modules runs first: reported, not ready-blocking, unless `healthProbe: { required: true }`; `healthProbe: false` leaves it out. |
 | `registerModules` | Every feature module's own bindings, from the one list in `composition/modules.ts`. Order does not matter: tsyringe resolves when somebody asks, not when something is registered. |
 
 ### Modules

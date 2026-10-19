@@ -11,6 +11,23 @@ a minor release. Pin exact versions.
 
 ### Added
 
+- **`/health` reports the cache** (#70). With `CACHE_DRIVER=redis`, an instance
+  that had lost Redis still answered `ready: true`, even though its login
+  limiter refused every attempt. `HealthReport` gains `cache: "up" | "down" |
+  "not_applicable"` — `not_applicable` for the in-memory cache — and readiness
+  pings Redis with the same short cache and timeout as the database check, and
+  without a log line on every probe.
+
+  A cache that is down is reported, not ready-blocking. Every replica shares
+  the server, so taking them all out of rotation would turn a cache outage into
+  a full one, and move traffic nowhere better.
+  `registerCache({ healthProbe: { required: true } })` makes it blocking;
+  `healthProbe: false` leaves it out of the report. `registerCache` and
+  `registerPersistence` can run in either order.
+
+  The field is new in every generated project's `/health` response. A client
+  that rejects unknown fields has to accept it.
+
 - **Signing out, and revoking tokens before they expire** (#68). A JWT stayed
   valid until `exp` whatever happened to it: no logout, no way to cut off a
   stolen token or a disabled account. `ITokenRevocation` in `monolite-auth`, with

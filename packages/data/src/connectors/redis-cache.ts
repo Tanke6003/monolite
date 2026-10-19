@@ -97,9 +97,16 @@ export class RedisCache implements ICache {
    * that cannot be reached stops the start-up instead of the first request.
    */
   async authenticate(): Promise<void> {
-    await this.ready();
-    await this.client.ping();
+    await this.ping();
     this.logger.info("Connection to Redis established successfully.");
+  }
+
+  /**
+   * Checks the server answers, without saying so in the log: the health probe
+   * calls it every few seconds, and `authenticate`'s line would bury the rest.
+   */
+  async ping(): Promise<void> {
+    await (await this.ready()).ping();
   }
 
   async close(): Promise<void> {

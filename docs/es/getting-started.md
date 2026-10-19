@@ -50,7 +50,9 @@ npm run dev
 ```
 
 `GET /health/ready` responde en cuanto la base de datos es alcanzable —`/health` y
-`/health/live` también—. El documento OpenAPI está en `/openapi.json`, generado a
+`/health/live` también—. La readiness reporta el cache junto a la base de datos
+(`not_applicable` para el que vive en memoria); un Redis caído aparece como
+`cache: "down"` sin sacar la instancia de rotación. El documento OpenAPI está en `/openapi.json`, generado a
 partir de los decoradores de ruta, y encima se monta en `/docs` el lector que hayas
 elegido en el asistente.
 

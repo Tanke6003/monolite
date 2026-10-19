@@ -277,6 +277,12 @@ the second — restarting does not fix someone else's database.
   draining, and they publish the resolved `apiPrefix` so a client can discover
   where the API is mounted instead of assuming it.
 
+With a shared cache registered, the report carries `cache: "up" | "down" |
+"not_applicable"` too. A cache that is down leaves the status `ok`: every replica
+talks to the same Redis, so taking them out of rotation would only turn a cache
+outage into a full one. `registerCache({ healthProbe: { required: true } })` is
+for an application where nothing useful works without it.
+
 ## What it exports
 
 Every name `monolite-http` exports, grouped by what you would be reaching for.

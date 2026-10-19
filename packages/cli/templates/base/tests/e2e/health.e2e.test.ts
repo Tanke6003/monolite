@@ -28,6 +28,8 @@ describe("health and the shape of a failure", () => {
     expect(response.body).toMatchObject({
       status: "ok",
       dataSource: "memory",
+      // The in-memory cache lives in the process and cannot be unreachable.
+      cache: "not_applicable",
       // Published rather than assumed: `API_PREFIX` is configurable, so a
       // client discovers where this instance serves instead of guessing.
       apiPrefix: API || "/",

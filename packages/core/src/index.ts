@@ -58,8 +58,11 @@ export { AsyncRequestContext, SYSTEM_USER } from "./context/async-request-contex
 
 export { HealthProbe } from "./health/health-probe.js";
 export { CompositeHealthProbe } from "./health/composite-health-probe.js";
+export { CacheHealthProbe } from "./health/cache-health-probe.js";
 
 // Per process. `monolite-data` has the Redis one, behind the same contract.
 export { MemoryCache } from "./cache/memory-cache.js";
 export type { MemoryCacheOptions } from "./cache/memory-cache.js";
-export type { HealthProbeOptions, IConnectionCheck } from "./health/health-probe.js";
+export type { HealthProbeOptions } from "./health/health-probe.js";
+export type { CacheHealthOptions } from "./health/cache-health-probe.js";
+export type { CheckTuning, IConnectionCheck } from "./health/connection-check.js";
